@@ -16,6 +16,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useProjectStore } from "@/lib/stores/project-store";
+import { createShootingDay } from "@/lib/actions/shooting-days";
 
 interface AddShootingDayFormProps {
   projectId: string;
@@ -23,6 +24,7 @@ interface AddShootingDayFormProps {
   onOpenChange: (open: boolean) => void;
   defaultDate?: Date;
   onSuccess?: () => void;
+  useMockData?: boolean; // Flag to use mock data instead of database
 }
 
 export function AddShootingDayForm({
@@ -31,9 +33,11 @@ export function AddShootingDayForm({
   onOpenChange,
   defaultDate,
   onSuccess,
+  useMockData = true, // Default to mock data for now
 }: AddShootingDayFormProps) {
-  const { addShootingDay, getShootingDaysForProject, getScenesForProject } = useProjectStore();
+  const { addShootingDay: addShootingDayToStore, getShootingDaysForProject, getScenesForProject } = useProjectStore();
   const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   const existingDays = getShootingDaysForProject(projectId);
   const scenes = getScenesForProject(projectId);
@@ -64,40 +68,66 @@ export function AddShootingDayForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
     // Calculate next day number
     const nextDayNumber = existingDays.length + 1;
 
-    addShootingDay({
-      projectId,
-      date: formData.date,
-      dayNumber: nextDayNumber,
-      unit: formData.unit,
-      status: formData.status,
-      generalCall: formData.generalCall,
-      wrapTime: formData.wrapTime || undefined,
-      crewCall: formData.crewCall || undefined,
-      talentCall: formData.talentCall || undefined,
-      lunchTime: formData.lunchTime || undefined,
-      scenes: formData.selectedScenes,
-      notes: formData.notes || undefined,
-    });
+    try {
+      if (useMockData) {
+        // Use local store (mock data)
+        addShootingDayToStore({
+          projectId,
+          date: formData.date,
+          dayNumber: nextDayNumber,
+          unit: formData.unit,
+          status: formData.status,
+          generalCall: formData.generalCall,
+          wrapTime: formData.wrapTime || undefined,
+          crewCall: formData.crewCall || undefined,
+          talentCall: formData.talentCall || undefined,
+          lunchTime: formData.lunchTime || undefined,
+          scenes: formData.selectedScenes,
+          notes: formData.notes || undefined,
+        });
+      } else {
+        // Use server action (database)
+        const result = await createShootingDay({
+          projectId,
+          date: formData.date,
+          dayNumber: nextDayNumber,
+          unit: formData.unit,
+          status: formData.status,
+          generalCall: formData.generalCall,
+          estimatedWrap: formData.wrapTime || undefined,
+          scenes: formData.selectedScenes,
+          notes: formData.notes || undefined,
+        });
 
-    setLoading(false);
-    setFormData({
-      date: "",
-      unit: "MAIN",
-      status: "TENTATIVE",
-      generalCall: "07:00",
-      wrapTime: "19:00",
-      crewCall: "06:30",
-      talentCall: "08:00",
-      lunchTime: "12:30",
-      notes: "",
-      selectedScenes: [],
-    });
-    onOpenChange(false);
-    onSuccess?.();
+        if (result.error) {
+          throw new Error(result.error);
+        }
+      }
+
+      setFormData({
+        date: "",
+        unit: "MAIN",
+        status: "TENTATIVE",
+        generalCall: "07:00",
+        wrapTime: "19:00",
+        crewCall: "06:30",
+        talentCall: "08:00",
+        lunchTime: "12:30",
+        notes: "",
+        selectedScenes: [],
+      });
+      onOpenChange(false);
+      onSuccess?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create shooting day");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const toggleScene = (sceneId: string) => {
@@ -337,6 +367,12 @@ export function AddShootingDayForm({
                 rows={2}
               />
             </div>
+
+            {error && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
+                {error}
+              </div>
+            )}
           </DialogBody>
 
           <DialogFooter>

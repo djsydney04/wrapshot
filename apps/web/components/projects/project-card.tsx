@@ -116,11 +116,7 @@ export function ProjectCard({ project, className }: ProjectCardProps) {
 }
 
 // Empty state component
-interface ProjectsEmptyStateProps {
-  onCreateProject?: () => void;
-}
-
-export function ProjectsEmptyState({ onCreateProject }: ProjectsEmptyStateProps) {
+export function ProjectsEmptyState() {
   return (
     <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-12">
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
@@ -130,8 +126,8 @@ export function ProjectsEmptyState({ onCreateProject }: ProjectsEmptyStateProps)
       <p className="mt-1 text-sm text-muted-foreground">
         Create your first project to get started
       </p>
-      <Button className="mt-4" size="sm" onClick={onCreateProject}>
-        Create Project
+      <Button className="mt-4" size="sm" asChild>
+        <Link href="/projects/new">Create Project</Link>
       </Button>
     </div>
   );

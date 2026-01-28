@@ -11,7 +11,7 @@ import {
   isToday,
   parseISO,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, Plus, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { ShootingDay, Scene } from "@/lib/mock-data";
@@ -25,8 +25,8 @@ interface WeekCalendarProps {
   className?: string;
 }
 
-const HOURS = Array.from({ length: 18 }, (_, i) => i + 5); // 5 AM to 10 PM (extended range)
-const HOUR_HEIGHT = 48; // pixels per hour
+const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 6 AM to 9 PM
+const HOUR_HEIGHT = 52; // pixels per hour
 
 export function WeekCalendar({
   shootingDays,
@@ -50,9 +50,9 @@ export function WeekCalendar({
 
   const getEventPosition = (callTime: string) => {
     const [hours, minutes] = callTime.split(":").map(Number);
-    const startHour = 5; // Calendar starts at 5 AM
+    const startHour = 6; // Calendar starts at 6 AM
     const top = ((hours - startHour) * 60 + minutes) * (HOUR_HEIGHT / 60);
-    return top;
+    return Math.max(0, top);
   };
 
   const getEventDuration = (event: ShootingDay) => {
@@ -63,7 +63,7 @@ export function WeekCalendar({
       let startTotal = startHours * 60 + startMinutes;
       let endTotal = endHours * 60 + endMinutes;
 
-      // Handle overnight shoots (wrap time is next day)
+      // Handle overnight shoots
       if (endTotal <= startTotal) {
         endTotal += 24 * 60;
       }
@@ -72,60 +72,39 @@ export function WeekCalendar({
       return (durationMinutes / 60) * HOUR_HEIGHT;
     }
 
-    // Default to 8 hours if no wrap time
-    return 8 * HOUR_HEIGHT;
+    // Default to 10 hours if no wrap time
+    return 10 * HOUR_HEIGHT;
   };
 
-  const formatDuration = (event: ShootingDay) => {
-    const [startHours, startMinutes] = event.generalCall.split(":").map(Number);
-
-    if (event.wrapTime) {
-      const [endHours, endMinutes] = event.wrapTime.split(":").map(Number);
-      let startTotal = startHours * 60 + startMinutes;
-      let endTotal = endHours * 60 + endMinutes;
-
-      if (endTotal <= startTotal) {
-        endTotal += 24 * 60;
-      }
-
-      const durationMinutes = endTotal - startTotal;
-      const hours = Math.floor(durationMinutes / 60);
-      const mins = durationMinutes % 60;
-
-      if (mins === 0) return `${hours}h`;
-      return `${hours}h ${mins}m`;
-    }
-
-    return "~8h";
-  };
-
-  const getStatusColor = (status: ShootingDay["status"]) => {
+  const getEventColor = (status: ShootingDay["status"]) => {
     switch (status) {
       case "COMPLETED":
-        return "bg-green-500/90 border-green-600 hover:bg-green-500";
+        return "bg-emerald-500/90 hover:bg-emerald-500";
       case "CONFIRMED":
-        return "bg-blue-500/90 border-blue-600 hover:bg-blue-500";
+        return "bg-blue-500/90 hover:bg-blue-500";
       case "SCHEDULED":
-        return "bg-yellow-500/90 border-yellow-600 hover:bg-yellow-500";
+        return "bg-amber-500/90 hover:bg-amber-500";
       case "TENTATIVE":
-        return "bg-gray-400/90 border-gray-500 hover:bg-gray-400";
+        return "bg-neutral-400/90 hover:bg-neutral-400";
       case "CANCELLED":
-        return "bg-red-500/90 border-red-600 hover:bg-red-500";
+        return "bg-red-400/90 hover:bg-red-400";
       default:
-        return "bg-gray-400/90 border-gray-500 hover:bg-gray-400";
+        return "bg-neutral-400/90 hover:bg-neutral-400";
     }
   };
 
-  const getSceneCount = (day: ShootingDay) => {
-    return day.scenes.length;
+  const formatTimeRange = (event: ShootingDay) => {
+    const start = event.generalCall;
+    const end = event.wrapTime || "—";
+    return `${start} – ${end}`;
   };
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0">
-        <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-semibold">
             {format(currentWeek, "MMMM yyyy")}
           </h2>
           <span className="text-sm text-muted-foreground">
@@ -135,7 +114,8 @@ export function WeekCalendar({
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="sm"
+            className="h-8 px-2"
             onClick={() => setCurrentWeek((prev) => subWeeks(prev, 1))}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -143,13 +123,15 @@ export function WeekCalendar({
           <Button
             variant="ghost"
             size="sm"
+            className="h-8 px-3 text-sm"
             onClick={() => setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 0 }))}
           >
             Today
           </Button>
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="sm"
+            className="h-8 px-2"
             onClick={() => setCurrentWeek((prev) => addWeeks(prev, 1))}
           >
             <ChevronRight className="h-4 w-4" />
@@ -160,8 +142,8 @@ export function WeekCalendar({
       {/* Calendar Grid */}
       <div className="flex-1 border border-border rounded-lg overflow-hidden flex flex-col min-h-0">
         {/* Day Headers */}
-        <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-border bg-muted/50 flex-shrink-0">
-          <div className="p-2" /> {/* Time column header */}
+        <div className="grid grid-cols-[56px_repeat(7,1fr)] border-b border-border bg-muted/30 flex-shrink-0">
+          <div className="p-2" />
           {weekDays.map((day, index) => {
             const isCurrentDay = isToday(day);
             const events = getDayEvents(day);
@@ -169,25 +151,26 @@ export function WeekCalendar({
               <div
                 key={index}
                 className={cn(
-                  "p-2 text-center border-l border-border",
-                  isCurrentDay && "bg-primary/5"
+                  "py-3 px-2 text-center border-l border-border",
+                  isCurrentDay && "bg-blue-50/50 dark:bg-blue-950/20"
                 )}
               >
-                <div className="text-xs text-muted-foreground uppercase">
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   {format(day, "EEE")}
                 </div>
                 <div
                   className={cn(
-                    "text-lg font-medium mt-0.5",
-                    isCurrentDay &&
-                      "bg-primary text-primary-foreground w-8 h-8 rounded-full flex items-center justify-center mx-auto"
+                    "text-lg font-semibold mt-0.5",
+                    isCurrentDay && "text-blue-600 dark:text-blue-400"
                   )}
                 >
                   {format(day, "d")}
                 </div>
                 {events.length > 0 && (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {events.length} shoot{events.length > 1 ? "s" : ""}
+                  <div className="flex items-center justify-center gap-1 mt-1">
+                    {events.slice(0, 3).map((_, i) => (
+                      <div key={i} className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                    ))}
                   </div>
                 )}
               </div>
@@ -197,18 +180,19 @@ export function WeekCalendar({
 
         {/* Time Grid */}
         <div className="flex-1 overflow-auto">
-          <div className="grid grid-cols-[60px_repeat(7,1fr)]" style={{ minHeight: `${HOURS.length * HOUR_HEIGHT}px` }}>
+          <div
+            className="grid grid-cols-[56px_repeat(7,1fr)] relative"
+            style={{ minHeight: `${HOURS.length * HOUR_HEIGHT}px` }}
+          >
             {/* Time Labels */}
-            <div className="relative">
-              {HOURS.map((hour) => (
+            <div className="relative border-r border-border">
+              {HOURS.map((hour, i) => (
                 <div
                   key={hour}
-                  className="border-b border-border pr-2 text-right"
-                  style={{ height: `${HOUR_HEIGHT}px` }}
+                  className="absolute right-2 -translate-y-1/2 text-[11px] text-muted-foreground"
+                  style={{ top: `${i * HOUR_HEIGHT}px` }}
                 >
-                  <span className="text-xs text-muted-foreground -mt-2 block">
-                    {hour === 12 ? "12 PM" : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
-                  </span>
+                  {hour === 12 ? "12 PM" : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
                 </div>
               ))}
             </div>
@@ -223,42 +207,45 @@ export function WeekCalendar({
                   key={dayIndex}
                   className={cn(
                     "relative border-l border-border",
-                    isCurrentDay && "bg-primary/5"
+                    isCurrentDay && "bg-blue-50/30 dark:bg-blue-950/10"
                   )}
                 >
                   {/* Hour Lines */}
-                  {HOURS.map((hour) => (
+                  {HOURS.map((_, i) => (
                     <div
-                      key={hour}
-                      className="border-b border-border hover:bg-muted/30 transition-colors cursor-pointer group"
-                      style={{ height: `${HOUR_HEIGHT}px` }}
-                      onClick={() => onAddClick?.(day)}
-                    >
-                      <div className="opacity-0 group-hover:opacity-100 flex items-center justify-center h-full transition-opacity">
-                        <Plus className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </div>
+                      key={i}
+                      className="absolute left-0 right-0 border-t border-border/50"
+                      style={{ top: `${i * HOUR_HEIGHT}px` }}
+                    />
                   ))}
+
+                  {/* Click to add overlay */}
+                  <button
+                    className="absolute inset-0 hover:bg-muted/20 transition-colors group"
+                    onClick={() => onAddClick?.(day)}
+                  >
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Plus className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </button>
 
                   {/* Events */}
                   {events.map((event) => {
                     const top = getEventPosition(event.generalCall);
                     const height = getEventDuration(event);
-                    const sceneCount = getSceneCount(event);
-                    const duration = formatDuration(event);
 
                     return (
-                      <div
+                      <button
                         key={event.id}
                         className={cn(
-                          "absolute left-1 right-1 rounded-md px-2 py-1.5 text-white text-xs cursor-pointer",
-                          "border-l-4 shadow-sm transition-all overflow-hidden",
-                          getStatusColor(event.status)
+                          "absolute left-1 right-1 rounded-lg px-2.5 py-2 text-white text-left cursor-pointer z-10",
+                          "transition-all shadow-sm",
+                          getEventColor(event.status)
                         )}
                         style={{
                           top: `${top}px`,
                           height: `${Math.max(height, HOUR_HEIGHT)}px`,
-                          minHeight: `${HOUR_HEIGHT}px`,
+                          minHeight: "48px",
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -266,62 +253,33 @@ export function WeekCalendar({
                         }}
                       >
                         <div className="font-semibold text-sm">Day {event.dayNumber}</div>
-                        <div className="opacity-90 flex items-center gap-1 mt-0.5">
-                          <span>{event.generalCall}</span>
-                          {event.wrapTime && (
-                            <>
-                              <span>—</span>
-                              <span>{event.wrapTime}</span>
-                            </>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1 text-[11px] opacity-80">
-                          <span>{event.unit}</span>
-                          {sceneCount > 0 && (
-                            <>
-                              <span>•</span>
-                              <span>{sceneCount} scene{sceneCount > 1 ? "s" : ""}</span>
-                            </>
-                          )}
+                        <div className="text-xs opacity-90 mt-0.5">
+                          {formatTimeRange(event)}
                         </div>
                         {height >= HOUR_HEIGHT * 2 && (
-                          <div className="flex items-center gap-1 mt-1 text-[11px] opacity-70">
-                            <Clock className="h-3 w-3" />
-                            <span>{duration}</span>
-                          </div>
+                          <>
+                            <div className="text-xs opacity-80 mt-1">
+                              {event.unit} Unit
+                            </div>
+                            {event.scenes.length > 0 && (
+                              <div className="text-xs opacity-70 mt-0.5">
+                                {event.scenes.length} scene{event.scenes.length !== 1 ? "s" : ""}
+                              </div>
+                            )}
+                          </>
                         )}
-                        {event.notes && height >= HOUR_HEIGHT * 3 && (
-                          <div className="mt-2 text-[11px] opacity-70 line-clamp-2">
+                        {height >= HOUR_HEIGHT * 4 && event.notes && (
+                          <div className="text-[11px] opacity-60 mt-2 line-clamp-2">
                             {event.notes}
                           </div>
                         )}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
               );
             })}
           </div>
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground flex-shrink-0">
-        <div className="flex items-center gap-1.5">
-          <div className="h-2.5 w-2.5 rounded-sm bg-green-500" />
-          <span>Completed</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="h-2.5 w-2.5 rounded-sm bg-blue-500" />
-          <span>Confirmed</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="h-2.5 w-2.5 rounded-sm bg-yellow-500" />
-          <span>Scheduled</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="h-2.5 w-2.5 rounded-sm bg-gray-400" />
-          <span>Tentative</span>
         </div>
       </div>
     </div>

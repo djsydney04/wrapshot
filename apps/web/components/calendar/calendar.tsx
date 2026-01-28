@@ -22,6 +22,7 @@ import type { ShootingDay } from "@/lib/mock-data";
 interface CalendarProps {
   shootingDays: ShootingDay[];
   onDayClick?: (date: Date, events: ShootingDay[]) => void;
+  onAddClick?: (date: Date) => void;
   selectedDate?: Date;
   className?: string;
 }
@@ -29,6 +30,7 @@ interface CalendarProps {
 export function Calendar({
   shootingDays,
   onDayClick,
+  onAddClick,
   selectedDate,
   className,
 }: CalendarProps) {
@@ -36,8 +38,8 @@ export function Calendar({
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
-  const calendarStart = startOfWeek(monthStart);
-  const calendarEnd = endOfWeek(monthEnd);
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
 
   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
@@ -47,34 +49,35 @@ export function Calendar({
     );
   };
 
-  const getStatusColor = (status: ShootingDay["status"]) => {
+  const getEventColor = (status: ShootingDay["status"]) => {
     switch (status) {
       case "COMPLETED":
-        return "bg-green-500";
+        return "bg-emerald-500";
       case "CONFIRMED":
         return "bg-blue-500";
       case "SCHEDULED":
-        return "bg-yellow-500";
+        return "bg-amber-500";
       case "TENTATIVE":
-        return "bg-gray-400";
+        return "bg-neutral-400";
       case "CANCELLED":
-        return "bg-red-500";
+        return "bg-red-400 line-through";
       default:
-        return "bg-gray-400";
+        return "bg-neutral-400";
     }
   };
 
   return (
-    <div className={cn("", className)}>
+    <div className={cn("flex flex-col h-full", className)}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-semibold">
           {format(currentMonth, "MMMM yyyy")}
         </h2>
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="sm"
+            className="h-8 px-2"
             onClick={() => setCurrentMonth((prev) => subMonths(prev, 1))}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -82,13 +85,15 @@ export function Calendar({
           <Button
             variant="ghost"
             size="sm"
+            className="h-8 px-3 text-sm"
             onClick={() => setCurrentMonth(new Date())}
           >
             Today
           </Button>
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="sm"
+            className="h-8 px-2"
             onClick={() => setCurrentMonth((prev) => addMonths(prev, 1))}
           >
             <ChevronRight className="h-4 w-4" />
@@ -97,13 +102,13 @@ export function Calendar({
       </div>
 
       {/* Calendar Grid */}
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0">
         {/* Day Headers */}
-        <div className="grid grid-cols-7 border-b border-border bg-muted/50">
+        <div className="grid grid-cols-7 mb-2">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
             <div
               key={day}
-              className="px-2 py-2 text-center text-xs font-medium text-muted-foreground"
+              className="px-2 py-1.5 text-center text-xs font-medium text-muted-foreground"
             >
               {day}
             </div>
@@ -111,7 +116,7 @@ export function Calendar({
         </div>
 
         {/* Calendar Days */}
-        <div className="grid grid-cols-7">
+        <div className="grid grid-cols-7 flex-1 border-t border-l border-border rounded-lg overflow-hidden">
           {days.map((day, index) => {
             const events = getDayEvents(day);
             const isCurrentMonth = isSameMonth(day, currentMonth);
@@ -121,40 +126,45 @@ export function Calendar({
             return (
               <button
                 key={index}
-                onClick={() => onDayClick?.(day, events)}
+                onClick={() => {
+                  if (events.length > 0) {
+                    onDayClick?.(day, events);
+                  } else {
+                    onAddClick?.(day);
+                  }
+                }}
                 className={cn(
                   "relative min-h-[100px] p-2 text-left border-b border-r border-border transition-colors",
-                  "hover:bg-[hsl(var(--notion-hover))]",
-                  !isCurrentMonth && "bg-muted/30",
-                  isSelected && "bg-[hsl(var(--notion-hover-strong))]",
-                  index % 7 === 6 && "border-r-0"
+                  "hover:bg-muted/40",
+                  !isCurrentMonth && "bg-muted/20",
+                  isSelected && "bg-muted/60"
                 )}
               >
                 <span
                   className={cn(
                     "inline-flex h-6 w-6 items-center justify-center rounded-full text-sm",
-                    !isCurrentMonth && "text-muted-foreground",
-                    isCurrentDay && "bg-primary text-primary-foreground font-medium"
+                    !isCurrentMonth && "text-muted-foreground/60",
+                    isCurrentDay && "bg-foreground text-background font-medium"
                   )}
                 >
                   {format(day, "d")}
                 </span>
 
                 {/* Events */}
-                <div className="mt-1 space-y-1">
+                <div className="mt-1 space-y-0.5">
                   {events.slice(0, 3).map((event) => (
                     <div
                       key={event.id}
                       className={cn(
-                        "rounded px-1.5 py-0.5 text-xs text-white truncate",
-                        getStatusColor(event.status)
+                        "rounded px-1.5 py-0.5 text-[11px] text-white font-medium truncate",
+                        getEventColor(event.status)
                       )}
                     >
-                      Day {event.dayNumber} • {event.generalCall}
+                      Day {event.dayNumber}
                     </div>
                   ))}
                   {events.length > 3 && (
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-[10px] text-muted-foreground pl-1">
                       +{events.length - 3} more
                     </div>
                   )}
@@ -162,26 +172,6 @@ export function Calendar({
               </button>
             );
           })}
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
-        <div className="flex items-center gap-1.5">
-          <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
-          <span>Completed</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-          <span>Confirmed</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="h-2.5 w-2.5 rounded-full bg-yellow-500" />
-          <span>Scheduled</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="h-2.5 w-2.5 rounded-full bg-gray-400" />
-          <span>Tentative</span>
         </div>
       </div>
     </div>

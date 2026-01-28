@@ -21,8 +21,9 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members  OrganizationMember[]
-  projects Project[]
+  members      OrganizationMember[]
+  projects     Project[]
+  subscription Subscription?
 }
 
 model OrganizationMember {
@@ -67,6 +68,7 @@ model Project {
   elements     Element[]
   callSheets   CallSheet[]
   members      ProjectMember[]
+  invites      ProjectInvite[]
 }
 
 enum ProjectStatus {
@@ -453,4 +455,55 @@ model Department {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, name])
+}
+
+// ============== BILLING & SUBSCRIPTIONS ==============
+
+model Subscription {
+  id                     String             @id @default(cuid())
+  organizationId         String             @unique
+  stripeCustomerId       String             @unique
+  stripeSubscriptionId   String?            @unique
+  stripePriceId          String?
+  stripeCurrentPeriodEnd DateTime?
+  status                 SubscriptionStatus @default(TRIALING)
+  plan                   PlanType           @default(FREE)
+  cancelAtPeriodEnd      Boolean            @default(false)
+  trialEndsAt            DateTime?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  UNPAID
+}
+
+enum PlanType {
+  FREE
+  PRO
+  STUDIO
+}
+
+// ============== PROJECT INVITES ==============
+
+model ProjectInvite {
+  id        String      @id @default(cuid())
+  projectId String
+  email     String
+  role      ProjectRole @default(VIEWER)
+  token     String      @unique @default(cuid())
+  expiresAt DateTime
+  createdAt DateTime    @default(now())
+  createdBy String      // userId who created the invite
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, email])
+  @@index([token])
 }

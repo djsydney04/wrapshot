@@ -1,39 +1,34 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Header } from "@/components/layout/header";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  User,
-  Bell,
-  Shield,
-  CreditCard,
-  Users,
-  Building2,
   Check,
-  ChevronRight,
+  CreditCard,
   Download,
   Zap,
   Sparkles,
   Crown,
+  Loader2,
+  AlertCircle,
+  CheckCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const settingsNav = [
-  { label: "Profile", href: "/settings", icon: User, description: "Your personal info" },
-  { label: "Organization", href: "/settings/organization", icon: Building2, description: "Company settings" },
-  { label: "Team", href: "/settings/team", icon: Users, description: "Manage members" },
-  { label: "Notifications", href: "/settings/notifications", icon: Bell, description: "Alert preferences" },
-  { label: "Billing", href: "/settings/billing", icon: CreditCard, description: "Plans & invoices" },
-  { label: "Security", href: "/settings/security", icon: Shield, description: "Password & 2FA" },
-];
+import {
+  SettingsLayout,
+  SettingsCard,
+  SettingsCardHeader,
+  SettingsCardBody,
+} from "@/components/layout/settings-layout";
+import { BillingGate, NoAccess } from "@/components/ui/permission-gate";
+import { useSubscription } from "@/lib/hooks/use-permissions";
+import { useAuth } from "@/components/providers/auth-provider";
 
 const plans = [
   {
-    id: "free",
+    id: "FREE",
     name: "Free",
     price: "$0",
     description: "For individuals getting started",
@@ -43,241 +38,363 @@ const plans = [
     bg: "bg-muted",
   },
   {
-    id: "pro",
+    id: "PRO",
     name: "Pro",
     price: "$29",
     description: "For growing production teams",
     features: ["Unlimited projects", "25 team members", "Advanced scheduling", "Call sheet generation", "30-day history"],
     icon: Sparkles,
-    color: "text-accent-blue",
-    bg: "bg-accent-blue-soft",
+    color: "text-blue-600",
+    bg: "bg-blue-50",
     popular: true,
   },
   {
-    id: "studio",
+    id: "STUDIO",
     name: "Studio",
     price: "$99",
     description: "For large productions",
     features: ["Everything in Pro", "Unlimited team members", "Priority support", "Custom integrations", "Unlimited history", "API access"],
     icon: Crown,
-    color: "text-accent-amber",
-    bg: "bg-accent-amber-soft",
+    color: "text-amber-600",
+    bg: "bg-amber-50",
   },
 ];
 
-const invoices = [
-  { id: "INV-001", date: "Jan 1, 2025", amount: "$29.00", status: "Paid" },
-  { id: "INV-002", date: "Dec 1, 2024", amount: "$29.00", status: "Paid" },
-  { id: "INV-003", date: "Nov 1, 2024", amount: "$29.00", status: "Paid" },
-];
+function BillingContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { currentOrg } = useAuth();
+  const subscription = useSubscription();
+  const currentPlan = subscription?.plan ?? "FREE";
 
-export default function BillingSettingsPage() {
-  const pathname = usePathname();
-  const currentPlan = "pro";
+  const [loadingPlan, setLoadingPlan] = React.useState<string | null>(null);
+  const [loadingPortal, setLoadingPortal] = React.useState(false);
+  const [message, setMessage] = React.useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Check for success/cancel from Stripe redirect
+  React.useEffect(() => {
+    const success = searchParams.get("success");
+    const canceled = searchParams.get("canceled");
+
+    if (success === "true") {
+      setMessage({ type: "success", text: "Your subscription has been updated!" });
+      // Clear the URL params
+      router.replace("/settings/billing");
+    } else if (canceled === "true") {
+      setMessage({ type: "error", text: "Checkout was canceled." });
+      router.replace("/settings/billing");
+    }
+  }, [searchParams, router]);
+
+  const handleUpgrade = async (planId: string) => {
+    if (!currentOrg?.id) return;
+
+    setLoadingPlan(planId);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/billing/create-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planId,
+          organizationId: currentOrg.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create checkout session");
+      }
+
+      // Redirect to Stripe checkout
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error("Error upgrading:", error);
+      setMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Failed to start upgrade process",
+      });
+      setLoadingPlan(null);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    if (!currentOrg?.id) return;
+
+    setLoadingPortal(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/billing/create-portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId: currentOrg.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create portal session");
+      }
+
+      // Redirect to Stripe customer portal
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error("Error opening portal:", error);
+      setMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Failed to open billing portal",
+      });
+      setLoadingPortal(false);
+    }
+  };
+
+  const getTrialDaysLeft = () => {
+    if (subscription?.status !== "TRIALING" || !subscription?.stripeCurrentPeriodEnd) {
+      return null;
+    }
+    const endDate = new Date(subscription.stripeCurrentPeriodEnd);
+    const now = new Date();
+    const diffTime = endDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(0, diffDays);
+  };
+
+  const trialDaysLeft = getTrialDaysLeft();
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Ambient background */}
-      <div className="fixed inset-0 gradient-mesh opacity-50 pointer-events-none" />
-      <div className="grain-page" />
+    <>
+      {/* Status Message */}
+      {message && (
+        <div
+          className={cn(
+            "flex items-center gap-2 p-3 rounded-lg mb-4",
+            message.type === "success"
+              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+              : "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+          )}
+        >
+          {message.type === "success" ? (
+            <CheckCircle className="h-4 w-4" />
+          ) : (
+            <AlertCircle className="h-4 w-4" />
+          )}
+          <span className="text-sm">{message.text}</span>
+        </div>
+      )}
 
-      <Header breadcrumbs={[{ label: "Settings" }, { label: "Billing" }]} />
-
-      <div className="flex-1 overflow-auto relative">
-        <div className="mx-auto max-w-5xl px-6 py-10">
-          <div className="flex gap-12">
-            {/* Sidebar Nav */}
-            <nav className="w-56 shrink-0">
-              <div className="sticky top-6 space-y-1">
-                {settingsNav.map((item) => {
-                  const isActive = pathname === item.href;
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "group flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-200",
-                        isActive
-                          ? "bg-accent-blue-soft shadow-soft"
-                          : "hover:bg-muted/60"
-                      )}
-                    >
-                      <div className={cn(
-                        "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
-                        isActive
-                          ? "bg-accent-blue text-white"
-                          : "bg-muted text-muted-foreground group-hover:bg-muted-foreground/10"
-                      )}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={cn(
-                          "text-sm font-medium",
-                          isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
-                        )}>
-                          {item.label}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {item.description}
-                        </p>
-                      </div>
-                      <ChevronRight className={cn(
-                        "h-4 w-4 text-muted-foreground/50 transition-transform",
-                        isActive && "text-accent-blue"
-                      )} />
-                    </Link>
-                  );
-                })}
+      {/* Current Plan */}
+      <SettingsCard>
+        <SettingsCardBody>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                "flex h-10 w-10 items-center justify-center rounded-lg",
+                currentPlan === "STUDIO" ? "bg-amber-50" : currentPlan === "PRO" ? "bg-blue-50" : "bg-muted"
+              )}>
+                {currentPlan === "STUDIO" ? (
+                  <Crown className="h-5 w-5 text-amber-600" />
+                ) : currentPlan === "PRO" ? (
+                  <Sparkles className="h-5 w-5 text-blue-600" />
+                ) : (
+                  <Zap className="h-5 w-5 text-muted-foreground" />
+                )}
               </div>
-            </nav>
-
-            {/* Content */}
-            <div className="flex-1 min-w-0 space-y-8">
-              {/* Header */}
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight">Billing</h1>
-                <p className="text-muted-foreground mt-1">
-                  Manage your subscription and payment methods
+                <div className="flex items-center gap-2">
+                  <h3 className="font-medium">
+                    {plans.find(p => p.id === currentPlan)?.name ?? "Free"} Plan
+                  </h3>
+                  {subscription?.status === "TRIALING" && trialDaysLeft !== null && (
+                    <Badge variant="secondary" className="bg-amber-50 text-amber-600 border-0">
+                      {trialDaysLeft} days left in trial
+                    </Badge>
+                  )}
+                  {subscription?.cancelAtPeriodEnd && (
+                    <Badge variant="secondary" className="bg-red-50 text-red-600 border-0">
+                      Canceling
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {currentPlan === "FREE"
+                    ? "Upgrade to unlock more features"
+                    : `$${currentPlan === "PRO" ? "29" : "99"}/month`}
                 </p>
               </div>
-
-              {/* Current Plan */}
-              <div className="card-premium p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent-blue-soft">
-                      <Sparkles className="h-6 w-6 text-accent-blue" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold">Pro Plan</h3>
-                        <Badge variant="secondary" className="bg-accent-blue-soft text-accent-blue border-0">
-                          Current
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">$29/month · Renews Feb 1, 2025</p>
-                    </div>
-                  </div>
-                  <Button variant="outline" className="rounded-xl">Manage Subscription</Button>
-                </div>
-              </div>
-
-              {/* Plans */}
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Plans</h2>
-                <div className="grid md:grid-cols-3 gap-4">
-                  {plans.map((plan) => {
-                    const Icon = plan.icon;
-                    const isCurrent = plan.id === currentPlan;
-                    return (
-                      <div
-                        key={plan.id}
-                        className={cn(
-                          "relative p-6 rounded-2xl border-2 transition-all",
-                          isCurrent
-                            ? "border-accent-blue bg-accent-blue-soft/30"
-                            : "border-border/50 bg-card hover:border-muted-foreground/30"
-                        )}
-                      >
-                        {plan.popular && (
-                          <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-accent-blue text-white">
-                              Most Popular
-                            </span>
-                          </div>
-                        )}
-
-                        <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl mb-4", plan.bg)}>
-                          <Icon className={cn("h-5 w-5", plan.color)} />
-                        </div>
-
-                        <h3 className="font-semibold">{plan.name}</h3>
-                        <div className="mt-1 mb-2">
-                          <span className="text-2xl font-bold">{plan.price}</span>
-                          <span className="text-muted-foreground">/month</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-4">{plan.description}</p>
-
-                        <ul className="space-y-2 mb-6">
-                          {plan.features.map((feature) => (
-                            <li key={feature} className="flex items-center gap-2 text-sm">
-                              <Check className="h-4 w-4 text-accent-emerald" />
-                              {feature}
-                            </li>
-                          ))}
-                        </ul>
-
-                        <Button
-                          variant={isCurrent ? "outline" : "default"}
-                          className="w-full rounded-xl"
-                          disabled={isCurrent}
-                        >
-                          {isCurrent ? "Current Plan" : "Upgrade"}
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Payment Method */}
-              <div className="card-premium">
-                <div className="p-6 border-b border-border/50">
-                  <h2 className="font-semibold">Payment Method</h2>
-                  <p className="text-sm text-muted-foreground mt-0.5">Manage your payment details</p>
-                </div>
-                <div className="p-6">
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-muted/50">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-card border border-border">
-                        <CreditCard className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="font-medium">•••• •••• •••• 4242</p>
-                        <p className="text-sm text-muted-foreground">Expires 12/25</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm">Update</Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Billing History */}
-              <div className="card-premium">
-                <div className="p-6 border-b border-border/50">
-                  <h2 className="font-semibold">Billing History</h2>
-                  <p className="text-sm text-muted-foreground mt-0.5">Download past invoices</p>
-                </div>
-                <div className="divide-y divide-border/50">
-                  {invoices.map((invoice) => (
-                    <div key={invoice.id} className="flex items-center justify-between p-4">
-                      <div className="flex items-center gap-4">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                          <CreditCard className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{invoice.id}</p>
-                          <p className="text-sm text-muted-foreground">{invoice.date}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="font-medium">{invoice.amount}</span>
-                        <Badge variant="secondary" className="bg-accent-emerald-soft text-accent-emerald border-0">
-                          {invoice.status}
-                        </Badge>
-                        <Button variant="ghost" size="icon-sm">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
+            {subscription?.stripeSubscriptionId && (
+              <Button
+                variant="outline"
+                onClick={handleManageSubscription}
+                disabled={loadingPortal}
+              >
+                {loadingPortal && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Manage Subscription
+              </Button>
+            )}
           </div>
+        </SettingsCardBody>
+      </SettingsCard>
+
+      {/* Plans */}
+      <div>
+        <h2 className="text-sm font-medium mb-3">Plans</h2>
+        <div className="grid md:grid-cols-3 gap-3">
+          {plans.map((plan) => {
+            const Icon = plan.icon;
+            const isCurrent = plan.id === currentPlan;
+            const isUpgrade =
+              (currentPlan === "FREE" && (plan.id === "PRO" || plan.id === "STUDIO")) ||
+              (currentPlan === "PRO" && plan.id === "STUDIO");
+            const isDowngrade =
+              (currentPlan === "STUDIO" && (plan.id === "PRO" || plan.id === "FREE")) ||
+              (currentPlan === "PRO" && plan.id === "FREE");
+            const isLoading = loadingPlan === plan.id;
+
+            return (
+              <div
+                key={plan.id}
+                className={cn(
+                  "relative p-5 rounded-xl border-2 transition-all",
+                  isCurrent
+                    ? "border-foreground bg-muted/30"
+                    : "border-border bg-card hover:border-muted-foreground/30"
+                )}
+              >
+                {plan.popular && !isCurrent && (
+                  <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-foreground text-background">
+                      Popular
+                    </span>
+                  </div>
+                )}
+
+                <div className={cn("flex h-9 w-9 items-center justify-center rounded-lg mb-3", plan.bg)}>
+                  <Icon className={cn("h-4 w-4", plan.color)} />
+                </div>
+
+                <h3 className="font-medium">{plan.name}</h3>
+                <div className="mt-1 mb-2">
+                  <span className="text-xl font-bold">{plan.price}</span>
+                  <span className="text-muted-foreground text-sm">/month</span>
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">{plan.description}</p>
+
+                <ul className="space-y-1.5 mb-4">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-center gap-2 text-sm">
+                      <Check className="h-3.5 w-3.5 text-emerald-600" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+
+                <Button
+                  variant={isCurrent ? "outline" : isUpgrade ? "default" : "outline"}
+                  className="w-full"
+                  disabled={isCurrent || isDowngrade || isLoading}
+                  onClick={() => isUpgrade && handleUpgrade(plan.id)}
+                >
+                  {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  {isCurrent
+                    ? "Current Plan"
+                    : isDowngrade
+                    ? "Manage in Portal"
+                    : "Upgrade"}
+                </Button>
+              </div>
+            );
+          })}
         </div>
       </div>
-    </div>
+
+      {/* Payment Method - Only show if they have a subscription */}
+      {subscription?.stripeSubscriptionId && (
+        <SettingsCard>
+          <SettingsCardHeader
+            title="Payment Method"
+            description="Manage your payment details in the billing portal"
+          />
+          <SettingsCardBody>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-md bg-card border border-border">
+                  <CreditCard className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm">Payment on file</p>
+                  <p className="text-xs text-muted-foreground">
+                    Manage in Stripe billing portal
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleManageSubscription}
+                disabled={loadingPortal}
+              >
+                {loadingPortal ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update"}
+              </Button>
+            </div>
+          </SettingsCardBody>
+        </SettingsCard>
+      )}
+
+      {/* Billing History - Only show if they have a subscription */}
+      {subscription?.stripeSubscriptionId && (
+        <SettingsCard>
+          <SettingsCardHeader
+            title="Billing History"
+            description="View invoices in the billing portal"
+          />
+          <SettingsCardBody>
+            <div className="text-center py-6">
+              <CreditCard className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground mb-3">
+                View and download invoices in the Stripe billing portal
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleManageSubscription}
+                disabled={loadingPortal}
+              >
+                {loadingPortal && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                <Download className="h-4 w-4 mr-2" />
+                View Invoices
+              </Button>
+            </div>
+          </SettingsCardBody>
+        </SettingsCard>
+      )}
+    </>
+  );
+}
+
+export default function BillingSettingsPage() {
+  return (
+    <SettingsLayout
+      title="Billing"
+      description="Manage your subscription and payment methods"
+      breadcrumbs={[{ label: "Settings" }, { label: "Billing" }]}
+    >
+      <BillingGate
+        fallback={<NoAccess message="You don't have permission to access billing settings." />}
+      >
+        <React.Suspense fallback={<div className="animate-pulse bg-muted h-48 rounded-xl" />}>
+          <BillingContent />
+        </React.Suspense>
+      </BillingGate>
+    </SettingsLayout>
   );
 }

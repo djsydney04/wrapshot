@@ -6,12 +6,13 @@ import {
   MoreHorizontal,
   Mail,
   UserPlus,
-  Shield,
-  Camera,
-  Eye,
   Edit,
   Trash2,
   Search,
+  Clock,
+  RefreshCw,
+  X,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,8 +34,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-
-type ProjectRole = "ADMIN" | "COORDINATOR" | "DEPARTMENT_HEAD" | "CREW" | "CAST" | "VIEWER";
+import {
+  getProjectMembers,
+  getProjectInvites,
+  createProjectInvite,
+  updateProjectMemberRole,
+  removeProjectMember,
+  cancelProjectInvite,
+  resendProjectInvite,
+} from "@/lib/actions/project-members";
+import { ProjectEditGate } from "@/components/ui/permission-gate";
+import type { ProjectRole } from "@/lib/permissions";
 
 interface ProjectMember {
   id: string;
@@ -42,67 +52,22 @@ interface ProjectMember {
   name: string;
   email: string;
   role: ProjectRole;
-  department?: string;
+  department?: string | null;
   joinedAt: string;
-  avatarUrl?: string;
+  avatarUrl?: string | null;
+}
+
+interface ProjectInvite {
+  id: string;
+  email: string;
+  role: ProjectRole;
+  expiresAt: string;
+  createdAt: string;
 }
 
 interface TeamSectionProps {
   projectId: string;
 }
-
-const mockProjectMembers: ProjectMember[] = [
-  {
-    id: "pm-1",
-    userId: "user-1",
-    name: "Sofia Laurent",
-    email: "sofia@production.com",
-    role: "ADMIN",
-    joinedAt: "2024-01-15",
-  },
-  {
-    id: "pm-2",
-    userId: "user-2",
-    name: "David Chen",
-    email: "david.chen@studioexec.com",
-    role: "COORDINATOR",
-    joinedAt: "2024-02-20",
-  },
-  {
-    id: "pm-3",
-    userId: "user-3",
-    name: "Jean-Pierre Martin",
-    email: "jp.martin@cinematography.fr",
-    role: "DEPARTMENT_HEAD",
-    department: "Camera",
-    joinedAt: "2024-02-25",
-  },
-  {
-    id: "pm-4",
-    userId: "user-4",
-    name: "Marcus Webb",
-    email: "marcus.webb@production.com",
-    role: "CREW",
-    department: "Direction",
-    joinedAt: "2024-03-01",
-  },
-  {
-    id: "pm-5",
-    userId: "user-5",
-    name: "Michael Chen",
-    email: "michael.chen@agency.com",
-    role: "CAST",
-    joinedAt: "2024-03-05",
-  },
-  {
-    id: "pm-6",
-    userId: "user-6",
-    name: "Client Viewer",
-    email: "client@studio.com",
-    role: "VIEWER",
-    joinedAt: "2024-03-10",
-  },
-];
 
 const roleConfig: Record<
   ProjectRole,
@@ -141,13 +106,39 @@ const roleConfig: Record<
 };
 
 export function TeamSection({ projectId }: TeamSectionProps) {
+  const [members, setMembers] = React.useState<ProjectMember[]>([]);
+  const [invites, setInvites] = React.useState<ProjectInvite[]>([]);
+  const [loading, setLoading] = React.useState(true);
   const [showAddMember, setShowAddMember] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [inviteEmail, setInviteEmail] = React.useState("");
   const [inviteRole, setInviteRole] = React.useState<ProjectRole>("CREW");
   const [inviteDepartment, setInviteDepartment] = React.useState("");
+  const [inviting, setInviting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const filteredMembers = mockProjectMembers.filter(
+  // Fetch members and invites
+  const fetchData = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const [membersData, invitesData] = await Promise.all([
+        getProjectMembers(projectId),
+        getProjectInvites(projectId),
+      ]);
+      setMembers(membersData);
+      setInvites(invitesData);
+    } catch (err) {
+      console.error("Error fetching team data:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId]);
+
+  React.useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const filteredMembers = members.filter(
     (member) =>
       member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       member.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -169,14 +160,72 @@ export function TeamSection({ projectId }: TeamSectionProps) {
     return grouped;
   }, [filteredMembers]);
 
-  const handleInvite = () => {
-    // TODO: Implement invite
-    console.log("Inviting", inviteEmail, "as", inviteRole, "to project", projectId);
-    setShowAddMember(false);
-    setInviteEmail("");
-    setInviteRole("CREW");
-    setInviteDepartment("");
+  const handleInvite = async () => {
+    setInviting(true);
+    setError(null);
+
+    try {
+      await createProjectInvite(
+        projectId,
+        inviteEmail,
+        inviteRole,
+        inviteDepartment || undefined
+      );
+      setShowAddMember(false);
+      setInviteEmail("");
+      setInviteRole("CREW");
+      setInviteDepartment("");
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send invite");
+    } finally {
+      setInviting(false);
+    }
   };
+
+  const handleRemoveMember = async (memberId: string) => {
+    try {
+      await removeProjectMember(projectId, memberId);
+      fetchData();
+    } catch (err) {
+      console.error("Error removing member:", err);
+    }
+  };
+
+  const handleRoleChange = async (memberId: string, newRole: ProjectRole) => {
+    try {
+      await updateProjectMemberRole(projectId, memberId, newRole);
+      fetchData();
+    } catch (err) {
+      console.error("Error updating role:", err);
+    }
+  };
+
+  const handleCancelInvite = async (inviteId: string) => {
+    try {
+      await cancelProjectInvite(projectId, inviteId);
+      fetchData();
+    } catch (err) {
+      console.error("Error canceling invite:", err);
+    }
+  };
+
+  const handleResendInvite = async (inviteId: string) => {
+    try {
+      await resendProjectInvite(projectId, inviteId);
+      fetchData();
+    } catch (err) {
+      console.error("Error resending invite:", err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -193,21 +242,76 @@ export function TeamSection({ projectId }: TeamSectionProps) {
             />
           </div>
           <span className="text-sm text-muted-foreground">
-            {mockProjectMembers.length} members
+            {members.length} members
           </span>
         </div>
 
-        <Button onClick={() => setShowAddMember(true)} className="gap-2">
-          <UserPlus className="h-4 w-4" />
-          Add Member
-        </Button>
+        <ProjectEditGate projectId={projectId}>
+          <Button onClick={() => setShowAddMember(true)} className="gap-2">
+            <UserPlus className="h-4 w-4" />
+            Add Member
+          </Button>
+        </ProjectEditGate>
       </div>
+
+      {/* Pending Invites */}
+      {invites.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20">
+              Pending Invites
+            </Badge>
+            <span className="text-sm text-muted-foreground">{invites.length}</span>
+          </div>
+
+          <div className="rounded-lg border border-border divide-y divide-border overflow-hidden">
+            {invites.map((invite) => (
+              <div
+                key={invite.id}
+                className="flex items-center gap-4 p-4 bg-amber-50/50"
+              >
+                <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium">{invite.email}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Invited as {roleConfig[invite.role].label}
+                  </p>
+                </div>
+
+                <ProjectEditGate projectId={projectId}>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleResendInvite(invite.id)}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-1" />
+                      Resend
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={() => handleCancelInvite(invite.id)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </ProjectEditGate>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Members by Role */}
       <div className="space-y-6">
         {(Object.keys(roleConfig) as ProjectRole[]).map((role) => {
-          const members = membersByRole[role];
-          if (members.length === 0) return null;
+          const roleMembers = membersByRole[role];
+          if (roleMembers.length === 0) return null;
 
           const config = roleConfig[role];
 
@@ -218,17 +322,21 @@ export function TeamSection({ projectId }: TeamSectionProps) {
                   {config.label}
                 </Badge>
                 <span className="text-sm text-muted-foreground">
-                  {members.length}
+                  {roleMembers.length}
                 </span>
               </div>
 
               <div className="rounded-lg border border-border divide-y divide-border overflow-hidden">
-                {members.map((member) => (
+                {roleMembers.map((member) => (
                   <div
                     key={member.id}
                     className="flex items-center gap-4 p-4 bg-card hover:bg-muted/30 transition-colors"
                   >
-                    <Avatar alt={member.name} size="md" />
+                    <Avatar
+                      alt={member.name}
+                      src={member.avatarUrl ?? undefined}
+                      size="md"
+                    />
 
                     <div className="flex-1 min-w-0">
                       <p className="font-medium">{member.name}</p>
@@ -241,28 +349,33 @@ export function TeamSection({ projectId }: TeamSectionProps) {
                       <Badge variant="secondary">{member.department}</Badge>
                     )}
 
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon-sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Change Role
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Mail className="h-4 w-4 mr-2" />
-                          Send Message
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Remove from Project
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <ProjectEditGate projectId={projectId}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon-sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Change Role
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Mail className="h-4 w-4 mr-2" />
+                            Send Message
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleRemoveMember(member.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Remove from Project
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </ProjectEditGate>
                   </div>
                 ))}
               </div>
@@ -271,7 +384,7 @@ export function TeamSection({ projectId }: TeamSectionProps) {
         })}
       </div>
 
-      {filteredMembers.length === 0 && (
+      {filteredMembers.length === 0 && !loading && (
         <div className="text-center py-12 text-muted-foreground">
           <p>No team members found</p>
         </div>
@@ -288,6 +401,12 @@ export function TeamSection({ projectId }: TeamSectionProps) {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {error && (
+              <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+                {error}
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="memberEmail">Email Address</Label>
               <Input
@@ -352,8 +471,16 @@ export function TeamSection({ projectId }: TeamSectionProps) {
             <Button variant="outline" onClick={() => setShowAddMember(false)}>
               Cancel
             </Button>
-            <Button onClick={handleInvite} disabled={!inviteEmail} className="gap-2">
-              <Mail className="h-4 w-4" />
+            <Button
+              onClick={handleInvite}
+              disabled={!inviteEmail || inviting}
+              className="gap-2"
+            >
+              {inviting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Mail className="h-4 w-4" />
+              )}
               Send Invite
             </Button>
           </div>

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { StoreProvider } from "@/components/providers/store-provider";
+import { AuthProvider } from "@/components/providers/auth-provider";
 
 export default async function AppLayout({
   children,
@@ -19,9 +20,11 @@ export default async function AppLayout({
 
   return (
     <StoreProvider>
-      <AppShell user={{ email: user.email }}>
-        {children}
-      </AppShell>
+      <AuthProvider>
+        <AppShell user={{ email: user.email }}>
+          {children}
+        </AppShell>
+      </AuthProvider>
     </StoreProvider>
   );
 }

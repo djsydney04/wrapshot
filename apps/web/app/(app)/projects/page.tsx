@@ -1,15 +1,14 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ProjectCard, ProjectsEmptyState } from "@/components/projects/project-card";
-import { AddProjectForm } from "@/components/forms/add-project-form";
 import { useProjectStore } from "@/lib/stores/project-store";
 import { Plus } from "lucide-react";
 
 export default function ProjectsPage() {
-  const [showAddProject, setShowAddProject] = React.useState(false);
   const { projects } = useProjectStore();
   const hasProjects = projects.length > 0;
 
@@ -21,9 +20,11 @@ export default function ProjectsPage() {
           { label: "Projects" },
         ]}
         actions={
-          <Button size="sm" className="gap-1" onClick={() => setShowAddProject(true)}>
-            <Plus className="h-4 w-4" />
-            New Project
+          <Button size="sm" className="gap-1" asChild>
+            <Link href="/projects/new">
+              <Plus className="h-4 w-4" />
+              New Project
+            </Link>
           </Button>
         }
       />
@@ -47,12 +48,9 @@ export default function ProjectsPage() {
             ))}
           </div>
         ) : (
-          <ProjectsEmptyState onCreateProject={() => setShowAddProject(true)} />
+          <ProjectsEmptyState />
         )}
       </div>
-
-      {/* Add Project Form */}
-      <AddProjectForm open={showAddProject} onOpenChange={setShowAddProject} />
     </div>
   );
 }

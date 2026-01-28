@@ -17,7 +17,9 @@ import {
   ArrowRight,
   CheckCircle2,
   Circle,
-  Sparkles,
+  FileText,
+  Send,
+  PlayCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -51,7 +53,7 @@ export default function DashboardPage() {
   const totalScenes = scenes.length;
   const completedScenes = scenes.filter((s) => s.status === "COMPLETED").length;
   const scheduledScenes = scenes.filter((s) => s.status === "SCHEDULED").length;
-  const upcomingDaysCount = upcomingDays.length;
+  const pendingScenes = totalScenes - completedScenes - scheduledScenes;
 
   const formatDateShort = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -74,219 +76,254 @@ export default function DashboardPage() {
     const date = new Date(dateStr);
     date.setHours(0, 0, 0, 0);
     const diff = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    if (diff === 0) return "today";
-    if (diff === 1) return "tomorrow";
-    return `in ${diff} days`;
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Tomorrow";
+    return `In ${diff} days`;
   };
 
+  // Quick actions based on current state
+  const quickActions = React.useMemo(() => {
+    const actions = [];
+
+    if (nextShootDay) {
+      actions.push({
+        label: "Generate Call Sheet",
+        description: `For ${nextProject?.name} - Day ${nextShootDay.dayNumber}`,
+        icon: FileText,
+        href: `/projects/${nextShootDay.projectId}/call-sheets`,
+        color: "bg-accent-blue text-white",
+      });
+    }
+
+    if (pendingScenes > 0) {
+      actions.push({
+        label: "Schedule Scenes",
+        description: `${pendingScenes} scenes need scheduling`,
+        icon: Calendar,
+        href: "/schedule",
+        color: "bg-accent-amber text-white",
+      });
+    }
+
+    if (projects.length > 0 && cast.length + crew.length === 0) {
+      actions.push({
+        label: "Add Team Members",
+        description: "Build your cast & crew list",
+        icon: Users,
+        href: "/settings/team",
+        color: "bg-accent-purple text-white",
+      });
+    }
+
+    return actions;
+  }, [nextShootDay, nextProject, pendingScenes, projects.length, cast.length, crew.length]);
+
   return (
-    <div className="flex h-full flex-col">
-      {/* Ambient background */}
-      <div className="fixed inset-0 gradient-mesh opacity-40 pointer-events-none" />
+    <div className="flex h-full flex-col bg-background">
       <div className="grain-page" />
 
       <Header
         breadcrumbs={[{ label: "Dashboard" }]}
         actions={
-          <Button size="sm" className="gap-1.5 rounded-xl" onClick={() => setShowAddProject(true)}>
-            <Plus className="h-4 w-4" />
+          <Button size="sm" onClick={() => setShowAddProject(true)}>
+            <Plus className="h-4 w-4 mr-1.5" />
             New Project
           </Button>
         }
       />
 
-      <div className="flex-1 overflow-auto relative">
-        <div className="mx-auto max-w-5xl px-6 py-10">
+      <div className="flex-1 overflow-auto">
+        <div className="mx-auto max-w-5xl px-6 py-8">
           {projects.length === 0 ? (
-            // Empty state
-            <div className="card-premium">
-              <div className="flex flex-col items-center justify-center py-20 px-8">
-                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-accent-blue-soft to-accent-purple-soft flex items-center justify-center mb-6">
-                  <Film className="h-8 w-8 text-accent-blue" />
+            // Empty state - action oriented
+            <div className="border border-border rounded-xl bg-card">
+              <div className="flex flex-col items-center justify-center py-16 px-8">
+                <div className="h-14 w-14 rounded-xl bg-muted flex items-center justify-center mb-5">
+                  <Film className="h-7 w-7 text-muted-foreground" />
                 </div>
-                <h1 className="text-2xl font-semibold mb-2 text-center">
-                  Welcome to SetSync
+                <h1 className="text-xl font-semibold mb-2">
+                  Start your first project
                 </h1>
-                <p className="text-muted-foreground text-center max-w-sm mb-6">
-                  Production management for filmmakers. Create your first project to begin.
+                <p className="text-muted-foreground text-center max-w-sm mb-6 text-sm">
+                  Create a project to manage scenes, schedules, and call sheets for your production.
                 </p>
-                <Button onClick={() => setShowAddProject(true)} className="gap-2 rounded-xl">
-                  <Plus className="h-4 w-4" />
+                <Button onClick={() => setShowAddProject(true)}>
+                  <Plus className="h-4 w-4 mr-1.5" />
                   Create Project
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="space-y-8">
-              {/* Next Shoot - Hero Card */}
-              {nextShootDay ? (
-                <Link href={`/projects/${nextShootDay.projectId}`} className="block group">
-                  <div className="card-premium p-6 hover:shadow-soft-lg transition-shadow">
-                    <div className="flex items-center gap-2 text-xs font-medium text-accent-emerald mb-4">
-                      <div className="h-2 w-2 rounded-full bg-accent-emerald animate-pulse" />
-                      Next Shoot {getDaysUntil(nextShootDay.date)}
-                    </div>
+            <div className="space-y-6">
+              {/* Page header with context */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-lg font-semibold">
+                    {new Date().toLocaleDateString("en-US", {
+                      weekday: "long",
+                      month: "long",
+                      day: "numeric"
+                    })}
+                  </h1>
+                  <p className="text-sm text-muted-foreground">
+                    {projects.length} project{projects.length !== 1 ? "s" : ""} · {upcomingDays.length} upcoming shoot{upcomingDays.length !== 1 ? "s" : ""}
+                  </p>
+                </div>
+              </div>
 
-                    <div className="flex items-start justify-between gap-6">
-                      <div className="flex items-start gap-5">
-                        {/* Date block */}
-                        <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-accent-blue-soft to-accent-purple-soft flex flex-col items-center justify-center flex-shrink-0">
-                          <span className="text-2xl font-bold leading-none text-foreground">
-                            {new Date(nextShootDay.date).getDate()}
-                          </span>
-                          <span className="text-[10px] uppercase text-muted-foreground mt-1 font-medium">
-                            {new Date(nextShootDay.date).toLocaleDateString("en-US", { month: "short" })}
-                          </span>
+              {/* Quick Actions - only show if there are actions */}
+              {quickActions.length > 0 && (
+                <div className="grid grid-cols-3 gap-3">
+                  {quickActions.map((action, i) => {
+                    const Icon = action.icon;
+                    return (
+                      <Link
+                        key={i}
+                        href={action.href}
+                        className="group flex items-center gap-3 p-4 rounded-xl border border-border bg-card hover:bg-muted/50 transition-colors"
+                      >
+                        <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0", action.color)}>
+                          <Icon className="h-5 w-5" />
                         </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">{action.label}</p>
+                          <p className="text-xs text-muted-foreground truncate">{action.description}</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
 
-                        {/* Details */}
-                        <div>
-                          <h2 className="text-xl font-semibold group-hover:text-accent-blue transition-colors">
-                            {nextProject?.name}
-                          </h2>
-                          <p className="text-muted-foreground mt-1">
-                            Day {nextShootDay.dayNumber} · {nextShootDay.scenes.length} scenes
-                          </p>
-                          <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1.5">
-                              <Clock className="h-4 w-4" />
-                              {nextShootDay.generalCall} call
-                            </span>
-                          </div>
-                        </div>
+              {/* Next Shoot - prominent but grounded */}
+              {nextShootDay && (
+                <div className="border border-border rounded-xl bg-card overflow-hidden">
+                  <div className="p-4 border-b border-border bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-accent-emerald" />
+                        <span className="text-sm font-medium">Next Shoot · {getDaysUntil(nextShootDay.date)}</span>
                       </div>
-
-                      <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-accent-blue group-hover:translate-x-0.5 transition-all flex-shrink-0 mt-2" />
+                      <Link
+                        href={`/projects/${nextShootDay.projectId}`}
+                        className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                      >
+                        View project <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
                     </div>
                   </div>
-                </Link>
-              ) : (
-                <div className="card-premium p-6 border-dashed">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center">
-                        <Calendar className="h-6 w-6 text-muted-foreground" />
+                  <div className="p-5">
+                    <div className="flex items-start gap-5">
+                      {/* Date block */}
+                      <div className="h-16 w-16 rounded-xl bg-muted flex flex-col items-center justify-center flex-shrink-0">
+                        <span className="text-2xl font-bold leading-none">
+                          {new Date(nextShootDay.date).getDate()}
+                        </span>
+                        <span className="text-[10px] uppercase text-muted-foreground mt-1 font-medium">
+                          {new Date(nextShootDay.date).toLocaleDateString("en-US", { month: "short" })}
+                        </span>
                       </div>
-                      <div>
-                        <p className="font-medium">No shoots scheduled</p>
-                        <p className="text-sm text-muted-foreground">Add shooting days to your projects</p>
+
+                      {/* Details */}
+                      <div className="flex-1">
+                        <h2 className="text-lg font-semibold">{nextProject?.name}</h2>
+                        <p className="text-muted-foreground text-sm">
+                          Day {nextShootDay.dayNumber} · {nextShootDay.scenes.length} scene{nextShootDay.scenes.length !== 1 ? "s" : ""}
+                        </p>
+                        <div className="flex items-center gap-4 mt-3">
+                          <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <Clock className="h-4 w-4" />
+                            {nextShootDay.generalCall} call
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Action */}
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/projects/${nextShootDay.projectId}/call-sheets`}>
+                            <FileText className="h-4 w-4 mr-1.5" />
+                            Call Sheet
+                          </Link>
+                        </Button>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" className="rounded-xl" asChild>
-                      <Link href="/schedule">
-                        <Plus className="h-4 w-4 mr-1.5" />
-                        Schedule
-                      </Link>
-                    </Button>
                   </div>
                 </div>
               )}
 
-              {/* Stats Grid */}
-              <div className="grid grid-cols-3 gap-4">
-                {/* Scenes */}
-                <div className="card-premium p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-purple-soft">
-                      <Clapperboard className="h-5 w-5 text-accent-purple" />
+              {/* Stats row - compact and actionable */}
+              <div className="grid grid-cols-4 gap-3">
+                <Link
+                  href="/projects"
+                  className="p-4 rounded-xl border border-border bg-card hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+                      <Film className="h-4.5 w-4.5 text-muted-foreground" />
                     </div>
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Scenes</span>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-2 text-sm">
-                        <CheckCircle2 className="h-4 w-4 text-accent-emerald" />
-                        Wrapped
-                      </span>
-                      <span className="font-semibold">{completedScenes}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-2 text-sm">
-                        <Circle className="h-4 w-4 text-accent-amber" />
-                        Scheduled
-                      </span>
-                      <span className="font-semibold">{scheduledScenes}</span>
+                    <div>
+                      <p className="text-2xl font-semibold leading-none">{projects.length}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Projects</p>
                     </div>
                   </div>
+                </Link>
 
-                  {/* Progress bar */}
-                  <div className="mt-4 pt-4 border-t border-border/50">
-                    <div className="h-2 bg-muted rounded-full overflow-hidden flex">
-                      {totalScenes > 0 && (
-                        <>
-                          <div
-                            className="h-full bg-accent-emerald transition-all"
-                            style={{ width: `${(completedScenes / totalScenes) * 100}%` }}
-                          />
-                          <div
-                            className="h-full bg-accent-amber transition-all"
-                            style={{ width: `${(scheduledScenes / totalScenes) * 100}%` }}
-                          />
-                        </>
-                      )}
+                <Link
+                  href="/schedule"
+                  className="p-4 rounded-xl border border-border bg-card hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+                      <Calendar className="h-4.5 w-4.5 text-muted-foreground" />
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {totalScenes > 0
-                        ? `${Math.round((completedScenes / totalScenes) * 100)}% complete`
-                        : "No scenes yet"
-                      }
-                    </p>
+                    <div>
+                      <p className="text-2xl font-semibold leading-none">{upcomingDays.length}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Shoot Days</p>
+                    </div>
+                  </div>
+                </Link>
+
+                <div className="p-4 rounded-xl border border-border bg-card">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+                      <Clapperboard className="h-4.5 w-4.5 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-semibold leading-none">{completedScenes}<span className="text-muted-foreground text-lg">/{totalScenes}</span></p>
+                      <p className="text-xs text-muted-foreground mt-1">Scenes Wrapped</p>
+                    </div>
                   </div>
                 </div>
 
-                {/* Shoot Days */}
-                <div className="card-premium p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-blue-soft">
-                      <Calendar className="h-5 w-5 text-accent-blue" />
+                <div className="p-4 rounded-xl border border-border bg-card">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+                      <Users className="h-4.5 w-4.5 text-muted-foreground" />
                     </div>
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Schedule</span>
-                  </div>
-
-                  <div className="text-3xl font-bold">{upcomingDaysCount}</div>
-                  <p className="text-sm text-muted-foreground mt-1">upcoming shoot days</p>
-
-                  <Link
-                    href="/schedule"
-                    className="mt-4 pt-4 border-t border-border/50 flex items-center justify-between text-sm hover:text-accent-blue transition-colors group"
-                  >
-                    <span>View calendar</span>
-                    <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
-                  </Link>
-                </div>
-
-                {/* Team */}
-                <div className="card-premium p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-teal-soft">
-                      <Users className="h-5 w-5 text-accent-teal" />
+                    <div>
+                      <p className="text-2xl font-semibold leading-none">{cast.length + crew.length}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Team Members</p>
                     </div>
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Team</span>
-                  </div>
-
-                  <div className="text-3xl font-bold">{cast.length + crew.length}</div>
-                  <p className="text-sm text-muted-foreground mt-1">total members</p>
-
-                  <div className="mt-4 pt-4 border-t border-border/50 flex items-center justify-between text-sm text-muted-foreground">
-                    <span>{cast.length} cast</span>
-                    <span>{crew.length} crew</span>
                   </div>
                 </div>
               </div>
 
-              {/* Projects + Upcoming side by side */}
-              <div className="grid lg:grid-cols-2 gap-6">
-                {/* Projects */}
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-semibold">Projects</h2>
-                    <Link href="/projects" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
-                      View all <ArrowRight className="h-3.5 w-3.5" />
+              {/* Two column layout */}
+              <div className="grid lg:grid-cols-2 gap-4">
+                {/* Projects list */}
+                <div className="border border-border rounded-xl bg-card overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                    <h2 className="font-medium text-sm">Projects</h2>
+                    <Link
+                      href="/projects"
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      View all
                     </Link>
                   </div>
-
-                  <div className="card-premium divide-y divide-border/50">
+                  <div className="divide-y divide-border">
                     {projects.slice(0, 4).map((project) => {
                       const projectScenes = scenes.filter((s) => s.projectId === project.id);
                       const projectCompleted = projectScenes.filter((s) => s.status === "COMPLETED").length;
@@ -298,68 +335,73 @@ export default function DashboardPage() {
                         <Link
                           key={project.id}
                           href={`/projects/${project.id}`}
-                          className="flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
+                          className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
                         >
-                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-accent-blue-soft to-accent-purple-soft flex items-center justify-center flex-shrink-0">
-                            <Film className="h-5 w-5 text-accent-blue" />
+                          <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                            <Film className="h-4 w-4 text-muted-foreground" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{project.name}</p>
+                            <p className="font-medium text-sm truncate">{project.name}</p>
                             <p className="text-xs text-muted-foreground">
-                              {projectScenes.length} scenes · {progress}% wrapped
+                              {projectScenes.length} scenes
                             </p>
                           </div>
-                          <div className="w-16 h-2 bg-muted rounded-full overflow-hidden flex-shrink-0">
-                            <div
-                              className="h-full bg-accent-emerald transition-all"
-                              style={{ width: `${progress}%` }}
-                            />
+                          <div className="flex items-center gap-2">
+                            <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-foreground/60 transition-all"
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-muted-foreground w-8">{progress}%</span>
                           </div>
                         </Link>
                       );
                     })}
 
                     {projects.length === 0 && (
-                      <div className="p-8 text-center text-sm text-muted-foreground">
+                      <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                         No projects yet
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Upcoming Shoots */}
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-semibold">Upcoming Shoots</h2>
-                    <Link href="/schedule" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
-                      Calendar <ArrowRight className="h-3.5 w-3.5" />
+                {/* Upcoming shoots */}
+                <div className="border border-border rounded-xl bg-card overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                    <h2 className="font-medium text-sm">Upcoming Shoots</h2>
+                    <Link
+                      href="/schedule"
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Calendar
                     </Link>
                   </div>
-
-                  <div className="card-premium divide-y divide-border/50">
+                  <div className="divide-y divide-border">
                     {upcomingDays.slice(0, 4).map((day) => {
                       const project = projects.find((p) => p.id === day.projectId);
                       return (
                         <Link
                           key={day.id}
                           href={`/projects/${day.projectId}`}
-                          className="flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
+                          className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
                         >
-                          <div className="h-10 w-10 rounded-xl bg-muted flex flex-col items-center justify-center flex-shrink-0">
-                            <span className="text-sm font-bold leading-none">
+                          <div className="h-8 w-8 rounded-lg bg-muted flex flex-col items-center justify-center flex-shrink-0">
+                            <span className="text-xs font-semibold leading-none">
                               {new Date(day.date).getDate()}
                             </span>
-                            <span className="text-[8px] uppercase text-muted-foreground">
+                            <span className="text-[7px] uppercase text-muted-foreground leading-none mt-0.5">
                               {new Date(day.date).toLocaleDateString("en-US", { month: "short" })}
                             </span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{project?.name}</p>
+                            <p className="font-medium text-sm truncate">{project?.name}</p>
                             <p className="text-xs text-muted-foreground">
-                              Day {day.dayNumber} · {day.scenes.length} scenes · {day.generalCall}
+                              Day {day.dayNumber} · {day.scenes.length} scenes
                             </p>
                           </div>
-                          <span className="text-xs text-muted-foreground flex-shrink-0">
+                          <span className="text-xs text-muted-foreground">
                             {formatDateShort(day.date)}
                           </span>
                         </Link>
@@ -367,8 +409,14 @@ export default function DashboardPage() {
                     })}
 
                     {upcomingDays.length === 0 && (
-                      <div className="p-8 text-center text-sm text-muted-foreground">
-                        No upcoming shoots
+                      <div className="px-4 py-8 text-center">
+                        <p className="text-sm text-muted-foreground mb-3">No shoots scheduled</p>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href="/schedule">
+                            <Plus className="h-3.5 w-3.5 mr-1.5" />
+                            Add shoot day
+                          </Link>
+                        </Button>
                       </div>
                     )}
                   </div>
