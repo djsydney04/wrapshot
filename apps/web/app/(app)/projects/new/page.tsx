@@ -73,10 +73,14 @@ export default function NewProjectPage() {
 
     const newProject = addProject({
       name: name.trim(),
-      description: description.trim() || undefined,
+      description: description.trim() || "",
       status: status as "DEVELOPMENT" | "PRE_PRODUCTION" | "PRODUCTION" | "POST_PRODUCTION" | "COMPLETED",
-      startDate: startDate || undefined,
-      endDate: endDate || undefined,
+      startDate: startDate || new Date().toISOString().split("T")[0],
+      endDate: endDate || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+      scenesCount: 0,
+      shootingDaysCount: 0,
+      castCount: 0,
+      locationsCount: 0,
     });
 
     // Small delay for UX

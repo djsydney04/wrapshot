@@ -12,7 +12,7 @@ interface Organization {
   role: OrgRole;
 }
 
-interface Subscription {
+export interface Subscription {
   plan: "FREE" | "PRO" | "STUDIO";
   status: "TRIALING" | "ACTIVE" | "CANCELED" | "PAST_DUE" | "UNPAID";
   trialEndsAt: string | null;
@@ -66,12 +66,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .eq("userId", userId);
 
     const orgs: Organization[] =
-      orgData?.map((m) => ({
-        id: (m.organization as { id: string }).id,
-        name: (m.organization as { name: string }).name,
-        slug: (m.organization as { slug: string }).slug,
-        role: m.role as OrgRole,
-      })) ?? [];
+      orgData?.map((m) => {
+        const org = m.organization as unknown as { id: string; name: string; slug: string } | null;
+        return {
+          id: org?.id ?? "",
+          name: org?.name ?? "",
+          slug: org?.slug ?? "",
+          role: m.role as OrgRole,
+        };
+      }).filter((o) => o.id) ?? [];
 
     setOrganizations(orgs);
 

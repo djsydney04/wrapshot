@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { StoreProvider } from "@/components/providers/store-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
+import { TourProvider } from "@/components/tour/tour-provider";
 
 export default async function AppLayout({
   children,
@@ -21,9 +22,9 @@ export default async function AppLayout({
   return (
     <StoreProvider>
       <AuthProvider>
-        <AppShell user={{ email: user.email }}>
-          {children}
-        </AppShell>
+        <TourProvider>
+          <AppShell user={{ email: user.email }}>{children}</AppShell>
+        </TourProvider>
       </AuthProvider>
     </StoreProvider>
   );

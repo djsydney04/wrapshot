@@ -60,16 +60,19 @@ export function Sidebar({ user }: SidebarProps) {
       label: "Dashboard",
       href: "/",
       icon: LayoutDashboard,
+      tourId: "dashboard",
     },
     {
       label: "Projects",
       href: "/projects",
       icon: Film,
+      tourId: "projects",
     },
     {
       label: "Schedule",
       href: "/schedule",
       icon: Calendar,
+      tourId: "schedule",
     },
   ];
 
@@ -120,6 +123,7 @@ export function Sidebar({ user }: SidebarProps) {
             variant="ghost"
             className="w-full justify-start gap-2 text-muted-foreground font-normal h-8"
             onClick={openCommandPalette}
+            data-tour="command-palette"
           >
             <Search className="h-4 w-4" />
             <span className="flex-1 text-left">Search</span>
@@ -140,7 +144,7 @@ export function Sidebar({ user }: SidebarProps) {
             if (!sidebarOpen) {
               return (
                 <Tooltip key={item.href} content={item.label} side="right">
-                  <Link href={item.href}>
+                  <Link href={item.href} data-tour={item.tourId}>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -157,7 +161,7 @@ export function Sidebar({ user }: SidebarProps) {
             }
 
             return (
-              <Link key={item.href} href={item.href}>
+              <Link key={item.href} href={item.href} data-tour={item.tourId}>
                 <Button
                   variant="ghost"
                   className={cn(

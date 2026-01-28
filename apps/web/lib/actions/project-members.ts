@@ -31,16 +31,19 @@ export async function getProjectMembers(projectId: string) {
     return [];
   }
 
-  return data?.map((m) => ({
-    id: m.id,
-    userId: (m.user as { id: string }).id,
-    email: (m.user as { email: string }).email,
-    name: `${(m.user as { firstName: string | null }).firstName ?? ""} ${(m.user as { lastName: string | null }).lastName ?? ""}`.trim() || (m.user as { email: string }).email,
-    avatarUrl: (m.user as { avatarUrl: string | null }).avatarUrl,
-    role: m.role as ProjectRole,
-    department: m.department,
-    joinedAt: m.createdAt,
-  })) ?? [];
+  return data?.map((m) => {
+    const user = m.user as unknown as { id: string; email: string; firstName: string | null; lastName: string | null; avatarUrl: string | null } | null;
+    return {
+      id: m.id,
+      userId: user?.id ?? "",
+      email: user?.email ?? "",
+      name: `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim() || (user?.email ?? ""),
+      avatarUrl: user?.avatarUrl ?? null,
+      role: m.role as ProjectRole,
+      department: m.department,
+      joinedAt: m.createdAt,
+    };
+  }).filter((m) => m.userId) ?? [];
 }
 
 // Get pending invites for a project
