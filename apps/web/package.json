@@ -30,7 +30,8 @@
     "@hookform/resolvers": "^3.9.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "tailwind-merge": "^2.6.0"
+    "tailwind-merge": "^2.6.0",
+    "stripe": "^17.5.0"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
