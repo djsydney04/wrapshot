@@ -50,6 +50,7 @@ export const ORG_ROLE_PERMISSIONS: Record<OrgRole, OrgPermission[]> = {
   ADMIN: [
     "org:read",
     "org:write",
+    "org:billing",
     "org:manage-team",
   ],
   MEMBER: [

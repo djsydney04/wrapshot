@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Clapperboard, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,99 +38,128 @@ export default function SignUpPage() {
     }
   };
 
-  return (
-    <div className="w-full max-w-sm">
-      {/* Logo */}
-      <div className="flex flex-col items-center mb-8">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary mb-4">
-          <Clapperboard className="h-6 w-6 text-primary-foreground" />
-        </div>
-        <h1 className="text-2xl font-semibold text-foreground">
-          Create your account
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Start managing your film productions
-        </p>
-      </div>
-
-      {/* Success Message */}
-      {message ? (
-        <div className="rounded-lg border border-green-200 bg-green-50 p-6 text-center">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 mx-auto mb-3">
-            <Check className="h-5 w-5 text-green-600" />
+  // Success State
+  if (message) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col items-center text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 mb-4">
+            <Check className="h-6 w-6 text-emerald-600" />
           </div>
-          <h3 className="font-medium text-green-900">Check your email</h3>
-          <p className="mt-1 text-sm text-green-700">
-            We&apos;ve sent you a confirmation link at <strong>{email}</strong>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Check your email
+          </h1>
+          <p className="text-sm text-muted-foreground mt-2 max-w-xs">
+            We sent a confirmation link to <strong className="text-foreground">{email}</strong>
           </p>
-          <Link href="/login">
-            <Button variant="outline" className="mt-4">
+        </div>
+
+        <div className="space-y-3">
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => {
+              setMessage(null);
+              setEmail("");
+              setPassword("");
+            }}
+          >
+            Use a different email
+          </Button>
+          <Link href="/login" className="block">
+            <Button variant="ghost" className="w-full">
               Back to sign in
             </Button>
           </Link>
         </div>
-      ) : (
-        /* Form */
-        <form onSubmit={handleSignUp} className="space-y-4">
-          <div className="space-y-3">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1.5">
-                Email
-              </label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1.5">
-                Password
-              </label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Min 6 characters"
-              />
-            </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Create an account
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Start managing your productions today
+        </p>
+      </div>
+
+      {/* Form */}
+      <form onSubmit={handleSignUp} className="space-y-4">
+        <div className="space-y-3">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium mb-1.5">
+              Email
+            </label>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+            />
           </div>
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium mb-1.5">
+              Password
+            </label>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Min 6 characters"
+            />
+          </div>
+        </div>
 
-          {error && (
-            <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2">
-              <p className="text-sm text-destructive">{error}</p>
-            </div>
-          )}
+        {error && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
 
-          <Button
-            type="submit"
-            disabled={loading}
-            className="w-full"
-          >
-            {loading ? "Creating account..." : "Create account"}
-          </Button>
+        <Button
+          type="submit"
+          disabled={loading}
+          className="w-full"
+        >
+          {loading ? "Creating account..." : "Create account"}
+        </Button>
 
-          <p className="text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link
-              href="/login"
-              className="font-medium text-foreground hover:underline"
-            >
-              Sign in
-            </Link>
-          </p>
-        </form>
-      )}
+        <p className="text-xs text-center text-muted-foreground">
+          By creating an account, you agree to our{" "}
+          <Link href="/terms" className="underline hover:text-foreground">
+            Terms
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="underline hover:text-foreground">
+            Privacy Policy
+          </Link>
+        </p>
+      </form>
+
+      {/* Footer */}
+      <p className="text-center text-sm text-muted-foreground">
+        Already have an account?{" "}
+        <Link
+          href="/login"
+          className="font-medium text-foreground hover:underline"
+        >
+          Sign in
+        </Link>
+      </p>
     </div>
   );
 }

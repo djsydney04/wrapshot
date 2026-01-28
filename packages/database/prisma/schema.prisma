@@ -461,7 +461,7 @@ model Department {
 model Subscription {
   id                     String             @id @default(cuid())
   organizationId         String             @unique
-  stripeCustomerId       String             @unique
+  stripeCustomerId       String?            @unique
   stripeSubscriptionId   String?            @unique
   stripePriceId          String?
   stripeCurrentPeriodEnd DateTime?

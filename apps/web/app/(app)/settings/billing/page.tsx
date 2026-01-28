@@ -381,6 +381,52 @@ function BillingContent() {
   );
 }
 
+function BillingGateWithDebug() {
+  const { currentOrg, loading, organizations } = useAuth();
+
+  if (loading) {
+    return <div className="animate-pulse bg-muted h-48 rounded-xl" />;
+  }
+
+  // No organization at all
+  if (organizations.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <div className="rounded-full bg-amber-50 p-4 mb-4">
+          <AlertCircle className="h-8 w-8 text-amber-600" />
+        </div>
+        <h3 className="font-medium mb-2">No Organization Found</h3>
+        <p className="text-muted-foreground text-sm max-w-md">
+          You need to create or join an organization to access billing settings.
+          Please complete the onboarding process first.
+        </p>
+      </div>
+    );
+  }
+
+  // No current org selected (shouldn't happen but just in case)
+  if (!currentOrg) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <div className="rounded-full bg-muted p-4 mb-4">
+          <AlertCircle className="h-8 w-8 text-muted-foreground" />
+        </div>
+        <p className="text-muted-foreground">Please select an organization to continue.</p>
+      </div>
+    );
+  }
+
+  return (
+    <BillingGate
+      fallback={
+        <NoAccess message="Only organization owners and admins can access billing settings." />
+      }
+    >
+      <BillingContent />
+    </BillingGate>
+  );
+}
+
 export default function BillingSettingsPage() {
   return (
     <SettingsLayout
@@ -388,13 +434,9 @@ export default function BillingSettingsPage() {
       description="Manage your subscription and payment methods"
       breadcrumbs={[{ label: "Settings" }, { label: "Billing" }]}
     >
-      <BillingGate
-        fallback={<NoAccess message="You don't have permission to access billing settings." />}
-      >
-        <React.Suspense fallback={<div className="animate-pulse bg-muted h-48 rounded-xl" />}>
-          <BillingContent />
-        </React.Suspense>
-      </BillingGate>
+      <React.Suspense fallback={<div className="animate-pulse bg-muted h-48 rounded-xl" />}>
+        <BillingGateWithDebug />
+      </React.Suspense>
     </SettingsLayout>
   );
 }

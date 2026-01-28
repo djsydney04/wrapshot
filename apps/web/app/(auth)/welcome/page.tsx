@@ -16,34 +16,40 @@ import { cn } from "@/lib/utils";
 const features = [
   {
     icon: Film,
-    title: "Scene Management",
-    description: "Organize your script breakdown with ease",
+    title: "Replace Final Draft Breakdowns",
+    description: "AI-powered script analysis and scene breakdowns in seconds",
   },
   {
     icon: Calendar,
-    title: "Smart Scheduling",
-    description: "Plan shooting days and generate call sheets",
+    title: "Replace Excel Schedules",
+    description: "Smart scheduling with automatic conflict detection",
   },
   {
     icon: Users,
-    title: "Team Collaboration",
-    description: "Keep cast and crew in sync",
+    title: "Replace Email Chains",
+    description: "Centralized team communication and availability tracking",
   },
   {
     icon: FileText,
-    title: "Script Integration",
-    description: "Import scripts and auto-generate breakdowns",
+    title: "Replace PDF Call Sheets",
+    description: "One-click generation with instant notifications",
   },
+];
+
+const benefits = [
+  "Cut pre-production time in half",
+  "Eliminate scheduling conflicts",
+  "Keep everyone in sync, always",
 ];
 
 const testimonials = [
   {
-    quote: "Finally, a production tool that actually understands film workflows.",
+    quote: "Finally, one tool instead of five. Our pre-production is 3x faster.",
     author: "Sarah Chen",
     role: "Producer",
   },
   {
-    quote: "Cut our pre-production time in half. Game changer.",
+    quote: "No more juggling spreadsheets and email. This is the future.",
     author: "Marcus Webb",
     role: "1st AD",
   },
@@ -72,34 +78,43 @@ export default function WelcomePage() {
         </div>
 
         {/* Main content */}
-        <div className="relative z-10 space-y-8">
+        <div className="relative z-10 space-y-6">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight">
-              Production management,
+            <h1 className="text-3xl font-bold tracking-tight leading-tight">
+              The all-in-one
               <br />
-              <span className="text-muted-foreground">simplified.</span>
+              production platform
             </h1>
-            <p className="mt-4 text-lg text-muted-foreground max-w-md">
-              The all-in-one platform for film and video production teams.
-              From script to screen, we&apos;ve got you covered.
+            <p className="mt-3 text-base text-muted-foreground max-w-md leading-relaxed">
+              Replace your spreadsheets, email chains, and production binders with one powerful workspace. From script to screen.
             </p>
           </div>
 
+          {/* Benefits list */}
+          <div className="space-y-2">
+            {benefits.map((benefit) => (
+              <div key={benefit} className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                <span className="text-sm text-foreground">{benefit}</span>
+              </div>
+            ))}
+          </div>
+
           {/* Features grid */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3 pt-2">
             {features.map((feature) => {
               const Icon = feature.icon;
               return (
                 <div
                   key={feature.title}
-                  className="flex items-start gap-3 p-3 rounded-lg bg-background/50 border border-border/50"
+                  className="flex items-start gap-2.5 p-3 rounded-lg bg-background/50 border border-border/50"
                 >
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
-                    <Icon className="h-4 w-4 text-primary" />
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10">
+                    <Icon className="h-3.5 w-3.5 text-primary" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium">{feature.title}</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <h3 className="text-xs font-semibold leading-tight">{feature.title}</h3>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
                       {feature.description}
                     </p>
                   </div>
@@ -111,23 +126,23 @@ export default function WelcomePage() {
 
         {/* Social proof */}
         <div className="relative z-10">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-            <CheckCircle className="h-4 w-4 text-emerald-500" />
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+            <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
             <span>Trusted by 500+ production teams</span>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex gap-3">
             {testimonials.map((testimonial, i) => (
               <div
                 key={i}
-                className="flex-1 p-4 rounded-lg bg-background/50 border border-border/50"
+                className="flex-1 p-3 rounded-lg bg-background/50 border border-border/50"
               >
-                <p className="text-sm italic text-muted-foreground">
+                <p className="text-xs italic text-muted-foreground leading-relaxed">
                   &ldquo;{testimonial.quote}&rdquo;
                 </p>
                 <div className="mt-2">
-                  <p className="text-sm font-medium">{testimonial.author}</p>
-                  <p className="text-xs text-muted-foreground">{testimonial.role}</p>
+                  <p className="text-xs font-medium">{testimonial.author}</p>
+                  <p className="text-[10px] text-muted-foreground">{testimonial.role}</p>
                 </div>
               </div>
             ))}
@@ -140,19 +155,19 @@ export default function WelcomePage() {
         <div className="w-full max-w-sm space-y-8">
           {/* Mobile logo */}
           <div className="flex flex-col items-center lg:hidden">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary mb-4">
-              <Clapperboard className="h-6 w-6 text-primary-foreground" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary mb-3">
+              <Clapperboard className="h-5 w-5 text-primary-foreground" />
             </div>
-            <h1 className="text-2xl font-semibold">SetSync</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Production management, simplified
+            <h1 className="text-xl font-semibold">SetSync</h1>
+            <p className="text-xs text-muted-foreground mt-1">
+              The all-in-one production platform
             </p>
           </div>
 
           {/* Desktop header */}
           <div className="hidden lg:block text-center">
-            <h2 className="text-2xl font-semibold">Get started</h2>
-            <p className="text-muted-foreground mt-1">
+            <h2 className="text-xl font-semibold">Get started</h2>
+            <p className="text-sm text-muted-foreground mt-1">
               Sign in to your account or create a new one
             </p>
           </div>
