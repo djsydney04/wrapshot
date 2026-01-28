@@ -1,0 +1,427 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Refined neutral palette - warmer, more sophisticated */
+    --background: 40 20% 99%;
+    --foreground: 220 20% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 10%;
+    --primary: 220 14% 10%;
+    --primary-foreground: 40 20% 99%;
+    --secondary: 40 15% 96%;
+    --secondary-foreground: 220 20% 10%;
+    --muted: 40 12% 95%;
+    --muted-foreground: 220 10% 45%;
+    --accent: 40 12% 93%;
+    --accent-foreground: 220 20% 10%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 40 12% 90%;
+    --input: 40 12% 90%;
+    --ring: 220 14% 10%;
+    --radius: 0.75rem;
+
+    /* Layout variables */
+    --sidebar-width: 240px;
+    --sidebar-collapsed-width: 48px;
+    --header-height: 45px;
+
+    /* Premium accent colors - soft, sophisticated pastels */
+    --accent-blue: 220 80% 65%;
+    --accent-blue-soft: 220 60% 95%;
+    --accent-purple: 270 60% 65%;
+    --accent-purple-soft: 270 50% 96%;
+    --accent-teal: 175 60% 50%;
+    --accent-teal-soft: 175 50% 95%;
+    --accent-rose: 350 70% 65%;
+    --accent-rose-soft: 350 60% 96%;
+    --accent-amber: 38 92% 60%;
+    --accent-amber-soft: 38 80% 95%;
+    --accent-emerald: 160 60% 45%;
+    --accent-emerald-soft: 160 50% 95%;
+
+    /* Gradient colors */
+    --gradient-start: 220 80% 97%;
+    --gradient-mid: 270 60% 97%;
+    --gradient-end: 350 60% 97%;
+
+    /* Status colors - refined */
+    --status-success: 160 55% 42%;
+    --status-warning: 38 92% 50%;
+    --status-error: 0 72% 51%;
+    --status-info: 220 80% 55%;
+
+    /* Hover states */
+    --hover: 40 15% 97%;
+    --hover-strong: 40 12% 94%;
+
+    /* Notion-like hover for sidebar */
+    --notion-hover: 40 12% 94%;
+  }
+
+  .dark {
+    --background: 220 20% 7%;
+    --foreground: 40 15% 92%;
+    --card: 220 18% 9%;
+    --card-foreground: 40 15% 92%;
+    --popover: 220 18% 9%;
+    --popover-foreground: 40 15% 92%;
+    --primary: 40 15% 92%;
+    --primary-foreground: 220 20% 7%;
+    --secondary: 220 15% 12%;
+    --secondary-foreground: 40 15% 92%;
+    --muted: 220 15% 12%;
+    --muted-foreground: 40 10% 55%;
+    --accent: 220 15% 14%;
+    --accent-foreground: 40 15% 92%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 15% 14%;
+    --input: 220 15% 14%;
+    --ring: 40 15% 92%;
+
+    /* Dark mode accents */
+    --accent-blue: 220 70% 55%;
+    --accent-blue-soft: 220 40% 15%;
+    --accent-purple: 270 50% 55%;
+    --accent-purple-soft: 270 30% 15%;
+    --accent-teal: 175 50% 45%;
+    --accent-teal-soft: 175 30% 12%;
+    --accent-rose: 350 60% 55%;
+    --accent-rose-soft: 350 40% 15%;
+    --accent-amber: 38 80% 50%;
+    --accent-amber-soft: 38 50% 15%;
+    --accent-emerald: 160 50% 40%;
+    --accent-emerald-soft: 160 30% 12%;
+
+    /* Dark gradient colors */
+    --gradient-start: 220 40% 12%;
+    --gradient-mid: 270 30% 12%;
+    --gradient-end: 350 30% 12%;
+
+    /* Dark status colors */
+    --status-success: 160 50% 40%;
+    --status-warning: 38 80% 45%;
+    --status-error: 0 62% 45%;
+    --status-info: 220 70% 50%;
+
+    /* Hover states */
+    --hover: 220 15% 10%;
+    --hover-strong: 220 15% 14%;
+
+    --notion-hover: 220 15% 12%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  /* ===========================
+     GRAIN TEXTURES
+     =========================== */
+  .grain {
+    position: relative;
+    overflow: hidden;
+  }
+  .grain::before {
+    content: "";
+    position: absolute;
+    inset: -50%;
+    width: 200%;
+    height: 200%;
+    pointer-events: none;
+    opacity: 0.25;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    border-radius: inherit;
+    mix-blend-mode: overlay;
+  }
+
+  .grain-subtle::before {
+    opacity: 0.15;
+  }
+
+  .grain-strong::before {
+    opacity: 0.35;
+  }
+
+  /* Page-level grain overlay - hyper pixilated */
+  .grain-page {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.12;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    mix-blend-mode: multiply;
+  }
+
+  .dark .grain-page {
+    mix-blend-mode: soft-light;
+    opacity: 0.15;
+  }
+
+  /* ===========================
+     PREMIUM GRADIENTS
+     =========================== */
+
+  /* Ambient background gradients */
+  .gradient-ambient {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--gradient-start)) 0%,
+      hsl(var(--gradient-mid)) 50%,
+      hsl(var(--gradient-end)) 100%
+    );
+  }
+
+  .gradient-ambient-subtle {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--gradient-start) / 0.5) 0%,
+      hsl(var(--gradient-mid) / 0.3) 50%,
+      hsl(var(--gradient-end) / 0.5) 100%
+    );
+  }
+
+  /* Soft radial glow */
+  .gradient-glow {
+    background: radial-gradient(
+      ellipse at top,
+      hsl(var(--accent-blue-soft)) 0%,
+      transparent 50%
+    );
+  }
+
+  .gradient-glow-purple {
+    background: radial-gradient(
+      ellipse at top,
+      hsl(var(--accent-purple-soft)) 0%,
+      transparent 50%
+    );
+  }
+
+  /* Card gradients */
+  .gradient-card {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--card)) 0%,
+      hsl(var(--muted) / 0.5) 100%
+    );
+  }
+
+  /* Mesh gradient effect */
+  .gradient-mesh {
+    background:
+      radial-gradient(at 40% 20%, hsl(var(--accent-blue-soft)) 0px, transparent 50%),
+      radial-gradient(at 80% 0%, hsl(var(--accent-purple-soft)) 0px, transparent 50%),
+      radial-gradient(at 0% 50%, hsl(var(--accent-teal-soft)) 0px, transparent 50%),
+      radial-gradient(at 80% 50%, hsl(var(--accent-rose-soft)) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, hsl(var(--accent-amber-soft)) 0px, transparent 50%),
+      hsl(var(--background));
+  }
+
+  /* Border gradients */
+  .border-gradient {
+    position: relative;
+    background: hsl(var(--card));
+    border: none !important;
+  }
+  .border-gradient::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      hsl(var(--border)) 0%,
+      hsl(var(--accent-blue) / 0.2) 50%,
+      hsl(var(--border)) 100%
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* ===========================
+     ACCENT COLORS
+     =========================== */
+  .text-accent-blue { color: hsl(var(--accent-blue)); }
+  .text-accent-purple { color: hsl(var(--accent-purple)); }
+  .text-accent-teal { color: hsl(var(--accent-teal)); }
+  .text-accent-rose { color: hsl(var(--accent-rose)); }
+  .text-accent-amber { color: hsl(var(--accent-amber)); }
+  .text-accent-emerald { color: hsl(var(--accent-emerald)); }
+
+  .bg-accent-blue { background-color: hsl(var(--accent-blue)); }
+  .bg-accent-purple { background-color: hsl(var(--accent-purple)); }
+  .bg-accent-teal { background-color: hsl(var(--accent-teal)); }
+  .bg-accent-rose { background-color: hsl(var(--accent-rose)); }
+  .bg-accent-amber { background-color: hsl(var(--accent-amber)); }
+  .bg-accent-emerald { background-color: hsl(var(--accent-emerald)); }
+
+  .bg-accent-blue-soft { background-color: hsl(var(--accent-blue-soft)); }
+  .bg-accent-purple-soft { background-color: hsl(var(--accent-purple-soft)); }
+  .bg-accent-teal-soft { background-color: hsl(var(--accent-teal-soft)); }
+  .bg-accent-rose-soft { background-color: hsl(var(--accent-rose-soft)); }
+  .bg-accent-amber-soft { background-color: hsl(var(--accent-amber-soft)); }
+  .bg-accent-emerald-soft { background-color: hsl(var(--accent-emerald-soft)); }
+
+  /* ===========================
+     STATUS COLORS
+     =========================== */
+  .text-success { color: hsl(var(--status-success)); }
+  .text-warning { color: hsl(var(--status-warning)); }
+  .text-error { color: hsl(var(--status-error)); }
+  .text-info { color: hsl(var(--status-info)); }
+
+  .bg-success { background-color: hsl(var(--status-success)); }
+  .bg-warning { background-color: hsl(var(--status-warning)); }
+  .bg-error { background-color: hsl(var(--status-error)); }
+  .bg-info { background-color: hsl(var(--status-info)); }
+
+  /* ===========================
+     GLASS EFFECTS
+     =========================== */
+  .glass {
+    @apply bg-white/70 dark:bg-card/70 backdrop-blur-md border-white/20;
+  }
+  .glass-strong {
+    @apply bg-white/90 dark:bg-card/90 backdrop-blur-xl;
+  }
+  .glass-subtle {
+    @apply bg-white/40 dark:bg-card/40 backdrop-blur-sm;
+  }
+
+  /* ===========================
+     SHADOWS
+     =========================== */
+  .shadow-soft {
+    box-shadow:
+      0 1px 2px hsl(var(--foreground) / 0.02),
+      0 4px 8px hsl(var(--foreground) / 0.03),
+      0 8px 16px hsl(var(--foreground) / 0.02);
+  }
+  .shadow-soft-lg {
+    box-shadow:
+      0 2px 4px hsl(var(--foreground) / 0.02),
+      0 8px 16px hsl(var(--foreground) / 0.04),
+      0 16px 32px hsl(var(--foreground) / 0.03);
+  }
+  .shadow-soft-xl {
+    box-shadow:
+      0 4px 8px hsl(var(--foreground) / 0.02),
+      0 12px 24px hsl(var(--foreground) / 0.05),
+      0 24px 48px hsl(var(--foreground) / 0.04);
+  }
+
+  /* Colored shadows */
+  .shadow-blue {
+    box-shadow: 0 8px 32px hsl(var(--accent-blue) / 0.15);
+  }
+  .shadow-purple {
+    box-shadow: 0 8px 32px hsl(var(--accent-purple) / 0.15);
+  }
+
+  /* Inset shadow */
+  .shadow-inset {
+    box-shadow: inset 0 1px 2px hsl(var(--foreground) / 0.05);
+  }
+
+  /* ===========================
+     HOVER & INTERACTION
+     =========================== */
+  .hover-lift {
+    @apply transition-all duration-200 ease-out;
+  }
+  .hover-lift:hover {
+    @apply -translate-y-0.5;
+    box-shadow:
+      0 4px 12px hsl(var(--foreground) / 0.05),
+      0 8px 24px hsl(var(--foreground) / 0.03);
+  }
+
+  .hover-glow:hover {
+    box-shadow: 0 0 0 3px hsl(var(--accent-blue) / 0.1);
+  }
+
+  /* ===========================
+     SCROLLBAR
+     =========================== */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 3px;
+  }
+
+  /* ===========================
+     ANIMATIONS
+     =========================== */
+  .animate-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  /* ===========================
+     LAYOUT UTILITIES
+     =========================== */
+  .divider {
+    @apply h-px w-full bg-border/50;
+  }
+
+  /* Premium card style */
+  .card-premium {
+    @apply rounded-2xl bg-card border border-border/50 shadow-soft overflow-hidden;
+  }
+
+  /* Section spacing */
+  .section-spacing {
+    @apply space-y-8;
+  }
+
+  /* Content max width */
+  .content-width {
+    @apply max-w-4xl mx-auto;
+  }
+}

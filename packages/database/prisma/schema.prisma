@@ -1,0 +1,456 @@
+// SetSync Database Schema
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============== AUTH & ORGANIZATIONS ==============
+// Note: Supabase manages users in auth.users table
+// We reference userId as String (UUID from Supabase auth)
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members  OrganizationMember[]
+  projects Project[]
+}
+
+model OrganizationMember {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String   // References auth.users.id from Supabase
+  role           OrgRole  @default(MEMBER)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ============== PROJECTS ==============
+
+model Project {
+  id             String        @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  status         ProjectStatus @default(DEVELOPMENT)
+  startDate      DateTime?
+  endDate        DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  scripts      Script[]
+  castMembers  CastMember[]
+  locations    Location[]
+  scenes       Scene[]
+  shootingDays ShootingDay[]
+  departments  Department[]
+  elements     Element[]
+  callSheets   CallSheet[]
+  members      ProjectMember[]
+}
+
+enum ProjectStatus {
+  DEVELOPMENT
+  PRE_PRODUCTION
+  PRODUCTION
+  POST_PRODUCTION
+  COMPLETED
+  ON_HOLD
+}
+
+model ProjectMember {
+  id        String      @id @default(cuid())
+  projectId String
+  userId    String      // References auth.users.id from Supabase
+  role      ProjectRole @default(VIEWER)
+  createdAt DateTime    @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+enum ProjectRole {
+  ADMIN
+  COORDINATOR
+  DEPARTMENT_HEAD
+  CREW
+  CAST
+  VIEWER
+}
+
+// ============== SCRIPTS ==============
+
+model Script {
+  id         String   @id @default(cuid())
+  projectId  String
+  version    String
+  color      String? // Industry standard: White, Blue, Pink, etc.
+  uploadedAt DateTime @default(now())
+  fileUrl    String?
+  content    String?  @db.Text
+  isActive   Boolean  @default(false)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scenes  Scene[]
+}
+
+// ============== CAST ==============
+
+model CastMember {
+  id               String         @id @default(cuid())
+  projectId        String
+  characterName    String
+  actorName        String?
+  castNumber       Int? // Traditional cast ID number
+  contractStart    DateTime?
+  contractEnd      DateTime?
+  dropDeadDate     DateTime?
+  dailyRate        Decimal?       @db.Decimal(10, 2)
+  weeklyRate       Decimal?       @db.Decimal(10, 2)
+  workStatus       CastWorkStatus @default(ON_HOLD)
+  unionAffiliation String?
+  email            String?
+  phone            String?
+  agentName        String?
+  agentContact     String?
+  notes            String?        @db.Text
+  hairMakeupMins   Int            @default(60)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  project            Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sceneAppearances   SceneCastMember[]
+  shootingDayEntries ShootingDayCast[]
+  availabilities     CastAvailability[]
+}
+
+enum CastWorkStatus {
+  ON_HOLD
+  CONFIRMED
+  WORKING
+  WRAPPED
+  DROPPED
+}
+
+model CastAvailability {
+  id           String             @id @default(cuid())
+  castMemberId String
+  date         DateTime           @db.Date
+  status       AvailabilityStatus @default(AVAILABLE)
+  notes        String?
+
+  castMember CastMember @relation(fields: [castMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([castMemberId, date])
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  UNAVAILABLE
+  TENTATIVE
+  FIRST_CHOICE
+}
+
+// ============== LOCATIONS ==============
+
+model Location {
+  id               String       @id @default(cuid())
+  projectId        String
+  name             String
+  address          String?
+  latitude         Decimal?     @db.Decimal(10, 8)
+  longitude        Decimal?     @db.Decimal(11, 8)
+  locationType     LocationType @default(PRACTICAL)
+  interiorExterior IntExt       @default(BOTH)
+  permitStatus     PermitStatus @default(NOT_STARTED)
+  permitStartDate  DateTime?
+  permitEndDate    DateTime?
+  locationFee      Decimal?     @db.Decimal(10, 2)
+  contactName      String?
+  contactPhone     String?
+  contactEmail     String?
+  technicalNotes   String?      @db.Text
+  parkingNotes     String?
+  loadInNotes      String?
+  soundNotes       String?
+  backupLocationId String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  project        Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  backupLocation Location?  @relation("BackupLocation", fields: [backupLocationId], references: [id])
+  backupFor      Location[] @relation("BackupLocation")
+  scenes         Scene[]
+}
+
+enum LocationType {
+  PRACTICAL
+  STUDIO
+  BACKLOT
+  VIRTUAL
+}
+
+enum IntExt {
+  INT
+  EXT
+  BOTH
+}
+
+enum PermitStatus {
+  NOT_STARTED
+  APPLIED
+  APPROVED
+  DENIED
+  EXPIRED
+}
+
+// ============== SCENES ==============
+
+model Scene {
+  id               String      @id @default(cuid())
+  projectId        String
+  scriptId         String?
+  sceneNumber      String
+  synopsis         String?     @db.Text
+  intExt           IntExt      @default(INT)
+  dayNight         DayNight    @default(DAY)
+  locationId       String?
+  pageCount        Decimal     @default(1) @db.Decimal(4, 3) // In 1/8ths
+  scriptDay        String? // Story continuity
+  estimatedMinutes Int?
+  notes            String?     @db.Text
+  status           SceneStatus @default(NOT_SCHEDULED)
+  sortOrder        Int         @default(0)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  script   Script?   @relation(fields: [scriptId], references: [id])
+  location Location? @relation(fields: [locationId], references: [id])
+
+  castMembers      SceneCastMember[]
+  elements         SceneElement[]
+  scheduledEntries ShootingDayScene[]
+}
+
+enum DayNight {
+  DAY
+  NIGHT
+  DAWN
+  DUSK
+  MORNING
+  AFTERNOON
+  EVENING
+}
+
+enum SceneStatus {
+  NOT_SCHEDULED
+  SCHEDULED
+  PARTIALLY_SHOT
+  COMPLETED
+  CUT
+}
+
+model SceneCastMember {
+  id           String @id @default(cuid())
+  sceneId      String
+  castMemberId String
+
+  scene      Scene      @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  castMember CastMember @relation(fields: [castMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([sceneId, castMemberId])
+}
+
+// ============== ELEMENTS ==============
+
+model Element {
+  id          String          @id @default(cuid())
+  projectId   String
+  category    ElementCategory
+  name        String
+  description String?
+  notes       String?         @db.Text
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scenes  SceneElement[]
+}
+
+enum ElementCategory {
+  PROP
+  WARDROBE
+  VEHICLE
+  ANIMAL
+  SPECIAL_EQUIPMENT
+  VFX
+  SFX
+  STUNT
+  MAKEUP
+  HAIR
+  GREENERY
+  ART_DEPARTMENT
+  SOUND
+  MUSIC
+  BACKGROUND
+  OTHER
+}
+
+model SceneElement {
+  id        String  @id @default(cuid())
+  sceneId   String
+  elementId String
+  quantity  Int     @default(1)
+  notes     String?
+
+  scene   Scene   @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  element Element @relation(fields: [elementId], references: [id], onDelete: Cascade)
+
+  @@unique([sceneId, elementId])
+}
+
+// ============== SHOOTING DAYS ==============
+
+model ShootingDay {
+  id            String            @id @default(cuid())
+  projectId     String
+  date          DateTime          @db.Date
+  dayNumber     Int // Day 1, Day 2, etc.
+  unit          String            @default("MAIN") // MAIN, SECOND, SPLINTER
+  isShootingDay Boolean           @default(true) // false for travel/prep days
+  generalCall   DateTime?         @db.Time
+  shootingCall  DateTime?         @db.Time
+  estimatedWrap DateTime?         @db.Time
+  actualWrap    DateTime?         @db.Time
+  weatherNotes  String?
+  notes         String?           @db.Text
+  status        ShootingDayStatus @default(SCHEDULED)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  project   Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scenes    ShootingDayScene[]
+  cast      ShootingDayCast[]
+  callSheet CallSheet?
+
+  @@unique([projectId, date, unit])
+}
+
+enum ShootingDayStatus {
+  TENTATIVE
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model ShootingDayScene {
+  id            String @id @default(cuid())
+  shootingDayId String
+  sceneId       String
+  sortOrder     Int    @default(0)
+  estimatedMins Int?
+  notes         String?
+
+  shootingDay ShootingDay @relation(fields: [shootingDayId], references: [id], onDelete: Cascade)
+  scene       Scene       @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  @@unique([shootingDayId, sceneId])
+}
+
+model ShootingDayCast {
+  id            String        @id @default(cuid())
+  shootingDayId String
+  castMemberId  String
+  workStatus    DayWorkStatus @default(W)
+  pickupTime    DateTime?     @db.Time
+  muHairCall    DateTime?     @db.Time
+  onSetCall     DateTime?     @db.Time
+  remarks       String?
+
+  shootingDay ShootingDay @relation(fields: [shootingDayId], references: [id], onDelete: Cascade)
+  castMember  CastMember  @relation(fields: [castMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([shootingDayId, castMemberId])
+}
+
+enum DayWorkStatus {
+  W // Work
+  SW // Start Work
+  WF // Work Finish
+  SWF // Start Work Finish
+  H // Hold
+  R // Rehearse
+  T // Travel
+  WD // Work Drop
+}
+
+// ============== CALL SHEETS ==============
+
+model CallSheet {
+  id              String    @id @default(cuid())
+  shootingDayId   String    @unique
+  version         Int       @default(1)
+  publishedAt     DateTime?
+  nearestHospital String?
+  safetyNotes     String?   @db.Text
+  parkingNotes    String?   @db.Text
+  mealNotes       String?
+  advanceNotes    String?   @db.Text
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  shootingDay     ShootingDay           @relation(fields: [shootingDayId], references: [id], onDelete: Cascade)
+  departmentCalls CallSheetDepartment[]
+}
+
+model CallSheetDepartment {
+  id          String   @id @default(cuid())
+  callSheetId String
+  department  String
+  callTime    DateTime @db.Time
+  notes       String?
+
+  callSheet CallSheet @relation(fields: [callSheetId], references: [id], onDelete: Cascade)
+
+  @@unique([callSheetId, department])
+}
+
+// ============== DEPARTMENTS ==============
+
+model Department {
+  id        String  @id @default(cuid())
+  projectId String
+  name      String
+  headName  String?
+  headEmail String?
+  headPhone String?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, name])
+}
