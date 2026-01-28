@@ -21,7 +21,7 @@ export function Header({ title, breadcrumbs, actions, className }: HeaderProps) 
   return (
     <header
       className={cn(
-        "flex h-[45px] items-center justify-between border-b border-border bg-background px-4",
+        "flex h-[45px] items-center justify-between border-b border-border/60 bg-background/80 backdrop-blur-sm px-4 relative z-10",
         className
       )}
     >

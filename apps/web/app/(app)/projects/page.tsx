@@ -31,8 +31,8 @@ export default function ProjectsPage() {
       <div className="flex-1 overflow-auto p-6">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-foreground">Projects</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="heading-lg">Projects</h1>
+          <p className="mt-1 text-body-sm">
             {hasProjects
               ? `${projects.length} project${projects.length !== 1 ? "s" : ""}`
               : "Create your first project to get started"}
