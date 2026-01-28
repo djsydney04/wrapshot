@@ -104,13 +104,18 @@ export default function DashboardPage() {
                 <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-accent-blue-soft to-accent-purple-soft flex items-center justify-center mb-6">
                   <Film className="h-8 w-8 text-accent-blue" />
                 </div>
-                <h1 className="text-2xl font-semibold mb-2 text-center">
+                <h1 className="heading-lg mb-2 text-center text-balance">
                   Welcome to SetSync
                 </h1>
-                <p className="text-muted-foreground text-center max-w-sm mb-6">
+                <p className="text-body-sm text-center max-w-md mb-6 text-balance">
                   Production management for filmmakers. Create your first project to begin.
                 </p>
-                <Button onClick={() => setShowAddProject(true)} className="gap-2 rounded-xl">
+                <Button
+                  onClick={() => setShowAddProject(true)}
+                  variant="premium"
+                  size="lg"
+                  className="gap-2 rounded-xl"
+                >
                   <Plus className="h-4 w-4" />
                   Create Project
                 </Button>
@@ -122,8 +127,8 @@ export default function DashboardPage() {
               {nextShootDay ? (
                 <Link href={`/projects/${nextShootDay.projectId}`} className="block group">
                   <div className="card-premium p-6 hover:shadow-soft-lg transition-shadow">
-                    <div className="flex items-center gap-2 text-xs font-medium text-accent-emerald mb-4">
-                      <div className="h-2 w-2 rounded-full bg-accent-emerald animate-pulse" />
+                    <div className="flex items-center gap-2 text-xs font-medium text-accent-mint mb-4">
+                      <div className="h-2 w-2 rounded-full bg-accent-mint animate-pulse" />
                       Next Shoot {getDaysUntil(nextShootDay.date)}
                     </div>
 
@@ -141,10 +146,10 @@ export default function DashboardPage() {
 
                         {/* Details */}
                         <div>
-                          <h2 className="text-xl font-semibold group-hover:text-accent-blue transition-colors">
+                          <h2 className="heading-md group-hover:text-accent-blue transition-colors">
                             {nextProject?.name}
                           </h2>
-                          <p className="text-muted-foreground mt-1">
+                          <p className="text-body-sm mt-1">
                             Day {nextShootDay.dayNumber} · {nextShootDay.scenes.length} scenes
                           </p>
                           <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
@@ -190,20 +195,20 @@ export default function DashboardPage() {
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-purple-soft">
                       <Clapperboard className="h-5 w-5 text-accent-purple" />
                     </div>
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Scenes</span>
+                    <span className="label-primary">Scenes</span>
                   </div>
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-2 text-sm">
-                        <CheckCircle2 className="h-4 w-4 text-accent-emerald" />
+                        <CheckCircle2 className="h-4 w-4 text-accent-mint" />
                         Wrapped
                       </span>
                       <span className="font-semibold">{completedScenes}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-2 text-sm">
-                        <Circle className="h-4 w-4 text-accent-amber" />
+                        <Circle className="h-4 w-4 text-accent-peach" />
                         Scheduled
                       </span>
                       <span className="font-semibold">{scheduledScenes}</span>
@@ -216,11 +221,11 @@ export default function DashboardPage() {
                       {totalScenes > 0 && (
                         <>
                           <div
-                            className="h-full bg-accent-emerald transition-all"
+                            className="h-full bg-accent-mint transition-all"
                             style={{ width: `${(completedScenes / totalScenes) * 100}%` }}
                           />
                           <div
-                            className="h-full bg-accent-amber transition-all"
+                            className="h-full bg-accent-peach transition-all"
                             style={{ width: `${(scheduledScenes / totalScenes) * 100}%` }}
                           />
                         </>
@@ -241,7 +246,7 @@ export default function DashboardPage() {
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-blue-soft">
                       <Calendar className="h-5 w-5 text-accent-blue" />
                     </div>
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Schedule</span>
+                    <span className="label-primary">Schedule</span>
                   </div>
 
                   <div className="text-3xl font-bold">{upcomingDaysCount}</div>
@@ -262,7 +267,7 @@ export default function DashboardPage() {
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-teal-soft">
                       <Users className="h-5 w-5 text-accent-teal" />
                     </div>
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Team</span>
+                    <span className="label-primary">Team</span>
                   </div>
 
                   <div className="text-3xl font-bold">{cast.length + crew.length}</div>
@@ -280,7 +285,7 @@ export default function DashboardPage() {
                 {/* Projects */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-semibold">Projects</h2>
+                    <h2 className="label-secondary">Projects</h2>
                     <Link href="/projects" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
                       View all <ArrowRight className="h-3.5 w-3.5" />
                     </Link>
@@ -311,7 +316,7 @@ export default function DashboardPage() {
                           </div>
                           <div className="w-16 h-2 bg-muted rounded-full overflow-hidden flex-shrink-0">
                             <div
-                              className="h-full bg-accent-emerald transition-all"
+                              className="h-full bg-accent-mint transition-all"
                               style={{ width: `${progress}%` }}
                             />
                           </div>
@@ -330,7 +335,7 @@ export default function DashboardPage() {
                 {/* Upcoming Shoots */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-semibold">Upcoming Shoots</h2>
+                    <h2 className="label-secondary">Upcoming Shoots</h2>
                     <Link href="/schedule" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
                       Calendar <ArrowRight className="h-3.5 w-3.5" />
                     </Link>

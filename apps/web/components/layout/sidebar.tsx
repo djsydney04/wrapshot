@@ -76,19 +76,19 @@ export function Sidebar({ user }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "relative flex h-screen flex-col border-r border-border bg-background transition-all duration-200",
+        "relative flex h-screen flex-col border-r border-border/60 bg-background/80 backdrop-blur-sm transition-all duration-200",
         sidebarOpen ? "w-[240px]" : "w-[48px]"
       )}
     >
       {/* Header */}
-      <div className="flex h-[45px] items-center justify-between px-3 border-b border-border">
+      <div className="flex h-[45px] items-center justify-between px-3 border-b border-border/60">
         {sidebarOpen ? (
           <>
             <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <div className="flex h-6 w-6 items-center justify-center rounded bg-primary">
-                <Clapperboard className="h-4 w-4 text-primary-foreground" />
+              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-accent-blue-soft">
+                <Clapperboard className="h-4 w-4 text-accent-blue" />
               </div>
-              <span className="font-semibold text-sm">SetSync</span>
+              <span className="font-display font-medium text-[15px]">SetSync</span>
             </Link>
             <Button
               variant="ghost"
@@ -179,7 +179,7 @@ export function Sidebar({ user }: SidebarProps) {
             <Separator className="my-3" />
             <div className="space-y-1">
               <div className="flex items-center justify-between px-2 py-1">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <span className="label-primary">
                   Projects
                 </span>
                 <Button variant="ghost" size="icon-sm" className="h-5 w-5 text-muted-foreground">
