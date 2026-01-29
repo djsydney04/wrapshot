@@ -193,3 +193,239 @@ export const DEPARTMENT_LABELS: Record<DepartmentType, string> = {
   ACCOUNTING: "Accounting",
   POST_PRODUCTION: "Post-Production",
 };
+
+// =============================================
+// FinanceOps Types
+// =============================================
+
+export type BudgetStatus = "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "LOCKED";
+export type ReceiptStatus = "MISSING" | "PENDING" | "APPROVED" | "REJECTED";
+export type BudgetUnits = "DAYS" | "WEEKS" | "FLAT" | "HOURS" | "EACH";
+export type AlertType = "WARNING" | "ERROR" | "INFO";
+export type BudgetHealthStatus = "ON_TRACK" | "WARNING" | "OVER_BUDGET";
+
+export interface Budget {
+  id: string;
+  projectId: string;
+  version: number;
+  versionName: string;
+  status: BudgetStatus;
+
+  // Totals (calculated from line items)
+  totalEstimated: number;
+  totalActual: number;
+  totalCommitted: number;
+
+  // Contingency
+  contingencyPercent: number;
+  contingencyAmount: number;
+
+  // Metadata
+  createdBy: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  lockedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BudgetCategory {
+  id: string;
+  budgetId: string;
+  code: string; // e.g., "2000", "2300"
+  name: string; // e.g., "Production", "Camera"
+  parentCategoryId?: string;
+
+  // Subtotals (calculated from line items)
+  subtotalEstimated: number;
+  subtotalActual: number;
+
+  // Display order
+  sortOrder: number;
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BudgetLineItem {
+  id: string;
+  categoryId: string;
+  accountCode: string; // e.g., "2301" for Camera Crew
+  description: string; // e.g., "Director of Photography"
+
+  // Calculation fields
+  units: BudgetUnits;
+  quantity: number;
+  rate: number;
+  subtotal: number; // quantity × rate
+
+  // Fringe benefits (for labor)
+  fringePercent: number;
+  fringeAmount: number; // subtotal × fringePercent
+
+  // Totals
+  estimatedTotal: number; // subtotal + fringeAmount
+  actualCost: number; // sum of transactions
+  committedCost: number; // POs issued but not paid
+  variance: number; // actualCost - estimatedTotal
+
+  // Schedule integration
+  linkedScheduleItems: string[]; // array of castMember/crew IDs
+  isScheduleSynced: boolean;
+
+  // Metadata
+  notes?: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Transaction {
+  id: string;
+  budgetId: string;
+  lineItemId?: string;
+
+  // Transaction details
+  date: string;
+  vendor: string;
+  amount: number;
+  description: string;
+  category: string; // from budget categories for quick filtering
+
+  // Receipt tracking
+  receiptUrl?: string; // uploaded receipt image/PDF
+  receiptStatus: ReceiptStatus;
+
+  // Metadata
+  enteredBy: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BudgetTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  budgetRange?: string; // e.g., "$500K - $2M"
+  templateData: {
+    categories: {
+      code: string;
+      name: string;
+      subcategories?: { code: string; name: string }[];
+    }[];
+    lineItems: {
+      accountCode: string;
+      category: string;
+      description: string;
+      units: BudgetUnits;
+      quantity: number;
+      rate: number;
+      fringePercent: number;
+    }[];
+  };
+  isSystemTemplate: boolean;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BudgetAlert {
+  id: string;
+  budgetId: string;
+  type: AlertType;
+  message: string;
+  department?: string;
+  categoryId?: string;
+  actionRequired: boolean;
+  isDismissed: boolean;
+  createdAt: string;
+  dismissedAt?: string;
+  dismissedBy?: string;
+}
+
+// Dashboard data interfaces
+export interface BudgetSummary {
+  estimated: number;
+  actual: number;
+  committed: number;
+  remaining: number;
+  percentSpent: number;
+}
+
+export interface BurnRate {
+  dailyAverage: number;
+  weeklyTrend: number[];
+  projectedFinal: number;
+}
+
+export interface DepartmentHealth {
+  department: string;
+  percentSpent: number;
+  percentScheduleComplete: number;
+  status: BudgetHealthStatus;
+}
+
+export interface DashboardData {
+  budgetSummary: BudgetSummary;
+  burnRate: BurnRate;
+  departmentHealth: DepartmentHealth[];
+  alerts: BudgetAlert[];
+}
+
+// Budget constants
+export const BUDGET_UNITS_LABELS: Record<BudgetUnits, string> = {
+  DAYS: "Days",
+  WEEKS: "Weeks",
+  FLAT: "Flat",
+  HOURS: "Hours",
+  EACH: "Each",
+};
+
+export const BUDGET_STATUS_LABELS: Record<BudgetStatus, string> = {
+  DRAFT: "Draft",
+  PENDING_APPROVAL: "Pending Approval",
+  APPROVED: "Approved",
+  LOCKED: "Locked",
+};
+
+export const RECEIPT_STATUS_LABELS: Record<ReceiptStatus, string> = {
+  MISSING: "Missing",
+  PENDING: "Pending",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+};
+
+// Standard film budget chart of accounts
+export const BUDGET_CHART_OF_ACCOUNTS = {
+  "1000": { name: "Above-the-Line", subcategories: {
+    "1100": "Story & Rights",
+    "1200": "Producers",
+    "1300": "Director",
+    "1400": "Cast",
+  }},
+  "2000": { name: "Production", subcategories: {
+    "2100": "Production Staff",
+    "2200": "Art Department",
+    "2300": "Camera",
+    "2400": "Sound",
+    "2500": "Grip & Electric",
+    "2600": "Wardrobe",
+    "2700": "Hair & Makeup",
+    "2800": "Locations",
+    "2900": "Transportation",
+  }},
+  "3000": { name: "Post-Production", subcategories: {
+    "3100": "Editing",
+    "3200": "Sound Post",
+    "3300": "Visual Effects",
+    "3400": "Music",
+  }},
+  "4000": { name: "Other", subcategories: {
+    "4100": "Insurance",
+    "4200": "Legal",
+    "4300": "Contingency",
+  }},
+} as const;

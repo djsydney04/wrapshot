@@ -28,6 +28,18 @@ const statusOptions = [
   { value: "COMPLETED", label: "Completed", description: "Project finished" },
 ] as const;
 
+const productionTypeOptions = [
+  { value: "feature", label: "Feature Film" },
+  { value: "short", label: "Short Film" },
+  { value: "commercial", label: "Commercial" },
+  { value: "music_video", label: "Music Video" },
+  { value: "documentary", label: "Documentary" },
+  { value: "tv_series", label: "TV Series" },
+  { value: "tv_pilot", label: "TV Pilot" },
+  { value: "web_series", label: "Web Series" },
+  { value: "other", label: "Other" },
+];
+
 export default function NewProjectPage() {
   const router = useRouter();
   const { addProject } = useProjectStore();
@@ -42,6 +54,8 @@ export default function NewProjectPage() {
   const [endDate, setEndDate] = React.useState("");
   const [director, setDirector] = React.useState("");
   const [producer, setProducer] = React.useState("");
+  const [productionType, setProductionType] = React.useState("");
+  const [estimatedBudget, setEstimatedBudget] = React.useState("");
 
   const canProceed = React.useMemo(() => {
     switch (step) {
@@ -158,7 +172,7 @@ export default function NewProjectPage() {
                     placeholder="e.g., The Great Adventure"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="h-12 text-lg"
+                    className="h-10"
                     autoFocus
                   />
                 </div>
@@ -172,7 +186,7 @@ export default function NewProjectPage() {
                     placeholder="A brief description of your project..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="flex min-h-[100px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
                   />
                 </div>
               </div>
@@ -188,34 +202,56 @@ export default function NewProjectPage() {
                 </div>
                 <h1 className="text-2xl font-semibold">Project details</h1>
                 <p className="text-muted-foreground mt-2">
-                  Add more details to help organize your project
+                  Add more details to help organize your production
                 </p>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-5">
+                {/* Production Type */}
+                <div className="space-y-2">
+                  <Label htmlFor="productionType" className="text-sm font-medium">
+                    Production Type
+                  </Label>
+                  <select
+                    id="productionType"
+                    value={productionType}
+                    onChange={(e) => setProductionType(e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="">Select production type...</option>
+                    {productionTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Status */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Production Status</Label>
                   <div className="grid grid-cols-2 gap-2">
-                    {statusOptions.map((option) => (
+                    {statusOptions.slice(0, 4).map((option) => (
                       <button
                         key={option.value}
                         type="button"
                         onClick={() => setStatus(option.value)}
                         className={cn(
-                          "flex flex-col items-start p-3 rounded-lg border-2 transition-all text-left",
+                          "flex flex-col items-start p-2.5 rounded-lg border-2 transition-all text-left",
                           status === option.value
                             ? "border-foreground bg-muted"
                             : "border-border hover:border-muted-foreground/30"
                         )}
                       >
                         <span className="font-medium text-sm">{option.label}</span>
-                        <span className="text-xs text-muted-foreground">{option.description}</span>
+                        <span className="text-xs text-muted-foreground leading-tight">{option.description}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                {/* Dates */}
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label htmlFor="startDate" className="text-sm font-medium">
                       Start Date
@@ -242,7 +278,8 @@ export default function NewProjectPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                {/* Key Personnel */}
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label htmlFor="director" className="text-sm font-medium">
                       Director
@@ -267,6 +304,23 @@ export default function NewProjectPage() {
                       className="h-10"
                     />
                   </div>
+                </div>
+
+                {/* Estimated Budget */}
+                <div className="space-y-2">
+                  <Label htmlFor="estimatedBudget" className="text-sm font-medium">
+                    Estimated Budget <span className="text-muted-foreground">(optional)</span>
+                  </Label>
+                  <Input
+                    id="estimatedBudget"
+                    placeholder="e.g., $500,000"
+                    value={estimatedBudget}
+                    onChange={(e) => setEstimatedBudget(e.target.value)}
+                    className="h-10"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This helps set up your finance tracking later
+                  </p>
                 </div>
               </div>
             </div>

@@ -14,6 +14,7 @@ import {
   LogOut,
   User,
   LayoutDashboard,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,12 @@ export function Sidebar({ user }: SidebarProps) {
       href: "/schedule",
       icon: Calendar,
       tourId: "schedule",
+    },
+    {
+      label: "Finance",
+      href: "/finance",
+      icon: DollarSign,
+      tourId: "finance",
     },
   ];
 

@@ -10,24 +10,18 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
-  User,
   Briefcase,
-  Building2,
   Settings,
   Sparkles,
   Loader2,
-  Users,
-  UserPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   saveOnboardingProfile,
-  createOnboardingOrganization,
-  joinOrganizationByCode,
   completeOnboarding,
 } from "@/lib/actions/onboarding";
 
-type Step = 1 | 2 | 3 | 4 | 5;
+type Step = 1 | 2 | 3 | 4;
 
 const JOB_TITLES = [
   { value: "producer", label: "Producer" },
@@ -66,9 +60,6 @@ export default function OnboardingPage() {
   const [lastName, setLastName] = React.useState("");
   const [jobTitle, setJobTitle] = React.useState("");
   const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
-  const [orgAction, setOrgAction] = React.useState<"create" | "join" | "skip" | null>(null);
-  const [orgName, setOrgName] = React.useState("");
-  const [inviteCode, setInviteCode] = React.useState("");
   const [timezone, setTimezone] = React.useState("America/Los_Angeles");
 
   // Detect timezone on mount
@@ -87,47 +78,18 @@ export default function OnboardingPage() {
       case 2:
         return true; // Optional
       case 3:
-        if (orgAction === "create") return orgName.trim().length > 0;
-        if (orgAction === "join") return inviteCode.trim().length > 0;
-        return orgAction === "skip";
-      case 4:
         return true; // Has defaults
-      case 5:
+      case 4:
         return true;
       default:
         return false;
     }
-  }, [step, firstName, lastName, orgAction, orgName, inviteCode]);
+  }, [step, firstName, lastName]);
 
   const handleNext = async () => {
     setError(null);
 
-    // Handle step-specific logic
-    if (step === 3 && orgAction === "create") {
-      setIsSubmitting(true);
-      try {
-        await createOnboardingOrganization(orgName);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to create organization");
-        setIsSubmitting(false);
-        return;
-      }
-      setIsSubmitting(false);
-    }
-
-    if (step === 3 && orgAction === "join") {
-      setIsSubmitting(true);
-      try {
-        await joinOrganizationByCode(inviteCode);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to join organization");
-        setIsSubmitting(false);
-        return;
-      }
-      setIsSubmitting(false);
-    }
-
-    if (step < 5) {
+    if (step < 4) {
       setStep((step + 1) as Step);
     }
   };
@@ -184,7 +146,7 @@ export default function OnboardingPage() {
       <div className="flex items-center justify-center border-b border-border px-6 py-4">
         {/* Step Indicator */}
         <div className="flex items-center gap-2">
-          {[1, 2, 3, 4, 5].map((s) => (
+          {[1, 2, 3, 4].map((s) => (
             <div
               key={s}
               className={cn(
@@ -288,128 +250,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 3: Organization */}
+          {/* Step 3: Preferences */}
           {step === 3 && (
-            <div className="space-y-8">
-              <div className="text-center">
-                <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                  <Building2 className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <h1 className="text-2xl font-semibold">Your organization</h1>
-                <p className="text-muted-foreground mt-2">
-                  Collaborate with your production team
-                </p>
-              </div>
-
-              {error && (
-                <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3">
-                  <p className="text-sm text-destructive">{error}</p>
-                </div>
-              )}
-
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => setOrgAction("create")}
-                  className={cn(
-                    "w-full p-4 rounded-xl border-2 transition-all text-left",
-                    orgAction === "create"
-                      ? "border-foreground bg-muted"
-                      : "border-border hover:border-muted-foreground/30"
-                  )}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                      <Building2 className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium">Create an organization</h3>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        Start a new workspace for your production company
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setOrgAction("join")}
-                  className={cn(
-                    "w-full p-4 rounded-xl border-2 transition-all text-left",
-                    orgAction === "join"
-                      ? "border-foreground bg-muted"
-                      : "border-border hover:border-muted-foreground/30"
-                  )}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
-                      <UserPlus className="h-5 w-5 text-emerald-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium">Join an existing organization</h3>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        I have an invite code from my team
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setOrgAction("skip")}
-                  className={cn(
-                    "w-full p-4 rounded-xl border-2 transition-all text-left",
-                    orgAction === "skip"
-                      ? "border-foreground bg-muted"
-                      : "border-border hover:border-muted-foreground/30"
-                  )}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                      <User className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium">Skip for now</h3>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        I&apos;ll set this up later
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              </div>
-
-              {orgAction === "create" && (
-                <div className="space-y-2 pt-2">
-                  <Label htmlFor="orgName">Organization Name</Label>
-                  <Input
-                    id="orgName"
-                    placeholder="e.g., Acme Productions"
-                    value={orgName}
-                    onChange={(e) => setOrgName(e.target.value)}
-                    className="h-11"
-                    autoFocus
-                  />
-                </div>
-              )}
-
-              {orgAction === "join" && (
-                <div className="space-y-2 pt-2">
-                  <Label htmlFor="inviteCode">Invite Code</Label>
-                  <Input
-                    id="inviteCode"
-                    placeholder="Enter your invite code"
-                    value={inviteCode}
-                    onChange={(e) => setInviteCode(e.target.value)}
-                    className="h-11"
-                    autoFocus
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Step 4: Preferences */}
-          {step === 4 && (
             <div className="space-y-8">
               <div className="text-center">
                 <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-muted flex items-center justify-center">
@@ -444,8 +286,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 5: Ready */}
-          {step === 5 && (
+          {/* Step 4: Ready */}
+          {step === 4 && (
             <div className="space-y-8">
               <div className="text-center">
                 <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-emerald-50 flex items-center justify-center">
@@ -517,7 +359,7 @@ export default function OnboardingPage() {
       </div>
 
       {/* Footer Navigation */}
-      {step < 5 && (
+      {step < 4 && (
         <div className="border-t border-border px-6 py-4">
           <div className="mx-auto max-w-xl flex items-center justify-between">
             <div>
@@ -530,7 +372,7 @@ export default function OnboardingPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              {(step === 2 || step === 4) && (
+              {(step === 2 || step === 3) && (
                 <Button variant="ghost" onClick={handleNext} disabled={isSubmitting}>
                   Skip
                 </Button>
