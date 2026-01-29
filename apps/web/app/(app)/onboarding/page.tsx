@@ -156,7 +156,7 @@ export default function OnboardingPage() {
             <div>
               <p className="text-sm text-muted-foreground mb-1">Step 1 of 4</p>
               <h1 className="text-2xl font-semibold tracking-tight">
-                Let's set up your profile
+                Let&apos;s set up your profile
               </h1>
             </div>
 
@@ -199,7 +199,7 @@ export default function OnboardingPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="role">What's your role?</Label>
+                <Label htmlFor="role">What&apos;s your role?</Label>
                 <select
                   id="role"
                   value={role}
@@ -347,7 +347,7 @@ export default function OnboardingPage() {
                 How did you find us?
               </h1>
               <p className="text-muted-foreground mt-2">
-                We'd love to know what brought you here.
+                We&apos;d love to know what brought you here.
               </p>
             </div>
 
