@@ -181,13 +181,6 @@ export default function BudgetDetailPage() {
           </div>
         </div>
 
-        {/* Notes */}
-        {budget.notes && (
-          <div className="mt-6 rounded-xl border border-border bg-card p-6">
-            <h3 className="font-medium mb-2">Notes</h3>
-            <p className="text-muted-foreground">{budget.notes}</p>
-          </div>
-        )}
       </div>
     </div>
   );
