@@ -1,6 +1,25 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalEnv": ["DATABASE_URL"],
+  "globalEnv": [
+    "DATABASE_URL",
+    "DIRECT_URL",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "NEXT_PUBLIC_APP_URL",
+    "ANTHROPIC_API_KEY",
+    "RESEND_API_KEY",
+    "LIVEBLOCKS_SECRET_KEY",
+    "INNGEST_EVENT_KEY",
+    "INNGEST_SIGNING_KEY",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "STRIPE_PRO_PRICE_ID",
+    "STRIPE_STUDIO_PRICE_ID",
+    "PROD_STRIPE_SECRET_KEY",
+    "PROD_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+    "SENTRY_DSN"
+  ],
   "tasks": {
     "db:generate": {
       "cache": false
@@ -22,6 +41,10 @@
     "build": {
       "dependsOn": ["^db:generate", "^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^db:generate"],
+      "outputs": []
     },
     "lint": {
       "dependsOn": ["^lint"]

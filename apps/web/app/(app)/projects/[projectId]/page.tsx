@@ -15,10 +15,13 @@ import { ScheduleSection } from "@/components/projects/sections/schedule-section
 import { GearSection } from "@/components/projects/sections/gear-section";
 import { ScriptSection } from "@/components/projects/sections/script-section";
 import { TeamSection } from "@/components/projects/sections/team-section";
+import { BudgetSection } from "@/components/projects/sections/budget-section";
+import { SettingsSection } from "@/components/projects/sections/settings-section";
 import { SetupWizard } from "@/components/projects/setup-wizard";
 import { useProjectStore } from "@/lib/stores/project-store";
 import { getProject, type Project } from "@/lib/actions/projects";
 import { getScenes, type Scene as DBScene } from "@/lib/actions/scenes";
+import { getBudgetsForProject, type Budget } from "@/lib/actions/budgets";
 
 const statusVariant: Record<Project["status"], "development" | "pre-production" | "production" | "post-production" | "completed" | "on-hold"> = {
   DEVELOPMENT: "development",
@@ -48,8 +51,9 @@ export default function ProjectDetailPage() {
   const [project, setProject] = React.useState<Project | null>(null);
   const [loading, setLoading] = React.useState(true);
 
-  // Database-backed scenes
+  // Database-backed data
   const [dbScenes, setDbScenes] = React.useState<DBScene[]>([]);
+  const [budgets, setBudgets] = React.useState<Budget[]>([]);
 
   // Still using store for other data (not yet migrated to DB)
   const {
@@ -62,16 +66,18 @@ export default function ProjectDetailPage() {
     getScriptsForProject,
   } = useProjectStore();
 
-  // Fetch project and scenes from database
+  // Fetch project, scenes, and budgets from database
   React.useEffect(() => {
     async function loadProject() {
       try {
-        const [projectData, scenesResult] = await Promise.all([
+        const [projectData, scenesResult, budgetsData] = await Promise.all([
           getProject(projectId),
           getScenes(projectId),
+          getBudgetsForProject(projectId),
         ]);
         setProject(projectData);
         if (scenesResult.data) setDbScenes(scenesResult.data);
+        setBudgets(budgetsData);
       } catch (err) {
         console.error("Error loading project:", err);
       } finally {
@@ -191,6 +197,10 @@ export default function ProjectDetailPage() {
         );
       case "team":
         return <TeamSection projectId={projectId} />;
+      case "budget":
+        return <BudgetSection projectId={projectId} />;
+      case "settings":
+        return <SettingsSection projectId={projectId} project={project} />;
       default:
         return null;
     }
@@ -242,6 +252,7 @@ export default function ProjectDetailPage() {
               shootingDays: shootingDays.length,
               gear: gear.length,
               hasScript: scripts.length > 0,
+              budgets: budgets.length,
             }}
             className="flex-1"
           />
@@ -252,7 +263,7 @@ export default function ProjectDetailPage() {
           {/* Mobile Section Tabs (hidden on desktop) */}
           <div className="md:hidden border-b border-border px-4 py-2 overflow-x-auto">
             <div className="flex gap-2">
-              {(["overview", "scenes", "cast", "crew", "team", "schedule", "gear", "script"] as ProjectSection[]).map(
+              {(["overview", "scenes", "cast", "crew", "team", "schedule", "gear", "budget", "script", "settings"] as ProjectSection[]).map(
                 (section) => (
                   <button
                     key={section}

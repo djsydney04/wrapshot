@@ -23,6 +23,7 @@ interface ProjectStore {
   scripts: Script[];
 
   // Project actions
+  setProjects: (projects: Project[]) => void;
   addProject: (project: Omit<Project, "id">) => Project;
   updateProject: (id: string, updates: Partial<Project>) => void;
   deleteProject: (id: string) => void;
@@ -89,6 +90,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   scripts: [],
 
   // Project actions
+  setProjects: (projects) => set({ projects }),
   addProject: (project) => {
     const newProject = { ...project, id: `proj-${generateId()}` } as Project;
     set((state) => ({

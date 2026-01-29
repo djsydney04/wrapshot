@@ -145,6 +145,14 @@ export async function getProjects(): Promise<Project[]> {
     throw new Error("Not authenticated");
   }
 
+  // Debug: Check what org the user belongs to and how many projects exist
+  const { data: debugData } = await supabase.rpc("debug_user_projects", {
+    user_id: userId,
+  });
+  if (debugData) {
+    console.log("[getProjects] Debug info:", debugData);
+  }
+
   // Get projects the user is a member of
   const { data, error } = await supabase
     .from("ProjectMember")
@@ -166,9 +174,12 @@ export async function getProjects(): Promise<Project[]> {
     .eq("userId", userId);
 
   if (error) {
-    console.error("Error fetching projects:", error);
+    console.error("[getProjects] Error fetching projects:", error);
+    console.error("[getProjects] userId:", userId);
     return [];
   }
+
+  console.log("[getProjects] Found memberships:", data?.length ?? 0);
 
   // Type for the joined project data
   type ProjectData = {

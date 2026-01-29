@@ -10,6 +10,8 @@ import {
   Clapperboard,
   Package,
   UserPlus,
+  DollarSign,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +23,9 @@ export type ProjectSection =
   | "crew"
   | "scenes"
   | "gear"
-  | "team";
+  | "team"
+  | "budget"
+  | "settings";
 
 interface SectionItem {
   id: ProjectSection;
@@ -41,6 +45,7 @@ interface ProjectSidebarProps {
     gear: number;
     hasScript: boolean;
     team?: number;
+    budgets?: number;
   };
   className?: string;
 }
@@ -59,7 +64,9 @@ export function ProjectSidebar({
     { id: "crew", label: "Crew", icon: UserCircle, count: counts.crew },
     { id: "team", label: "Team Access", icon: UserPlus, count: counts.team },
     { id: "gear", label: "Gear & Props", icon: Package, count: counts.gear },
+    { id: "budget", label: "Budget", icon: DollarSign, count: counts.budgets },
     { id: "script", label: "Script", icon: FileText },
+    { id: "settings", label: "Settings", icon: Settings },
   ];
 
   return (
