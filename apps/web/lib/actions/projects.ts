@@ -12,12 +12,18 @@ export type ProjectStatus =
   | "COMPLETED"
   | "ON_HOLD";
 
+export interface CrewInvite {
+  email: string;
+  role: "ADMIN" | "COORDINATOR" | "DEPARTMENT_HEAD" | "CREW" | "CAST" | "VIEWER";
+}
+
 export interface CreateProjectData {
   name: string;
   description?: string;
   status?: ProjectStatus;
   startDate?: string;
   endDate?: string;
+  crewInvites?: CrewInvite[];
 }
 
 export interface Project {
@@ -39,7 +45,6 @@ export interface Project {
 
 // Create a new project
 export async function createProject(
-  organizationId: string,
   data: CreateProjectData
 ): Promise<Project> {
   const supabase = await createClient();
@@ -50,18 +55,29 @@ export async function createProject(
   }
 
   // Check plan limit
-  const canCreate = await checkPlanLimit(organizationId, "projects");
+  const canCreate = await checkPlanLimit(userId, "projects");
   if (!canCreate) {
     throw new Error(
       "PLAN_LIMIT_REACHED:You've reached the project limit for your plan. Upgrade to create more projects."
     );
   }
 
+  // Get or create user's organization
+  const { data: orgId, error: orgError } = await supabase.rpc(
+    "get_or_create_user_organization",
+    { user_id: userId }
+  );
+
+  if (orgError || !orgId) {
+    console.error("Error getting/creating organization:", orgError);
+    throw new Error("Failed to set up workspace");
+  }
+
   // Create the project
   const { data: project, error: projectError } = await supabase
     .from("Project")
     .insert({
-      organizationId,
+      organizationId: orgId,
       name: data.name,
       description: data.description || null,
       status: data.status || "DEVELOPMENT",
@@ -88,6 +104,25 @@ export async function createProject(
     // Try to clean up the project
     await supabase.from("Project").delete().eq("id", project.id);
     throw new Error("Failed to create project");
+  }
+
+  // Create project invites for crew members
+  if (data.crewInvites && data.crewInvites.length > 0) {
+    const invites = data.crewInvites.map((invite) => ({
+      projectId: project.id,
+      email: invite.email,
+      role: invite.role,
+      invitedBy: userId,
+    }));
+
+    const { error: inviteError } = await supabase
+      .from("ProjectInvite")
+      .insert(invites);
+
+    if (inviteError) {
+      console.error("Error creating project invites:", inviteError);
+      // Non-fatal - project is still created, just invites failed
+    }
   }
 
   revalidatePath("/projects");
@@ -358,14 +393,15 @@ export async function deleteProject(projectId: string): Promise<void> {
   revalidatePath("/projects");
 }
 
-// Get project count for current organization (for billing checks)
-export async function getProjectCount(organizationId: string): Promise<number> {
+// Get project count for user (for billing checks)
+export async function getProjectCount(userId: string): Promise<number> {
   const supabase = await createClient();
 
+  // Count projects where user is a member
   const { count, error } = await supabase
-    .from("Project")
+    .from("ProjectMember")
     .select("id", { count: "exact", head: true })
-    .eq("organizationId", organizationId);
+    .eq("userId", userId);
 
   if (error) {
     console.error("Error counting projects:", error);

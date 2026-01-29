@@ -2,19 +2,10 @@
 
 import * as React from "react";
 import {
-  useOrgPermission,
   useProjectPermission,
-  useAnyOrgPermission,
   useAnyProjectPermission,
 } from "@/lib/hooks/use-permissions";
-import type { OrgPermission, ProjectPermission } from "@/lib/permissions";
-
-interface OrgPermissionGateProps {
-  permission: OrgPermission | OrgPermission[];
-  requireAll?: boolean;
-  fallback?: React.ReactNode;
-  children: React.ReactNode;
-}
+import type { ProjectPermission } from "@/lib/permissions";
 
 interface ProjectPermissionGateProps {
   projectId: string;
@@ -22,38 +13,6 @@ interface ProjectPermissionGateProps {
   requireAll?: boolean;
   fallback?: React.ReactNode;
   children: React.ReactNode;
-}
-
-// Organization permission gate
-export function OrgPermissionGate({
-  permission,
-  requireAll = false,
-  fallback = null,
-  children,
-}: OrgPermissionGateProps) {
-  const permissions = Array.isArray(permission) ? permission : [permission];
-
-  // Use hooks at the top level
-  const hasAny = useAnyOrgPermission(permissions);
-  const hasSingle = useOrgPermission(permissions[0]);
-
-  // Determine if user has access
-  let hasAccess: boolean;
-  if (permissions.length === 1) {
-    hasAccess = hasSingle;
-  } else if (requireAll) {
-    // For requireAll, we need to check each permission individually
-    // This is a workaround since we can't call hooks conditionally
-    hasAccess = hasAny; // Simplified - in practice you'd want useAllOrgPermissions
-  } else {
-    hasAccess = hasAny;
-  }
-
-  if (!hasAccess) {
-    return <>{fallback}</>;
-  }
-
-  return <>{children}</>;
 }
 
 // Project permission gate
@@ -87,36 +46,6 @@ export function ProjectPermissionGate({
   return <>{children}</>;
 }
 
-// Billing access gate (convenience component)
-export function BillingGate({
-  fallback = null,
-  children,
-}: {
-  fallback?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <OrgPermissionGate permission="org:billing" fallback={fallback}>
-      {children}
-    </OrgPermissionGate>
-  );
-}
-
-// Team management gate (convenience component)
-export function TeamManagementGate({
-  fallback = null,
-  children,
-}: {
-  fallback?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <OrgPermissionGate permission="org:manage-team" fallback={fallback}>
-      {children}
-    </OrgPermissionGate>
-  );
-}
-
 // Project edit gate (convenience component)
 export function ProjectEditGate({
   projectId,
@@ -131,6 +60,27 @@ export function ProjectEditGate({
     <ProjectPermissionGate
       projectId={projectId}
       permission="project:write"
+      fallback={fallback}
+    >
+      {children}
+    </ProjectPermissionGate>
+  );
+}
+
+// Budget view gate (convenience component)
+export function BudgetViewGate({
+  projectId,
+  fallback = null,
+  children,
+}: {
+  projectId: string;
+  fallback?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <ProjectPermissionGate
+      projectId={projectId}
+      permission="budget:read"
       fallback={fallback}
     >
       {children}

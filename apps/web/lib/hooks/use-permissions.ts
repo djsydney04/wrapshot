@@ -2,30 +2,15 @@
 
 import { useAuth } from "@/components/providers/auth-provider";
 import {
-  type OrgRole,
   type ProjectRole,
-  type OrgPermission,
   type ProjectPermission,
-  orgRoleHasPermission,
   projectRoleHasPermission,
 } from "@/lib/permissions";
-
-// Get current user's org role
-export function useOrgRole(): OrgRole | null {
-  const { currentOrg } = useAuth();
-  return currentOrg?.role ?? null;
-}
 
 // Get user's role in a specific project
 export function useProjectRole(projectId: string): ProjectRole | null {
   const { projectRoles } = useAuth();
   return projectRoles[projectId] ?? null;
-}
-
-// Check if user has org permission
-export function useOrgPermission(permission: OrgPermission): boolean {
-  const role = useOrgRole();
-  return orgRoleHasPermission(role, permission);
 }
 
 // Check if user has project permission
@@ -35,18 +20,6 @@ export function useProjectPermission(
 ): boolean {
   const role = useProjectRole(projectId);
   return projectRoleHasPermission(role, permission);
-}
-
-// Check multiple org permissions (returns true if user has ANY of them)
-export function useAnyOrgPermission(permissions: OrgPermission[]): boolean {
-  const role = useOrgRole();
-  return permissions.some((p) => orgRoleHasPermission(role, p));
-}
-
-// Check multiple org permissions (returns true if user has ALL of them)
-export function useAllOrgPermissions(permissions: OrgPermission[]): boolean {
-  const role = useOrgRole();
-  return permissions.every((p) => orgRoleHasPermission(role, p));
 }
 
 // Check multiple project permissions (returns true if user has ANY of them)
@@ -67,16 +40,6 @@ export function useAllProjectPermissions(
   return permissions.every((p) => projectRoleHasPermission(role, p));
 }
 
-// Check if user can access billing
-export function useCanAccessBilling(): boolean {
-  return useOrgPermission("org:billing");
-}
-
-// Check if user can manage team
-export function useCanManageOrgTeam(): boolean {
-  return useOrgPermission("org:manage-team");
-}
-
 // Check if user can manage project team
 export function useCanManageProjectTeam(projectId: string): boolean {
   return useProjectPermission(projectId, "project:manage-team");
@@ -90,6 +53,16 @@ export function useCanEditProject(projectId: string): boolean {
 // Check if user can delete project
 export function useCanDeleteProject(projectId: string): boolean {
   return useProjectPermission(projectId, "project:delete");
+}
+
+// Check if user can view budget
+export function useCanViewBudget(projectId: string): boolean {
+  return useProjectPermission(projectId, "budget:read");
+}
+
+// Check if user can edit budget
+export function useCanEditBudget(projectId: string): boolean {
+  return useProjectPermission(projectId, "budget:write");
 }
 
 // Check subscription status

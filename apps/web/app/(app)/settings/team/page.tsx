@@ -27,7 +27,6 @@ import {
   SettingsLayout,
   SettingsCard,
 } from "@/components/layout/settings-layout";
-import { TeamManagementGate, NoAccess } from "@/components/ui/permission-gate";
 
 interface TeamMember {
   id: string;
@@ -276,27 +275,19 @@ function TeamPageContent() {
 }
 
 export default function TeamSettingsPage() {
-  const [showInvite, setShowInvite] = React.useState(false);
-
   return (
     <SettingsLayout
       title="Team"
-      description="Manage who has access to your organization"
+      description="Manage your account team members"
       breadcrumbs={[{ label: "Settings" }, { label: "Team" }]}
       actions={
-        <TeamManagementGate>
-          <Button onClick={() => setShowInvite(true)} className="gap-2" size="sm">
-            <Plus className="h-4 w-4" />
-            Invite Member
-          </Button>
-        </TeamManagementGate>
+        <Button className="gap-2" size="sm">
+          <Plus className="h-4 w-4" />
+          Invite Member
+        </Button>
       }
     >
-      <TeamManagementGate
-        fallback={<NoAccess message="You don't have permission to manage team members." />}
-      >
-        <TeamPageContent />
-      </TeamManagementGate>
+      <TeamPageContent />
     </SettingsLayout>
   );
 }

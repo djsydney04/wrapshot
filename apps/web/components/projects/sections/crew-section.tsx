@@ -97,7 +97,7 @@ export function CrewSection({ projectId, crew }: CrewSectionProps) {
           </div>
         </div>
         <Button size="sm" onClick={() => setShowAddCrew(true)}>
-          <Plus className="h-4 w-4 mr-1" />
+          <Plus className="h-4 w-4" />
           Add Crew Member
         </Button>
       </div>
@@ -166,7 +166,7 @@ export function CrewSection({ projectId, crew }: CrewSectionProps) {
             </p>
             {!searchQuery && (
               <Button onClick={() => setShowAddCrew(true)}>
-                <Plus className="h-4 w-4 mr-1" />
+                <Plus className="h-4 w-4" />
                 Add First Crew Member
               </Button>
             )}

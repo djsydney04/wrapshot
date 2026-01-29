@@ -10,14 +10,12 @@ import {
   Shield,
   CreditCard,
   Users,
-  Building2,
   ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const settingsNav = [
   { label: "Profile", href: "/settings", icon: User, description: "Your personal info" },
-  { label: "Organization", href: "/settings/organization", icon: Building2, description: "Company settings" },
   { label: "Team", href: "/settings/team", icon: Users, description: "Manage members" },
   { label: "Notifications", href: "/settings/notifications", icon: Bell, description: "Alert preferences" },
   { label: "Billing", href: "/settings/billing", icon: CreditCard, description: "Plans & invoices" },
@@ -176,7 +174,7 @@ interface SettingsCardFooterProps {
 
 export function SettingsCardFooter({ children, className }: SettingsCardFooterProps) {
   return (
-    <div className={cn("flex items-center justify-end gap-3 px-5 py-4 bg-muted/30 border-t border-border", className)}>
+    <div className={cn("flex items-center justify-end gap-3 p-5 bg-muted/30 border-t border-border", className)}>
       {children}
     </div>
   );

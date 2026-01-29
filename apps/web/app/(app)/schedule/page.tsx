@@ -112,7 +112,7 @@ export default function SchedulePage() {
               </button>
             </div>
             <Button size="sm" onClick={() => handleAddClick()}>
-              <Plus className="h-4 w-4 mr-1.5" />
+              <Plus className="h-4 w-4" />
               Add Day
             </Button>
           </div>
@@ -122,6 +122,16 @@ export default function SchedulePage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Main Content */}
         <div className="flex-1 overflow-hidden p-6 flex flex-col">
+          {/* Page Header */}
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold text-foreground">Schedule</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {shootingDays.length > 0
+                ? `${shootingDays.length} shooting day${shootingDays.length !== 1 ? "s" : ""} · ${shootingDays.filter(d => d.status === "COMPLETED").length} completed`
+                : "Plan your shooting schedule"}
+            </p>
+          </div>
+
           {viewMode === "week" ? (
             <WeekCalendar
               shootingDays={shootingDays}
@@ -202,7 +212,7 @@ export default function SchedulePage() {
                     Add your first shooting day to get started
                   </p>
                   <Button onClick={() => handleAddClick()}>
-                    <Plus className="h-4 w-4 mr-1.5" />
+                    <Plus className="h-4 w-4" />
                     Add Shooting Day
                   </Button>
                 </div>
@@ -237,7 +247,7 @@ export default function SchedulePage() {
                     No shoots scheduled for this day
                   </p>
                   <Button variant="outline" size="sm" onClick={() => handleAddClick(selectedDate)}>
-                    <Plus className="h-4 w-4 mr-1.5" />
+                    <Plus className="h-4 w-4" />
                     Add Shooting Day
                   </Button>
                 </div>

@@ -2,16 +2,9 @@
 
 import * as React from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { OrgRole, ProjectRole } from "@/lib/permissions";
+import type { ProjectRole } from "@/lib/permissions";
 
 // Types
-interface Organization {
-  id: string;
-  name: string;
-  slug: string;
-  role: OrgRole;
-}
-
 export interface Subscription {
   plan: "FREE" | "PRO" | "STUDIO";
   status: "TRIALING" | "ACTIVE" | "CANCELED" | "PAST_DUE" | "UNPAID";
@@ -29,9 +22,6 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  organizations: Organization[];
-  currentOrg: Organization | null;
-  setCurrentOrg: (org: Organization | null) => void;
   projectRoles: Record<string, ProjectRole>;
   subscription: Subscription | null;
   refreshAuth: () => Promise<void>;
@@ -42,47 +32,12 @@ const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<User | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const [organizations, setOrganizations] = React.useState<Organization[]>([]);
-  const [currentOrg, setCurrentOrg] = React.useState<Organization | null>(null);
   const [projectRoles, setProjectRoles] = React.useState<Record<string, ProjectRole>>({});
   const [subscription, setSubscription] = React.useState<Subscription | null>(null);
 
   const supabase = createClient();
 
   const fetchUserData = React.useCallback(async (userId: string) => {
-    // Fetch organization memberships
-    const { data: orgData } = await supabase
-      .from("OrganizationMember")
-      .select(
-        `
-        role,
-        organization:Organization (
-          id,
-          name,
-          slug
-        )
-      `
-      )
-      .eq("userId", userId);
-
-    const orgs: Organization[] =
-      orgData?.map((m) => {
-        const org = m.organization as unknown as { id: string; name: string; slug: string } | null;
-        return {
-          id: org?.id ?? "",
-          name: org?.name ?? "",
-          slug: org?.slug ?? "",
-          role: m.role as OrgRole,
-        };
-      }).filter((o) => o.id) ?? [];
-
-    setOrganizations(orgs);
-
-    // Set current org to first one if not set
-    if (orgs.length > 0 && !currentOrg) {
-      setCurrentOrg(orgs[0]);
-    }
-
     // Fetch project memberships
     const { data: projectData } = await supabase
       .from("ProjectMember")
@@ -95,30 +50,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     setProjectRoles(roles);
 
-    // Fetch subscription for current org
-    if (orgs.length > 0) {
-      const orgId = currentOrg?.id ?? orgs[0].id;
-      const { data: subData } = await supabase
-        .from("Subscription")
-        .select("plan, status, trialEndsAt, stripeCurrentPeriodEnd, stripeSubscriptionId, cancelAtPeriodEnd")
-        .eq("organizationId", orgId)
-        .single();
+    // Fetch subscription for user
+    const { data: subData } = await supabase
+      .from("Subscription")
+      .select("plan, status, trialEndsAt, stripeCurrentPeriodEnd, stripeSubscriptionId, cancelAtPeriodEnd")
+      .eq("userId", userId)
+      .maybeSingle();
 
-      if (subData) {
-        setSubscription(subData as Subscription);
-      } else {
-        // Default to free plan if no subscription
-        setSubscription({
-          plan: "FREE",
-          status: "ACTIVE",
-          trialEndsAt: null,
-          stripeCurrentPeriodEnd: null,
-          stripeSubscriptionId: null,
-          cancelAtPeriodEnd: false,
-        });
-      }
+    if (subData) {
+      setSubscription(subData as Subscription);
+    } else {
+      // Default to free plan if no subscription
+      setSubscription({
+        plan: "FREE",
+        status: "ACTIVE",
+        trialEndsAt: null,
+        stripeCurrentPeriodEnd: null,
+        stripeSubscriptionId: null,
+        cancelAtPeriodEnd: false,
+      });
     }
-  }, [currentOrg, supabase]);
+  }, [supabase]);
 
   const refreshAuth = React.useCallback(async () => {
     const {
@@ -133,8 +85,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await fetchUserData(authUser.id);
     } else {
       setUser(null);
-      setOrganizations([]);
-      setCurrentOrg(null);
       setProjectRoles({});
       setSubscription(null);
     }
@@ -158,8 +108,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fetchUserData(session.user.id);
       } else {
         setUser(null);
-        setOrganizations([]);
-        setCurrentOrg(null);
         setProjectRoles({});
         setSubscription(null);
       }
@@ -171,39 +119,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [refreshAuth, supabase, fetchUserData]);
 
-  // Update subscription when current org changes
-  React.useEffect(() => {
-    if (currentOrg && user) {
-      supabase
-        .from("Subscription")
-        .select("plan, status, trialEndsAt, stripeCurrentPeriodEnd, stripeSubscriptionId, cancelAtPeriodEnd")
-        .eq("organizationId", currentOrg.id)
-        .single()
-        .then(({ data }) => {
-          if (data) {
-            setSubscription(data as Subscription);
-          } else {
-            setSubscription({
-              plan: "FREE",
-              status: "ACTIVE",
-              trialEndsAt: null,
-              stripeCurrentPeriodEnd: null,
-              stripeSubscriptionId: null,
-              cancelAtPeriodEnd: false,
-            });
-          }
-        });
-    }
-  }, [currentOrg, user, supabase]);
-
   return (
     <AuthContext.Provider
       value={{
         user,
         loading,
-        organizations,
-        currentOrg,
-        setCurrentOrg,
         projectRoles,
         subscription,
         refreshAuth,

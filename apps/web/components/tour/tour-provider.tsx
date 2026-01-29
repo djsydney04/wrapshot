@@ -27,14 +27,19 @@ export function TourProvider({ children }: TourProviderProps) {
 
   const [targetRect, setTargetRect] = React.useState<DOMRect | null>(null);
 
-  // Check for startTour query param
+  // Check for tour query param
   React.useEffect(() => {
-    if (searchParams.get("startTour") === "true") {
-      startTour();
-      // Clean up URL
-      const url = new URL(window.location.href);
-      url.searchParams.delete("startTour");
-      window.history.replaceState({}, "", url.toString());
+    if (searchParams.get("tour") === "1" || searchParams.get("startTour") === "true") {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        startTour();
+        // Clean up URL
+        const url = new URL(window.location.href);
+        url.searchParams.delete("tour");
+        url.searchParams.delete("startTour");
+        window.history.replaceState({}, "", url.toString());
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [searchParams, startTour]);
 

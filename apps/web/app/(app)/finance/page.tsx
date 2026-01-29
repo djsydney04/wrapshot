@@ -7,14 +7,26 @@ import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useProjectStore } from "@/lib/stores/project-store";
+import { useAuth } from "@/components/providers/auth-provider";
+import { projectRoleHasPermission } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import type { Budget, BudgetStatus } from "@/lib/mock-data";
 
 export default function FinancePage() {
   const router = useRouter();
   const { projects } = useProjectStore();
+  const { projectRoles } = useAuth();
+
+  // Filter projects to only show those where user has budget:read permission
+  const projectsWithBudgetAccess = React.useMemo(() => {
+    return projects.filter((project) => {
+      const role = projectRoles[project.id];
+      return projectRoleHasPermission(role, "budget:read");
+    });
+  }, [projects, projectRoles]);
 
   // Mock budgets for now - will be replaced with real data
+  // TODO: When implementing real budgets, filter by projectsWithBudgetAccess
   const budgets: Budget[] = [];
 
   // Default to first project for now
@@ -53,13 +65,23 @@ export default function FinancePage() {
         breadcrumbs={[{ label: "Finance" }]}
         actions={
           <Button size="sm" onClick={() => router.push("/finance/new")}>
-            <Plus className="h-4 w-4 mr-1.5" />
+            <Plus className="h-4 w-4" />
             New Budget
           </Button>
         }
       />
 
       <div className="flex-1 overflow-auto p-6">
+        {/* Page Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold text-foreground">Finance</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {budgets.length > 0
+              ? `${budgets.length} budget${budgets.length !== 1 ? "s" : ""}`
+              : "Manage your production budgets and expenses"}
+          </p>
+        </div>
+
         {budgets.length > 0 ? (
           <div className="space-y-6">
             {/* Budget Cards */}
@@ -180,7 +202,7 @@ export default function FinancePage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Button size="lg" onClick={() => router.push("/finance/new")}>
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="h-4 w-4" />
                   Create Budget
                 </Button>
                 <Button size="lg" variant="outline" onClick={() => router.push("/finance/templates")}>
@@ -192,8 +214,8 @@ export default function FinancePage() {
               {/* Feature Highlights */}
               <div className="mt-12 grid gap-4 text-left">
                 <div className="flex gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
-                    <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div>
                     <h4 className="font-medium mb-0.5">Real-time Tracking</h4>
@@ -203,8 +225,8 @@ export default function FinancePage() {
                   </div>
                 </div>
                 <div className="flex gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                    <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div>
                     <h4 className="font-medium mb-0.5">Schedule Integration</h4>
@@ -214,8 +236,8 @@ export default function FinancePage() {
                   </div>
                 </div>
                 <div className="flex gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <AlertCircle className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div>
                     <h4 className="font-medium mb-0.5">Smart Alerts</h4>

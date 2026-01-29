@@ -3,7 +3,6 @@
 import * as React from "react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
-import { AddProjectForm } from "@/components/forms/add-project-form";
 import { useProjectStore } from "@/lib/stores/project-store";
 import Link from "next/link";
 import {
@@ -24,7 +23,6 @@ import {
 import { cn } from "@/lib/utils";
 
 export default function DashboardPage() {
-  const [showAddProject, setShowAddProject] = React.useState(false);
   const { projects, scenes, shootingDays, cast, crew } = useProjectStore();
 
   const today = React.useMemo(() => {
@@ -125,9 +123,11 @@ export default function DashboardPage() {
       <Header
         breadcrumbs={[{ label: "Dashboard" }]}
         actions={
-          <Button size="sm" onClick={() => setShowAddProject(true)}>
-            <Plus className="h-4 w-4 mr-1.5" />
-            New Project
+          <Button size="sm" asChild>
+            <Link href="/projects/new">
+              <Plus className="h-4 w-4" />
+              New Project
+            </Link>
           </Button>
         }
       />
@@ -136,39 +136,70 @@ export default function DashboardPage() {
         <div className="mx-auto max-w-5xl px-6 py-8">
           {projects.length === 0 ? (
             // Empty state - action oriented
-            <div className="border border-border rounded-xl bg-card">
-              <div className="flex flex-col items-center justify-center py-16 px-8">
-                <div className="h-14 w-14 rounded-xl bg-muted flex items-center justify-center mb-5">
-                  <Film className="h-7 w-7 text-muted-foreground" />
+            <div className="flex items-center justify-center min-h-[600px]">
+              <div className="text-center max-w-md">
+                <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-muted mb-6">
+                  <Film className="h-10 w-10 text-muted-foreground" />
                 </div>
-                <h1 className="text-xl font-semibold mb-2">
-                  Start your first project
-                </h1>
-                <p className="text-muted-foreground text-center max-w-sm mb-6 text-sm">
-                  Create a project to manage scenes, schedules, and call sheets for your production.
+                <h2 className="text-2xl font-semibold mb-2">
+                  No projects yet
+                </h2>
+                <p className="text-muted-foreground mb-6">
+                  Create your first project to start managing scenes, schedules, and call sheets for your production.
                 </p>
-                <Button onClick={() => setShowAddProject(true)}>
-                  <Plus className="h-4 w-4 mr-1.5" />
-                  Create Project
+                <Button size="lg" asChild>
+                  <Link href="/projects/new">
+                    <Plus className="h-4 w-4" />
+                    Create Project
+                  </Link>
                 </Button>
+
+                {/* Feature Highlights */}
+                <div className="mt-12 grid gap-4 text-left">
+                  <div className="flex gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <Clapperboard className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-0.5">Scene Management</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Organize and track all your scenes with detailed breakdowns
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-0.5">Smart Scheduling</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Plan shooting days and manage your production calendar
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-0.5">Call Sheets</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Generate professional call sheets with one click
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Page header with context */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-lg font-semibold">
-                    {new Date().toLocaleDateString("en-US", {
-                      weekday: "long",
-                      month: "long",
-                      day: "numeric"
-                    })}
-                  </h1>
-                  <p className="text-sm text-muted-foreground">
-                    {projects.length} project{projects.length !== 1 ? "s" : ""} · {upcomingDays.length} upcoming shoot{upcomingDays.length !== 1 ? "s" : ""}
-                  </p>
-                </div>
+              {/* Page Header */}
+              <div className="mb-6">
+                <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {projects.length} project{projects.length !== 1 ? "s" : ""} · {upcomingDays.length} upcoming shoot{upcomingDays.length !== 1 ? "s" : ""}
+                </p>
               </div>
 
               {/* Quick Actions - only show if there are actions */}
@@ -413,7 +444,7 @@ export default function DashboardPage() {
                         <p className="text-sm text-muted-foreground mb-3">No shoots scheduled</p>
                         <Button variant="outline" size="sm" asChild>
                           <Link href="/schedule">
-                            <Plus className="h-3.5 w-3.5 mr-1.5" />
+                            <Plus className="h-3.5 w-3.5" />
                             Add shoot day
                           </Link>
                         </Button>
@@ -427,7 +458,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <AddProjectForm open={showAddProject} onOpenChange={setShowAddProject} />
     </div>
   );
 }

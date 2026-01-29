@@ -140,7 +140,7 @@ export function GearSection({
           </div>
         </div>
         <Button size="sm" onClick={() => setShowAddGear(true)}>
-          <Plus className="h-4 w-4 mr-1" />
+          <Plus className="h-4 w-4" />
           Add Item
         </Button>
       </div>
@@ -269,7 +269,7 @@ export function GearSection({
             </p>
             {!searchQuery && filterDepartment === "all" && (
               <Button onClick={() => setShowAddGear(true)}>
-                <Plus className="h-4 w-4 mr-1" />
+                <Plus className="h-4 w-4" />
                 Add First Item
               </Button>
             )}

@@ -8,7 +8,8 @@ export async function saveOnboardingProfile(data: {
   lastName: string;
   jobTitle?: string;
   avatarUrl?: string;
-  timezone: string;
+  productionType?: string;
+  referralSource?: string;
 }) {
   const supabase = await createClient();
   const {
@@ -29,7 +30,8 @@ export async function saveOnboardingProfile(data: {
       displayName,
       jobTitle: data.jobTitle || null,
       avatarUrl: data.avatarUrl || null,
-      timezone: data.timezone || "America/Los_Angeles",
+      productionType: data.productionType || null,
+      referralSource: data.referralSource || null,
       updatedAt: new Date().toISOString(),
     },
     { onConflict: "userId" }
@@ -44,7 +46,7 @@ export async function saveOnboardingProfile(data: {
   return { success: true };
 }
 
-export async function createOnboardingOrganization(name: string) {
+export async function sendOnboardingInvites(emails: string[]) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -54,99 +56,34 @@ export async function createOnboardingOrganization(name: string) {
     throw new Error("Not authenticated");
   }
 
-  // Generate slug from name
-  const slug = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
+  const validEmails = emails
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e && e.includes("@"));
 
-  // Create organization
-  const { data: org, error: orgError } = await supabase
-    .from("Organization")
-    .insert({
-      name,
-      slug: `${slug}-${Date.now().toString(36)}`,
-    })
-    .select()
-    .single();
-
-  if (orgError) {
-    console.error("Error creating organization:", orgError);
-    throw new Error("Failed to create organization");
+  if (validEmails.length === 0) {
+    return { success: true, sent: 0 };
   }
 
-  // Add user as owner
-  const { error: memberError } = await supabase
-    .from("OrganizationMember")
-    .insert({
-      organizationId: org.id,
-      userId: user.id,
-      role: "OWNER",
-    });
+  // Insert invites (ignore duplicates)
+  const invites = validEmails.map((email) => ({
+    invitedBy: user.id,
+    email,
+    status: "PENDING",
+  }));
 
-  if (memberError) {
-    console.error("Error adding member:", memberError);
-    throw new Error("Failed to add member to organization");
+  const { error } = await supabase
+    .from("OnboardingInvite")
+    .upsert(invites, { onConflict: "invitedBy,email", ignoreDuplicates: true });
+
+  if (error) {
+    console.error("Error sending invites:", error);
+    throw new Error("Failed to send invites");
   }
 
-  // Create a default subscription (free plan)
-  await supabase.from("Subscription").insert({
-    organizationId: org.id,
-    status: "TRIALING",
-    plan: "FREE",
-  });
+  // TODO: Send actual invite emails via your email service
+  // For now, just store them in the database
 
-  revalidatePath("/");
-  return org;
-}
-
-export async function joinOrganizationByCode(code: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("Not authenticated");
-  }
-
-  // Find invitation by code/token
-  const { data: invitation, error: inviteError } = await supabase
-    .from("OrganizationInvitation")
-    .select("id, organizationId, role, expiresAt")
-    .eq("token", code)
-    .single();
-
-  if (inviteError || !invitation) {
-    throw new Error("Invalid or expired invite code");
-  }
-
-  // Check if expired
-  if (new Date(invitation.expiresAt) < new Date()) {
-    throw new Error("This invite code has expired");
-  }
-
-  // Add user to organization
-  const { error: memberError } = await supabase
-    .from("OrganizationMember")
-    .insert({
-      organizationId: invitation.organizationId,
-      userId: user.id,
-      role: invitation.role || "MEMBER",
-    });
-
-  if (memberError) {
-    if (memberError.code === "23505") {
-      throw new Error("You are already a member of this organization");
-    }
-    throw new Error("Failed to join organization");
-  }
-
-  // Delete the used invitation
-  await supabase.from("OrganizationInvitation").delete().eq("id", invitation.id);
-
-  revalidatePath("/");
-  return { success: true };
+  return { success: true, sent: validEmails.length };
 }
 
 export async function updateOnboardingStep(step: number) {

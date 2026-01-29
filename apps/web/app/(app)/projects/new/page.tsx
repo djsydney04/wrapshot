@@ -11,16 +11,20 @@ import { useAuth } from "@/components/providers/auth-provider";
 import {
   ArrowLeft,
   ArrowRight,
-  Check,
-  Clapperboard,
-  Calendar,
-  Sparkles,
   Loader2,
   AlertTriangle,
+  X,
+  UserPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PROJECT_ROLE_LABELS, type ProjectRole } from "@/lib/permissions";
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
+
+interface CrewInvite {
+  email: string;
+  role: ProjectRole;
+}
 
 const statusOptions = [
   { value: "DEVELOPMENT", label: "Development", description: "Pre-production planning" },
@@ -44,7 +48,7 @@ const productionTypeOptions = [
 
 export default function NewProjectPage() {
   const router = useRouter();
-  const { currentOrg } = useAuth();
+  const { user } = useAuth();
   const [step, setStep] = React.useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -61,6 +65,11 @@ export default function NewProjectPage() {
   const [productionType, setProductionType] = React.useState("");
   const [estimatedBudget, setEstimatedBudget] = React.useState("");
 
+  // Crew invite state
+  const [crewInvites, setCrewInvites] = React.useState<CrewInvite[]>([]);
+  const [inviteEmail, setInviteEmail] = React.useState("");
+  const [inviteRole, setInviteRole] = React.useState<ProjectRole>("CREW");
+
   const canProceed = React.useMemo(() => {
     switch (step) {
       case 1:
@@ -68,14 +77,16 @@ export default function NewProjectPage() {
       case 2:
         return true; // Optional step
       case 3:
-        return true; // Choice step
+        return true; // Optional crew invite step
+      case 4:
+        return true; // Final step
       default:
         return false;
     }
   }, [step, name]);
 
   const handleNext = () => {
-    if (step < 3) {
+    if (step < 4) {
       setStep((step + 1) as Step);
     }
   };
@@ -86,9 +97,22 @@ export default function NewProjectPage() {
     }
   };
 
+  const handleAddInvite = () => {
+    const trimmedEmail = inviteEmail.trim().toLowerCase();
+    if (!trimmedEmail || !trimmedEmail.includes("@")) return;
+    if (crewInvites.some((inv) => inv.email === trimmedEmail)) return;
+
+    setCrewInvites([...crewInvites, { email: trimmedEmail, role: inviteRole }]);
+    setInviteEmail("");
+  };
+
+  const handleRemoveInvite = (email: string) => {
+    setCrewInvites(crewInvites.filter((inv) => inv.email !== email));
+  };
+
   const handleCreate = async (withSetup: boolean) => {
-    if (!currentOrg) {
-      setError("No organization selected. Please complete onboarding first.");
+    if (!user) {
+      setError("Not authenticated. Please sign in.");
       return;
     }
 
@@ -96,12 +120,13 @@ export default function NewProjectPage() {
     setError(null);
 
     try {
-      const newProject = await createProject(currentOrg.id, {
+      const newProject = await createProject({
         name: name.trim(),
         description: description.trim() || undefined,
         status: status as "DEVELOPMENT" | "PRE_PRODUCTION" | "PRODUCTION" | "POST_PRODUCTION" | "COMPLETED" | "ON_HOLD",
         startDate: startDate || undefined,
         endDate: endDate || undefined,
+        crewInvites: crewInvites.length > 0 ? crewInvites : undefined,
       });
 
       if (withSetup) {
@@ -124,7 +149,7 @@ export default function NewProjectPage() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && canProceed && step < 3) {
+    if (e.key === "Enter" && canProceed && step < 4) {
       e.preventDefault();
       handleNext();
     }
@@ -147,11 +172,11 @@ export default function NewProjectPage() {
 
         {/* Step Indicator */}
         <div className="flex items-center gap-2">
-          {[1, 2, 3].map((s) => (
+          {[1, 2, 3, 4].map((s) => (
             <div
               key={s}
               className={cn(
-                "h-2 w-8 rounded-full transition-colors",
+                "h-1.5 w-6 rounded-full transition-colors",
                 s <= step ? "bg-foreground" : "bg-muted"
               )}
             />
@@ -166,42 +191,34 @@ export default function NewProjectPage() {
         <div className="mx-auto max-w-xl px-6 py-12">
           {/* Step 1: Project Basics */}
           {step === 1 && (
-            <div className="space-y-8">
-              <div className="text-center">
-                <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                  <Clapperboard className="h-6 w-6 text-muted-foreground" />
-                </div>
+            <div className="space-y-6">
+              <div>
                 <h1 className="text-2xl font-semibold">Create a new project</h1>
-                <p className="text-muted-foreground mt-2">
+                <p className="text-muted-foreground mt-1">
                   Start by giving your project a name
                 </p>
               </div>
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-sm font-medium">
-                    Project Name <span className="text-destructive">*</span>
-                  </Label>
+                  <Label htmlFor="name">Project name</Label>
                   <Input
                     id="name"
                     placeholder="e.g., The Great Adventure"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="h-10"
                     autoFocus
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="description" className="text-sm font-medium">
-                    Description <span className="text-muted-foreground">(optional)</span>
-                  </Label>
+                  <Label htmlFor="description">Description</Label>
                   <textarea
                     id="description"
                     placeholder="A brief description of your project..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+                    className="flex min-h-[72px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
                   />
                 </div>
               </div>
@@ -210,30 +227,25 @@ export default function NewProjectPage() {
 
           {/* Step 2: Project Details */}
           {step === 2 && (
-            <div className="space-y-8">
-              <div className="text-center">
-                <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                  <Calendar className="h-6 w-6 text-muted-foreground" />
-                </div>
+            <div className="space-y-6">
+              <div>
                 <h1 className="text-2xl font-semibold">Project details</h1>
-                <p className="text-muted-foreground mt-2">
+                <p className="text-muted-foreground mt-1">
                   Add more details to help organize your production
                 </p>
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-4">
                 {/* Production Type */}
                 <div className="space-y-2">
-                  <Label htmlFor="productionType" className="text-sm font-medium">
-                    Production Type
-                  </Label>
+                  <Label htmlFor="productionType">Production type</Label>
                   <select
                     id="productionType"
                     value={productionType}
                     onChange={(e) => setProductionType(e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
-                    <option value="">Select production type...</option>
+                    <option value="">Select type...</option>
                     {productionTypeOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
@@ -244,7 +256,7 @@ export default function NewProjectPage() {
 
                 {/* Status */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Production Status</Label>
+                  <Label>Status</Label>
                   <div className="grid grid-cols-2 gap-2">
                     {statusOptions.slice(0, 4).map((option) => (
                       <button
@@ -252,14 +264,14 @@ export default function NewProjectPage() {
                         type="button"
                         onClick={() => setStatus(option.value)}
                         className={cn(
-                          "flex flex-col items-start p-2.5 rounded-lg border-2 transition-all text-left",
+                          "flex flex-col items-start p-2 rounded-md border text-left text-sm transition-colors",
                           status === option.value
                             ? "border-foreground bg-muted"
-                            : "border-border hover:border-muted-foreground/30"
+                            : "border-border hover:border-foreground/50"
                         )}
                       >
-                        <span className="font-medium text-sm">{option.label}</span>
-                        <span className="text-xs text-muted-foreground leading-tight">{option.description}</span>
+                        <span className="font-medium">{option.label}</span>
+                        <span className="text-xs text-muted-foreground">{option.description}</span>
                       </button>
                     ))}
                   </div>
@@ -268,27 +280,21 @@ export default function NewProjectPage() {
                 {/* Dates */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label htmlFor="startDate" className="text-sm font-medium">
-                      Start Date
-                    </Label>
+                    <Label htmlFor="startDate">Start date</Label>
                     <Input
                       id="startDate"
                       type="date"
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
-                      className="h-10"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="endDate" className="text-sm font-medium">
-                      End Date
-                    </Label>
+                    <Label htmlFor="endDate">End date</Label>
                     <Input
                       id="endDate"
                       type="date"
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
-                      className="h-10"
                     />
                   </div>
                 </div>
@@ -296,112 +302,177 @@ export default function NewProjectPage() {
                 {/* Key Personnel */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label htmlFor="director" className="text-sm font-medium">
-                      Director
-                    </Label>
+                    <Label htmlFor="director">Director</Label>
                     <Input
                       id="director"
-                      placeholder="Director name"
+                      placeholder="Name"
                       value={director}
                       onChange={(e) => setDirector(e.target.value)}
-                      className="h-10"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="producer" className="text-sm font-medium">
-                      Producer
-                    </Label>
+                    <Label htmlFor="producer">Producer</Label>
                     <Input
                       id="producer"
-                      placeholder="Producer name"
+                      placeholder="Name"
                       value={producer}
                       onChange={(e) => setProducer(e.target.value)}
-                      className="h-10"
                     />
                   </div>
                 </div>
 
                 {/* Estimated Budget */}
                 <div className="space-y-2">
-                  <Label htmlFor="estimatedBudget" className="text-sm font-medium">
-                    Estimated Budget <span className="text-muted-foreground">(optional)</span>
-                  </Label>
+                  <Label htmlFor="estimatedBudget">Estimated budget</Label>
                   <Input
                     id="estimatedBudget"
                     placeholder="e.g., $500,000"
                     value={estimatedBudget}
                     onChange={(e) => setEstimatedBudget(e.target.value)}
-                    className="h-10"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    This helps set up your finance tracking later
-                  </p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Step 3: Get Started */}
+          {/* Step 3: Add Your Crew */}
           {step === 3 && (
-            <div className="space-y-8">
-              <div className="text-center">
-                <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-emerald-50 flex items-center justify-center">
-                  <Check className="h-6 w-6 text-emerald-600" />
-                </div>
-                <h1 className="text-2xl font-semibold">You&apos;re all set!</h1>
-                <p className="text-muted-foreground mt-2">
-                  Choose how you want to start working on <strong>{name}</strong>
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-2xl font-semibold">Add your crew</h1>
+                <p className="text-muted-foreground mt-1">
+                  Invite team members to collaborate on this project
                 </p>
               </div>
 
-              <div className="space-y-3">
-                <button
-                  onClick={() => handleCreate(true)}
-                  disabled={isSubmitting}
-                  className="w-full p-4 rounded-xl border-2 border-border hover:border-foreground bg-card transition-all text-left group"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                      <Sparkles className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium group-hover:text-foreground">
-                        Start with guided setup
-                      </h3>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        We&apos;ll walk you through adding locations, scenes, cast, and crew
-                      </p>
-                    </div>
-                  </div>
-                </button>
+              <div className="space-y-4">
+                {/* Add invite form */}
+                <div className="flex gap-2">
+                  <Input
+                    type="email"
+                    placeholder="Email address"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddInvite();
+                      }
+                    }}
+                    className="flex-1"
+                  />
+                  <select
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value as ProjectRole)}
+                    className="h-9 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    {(["COORDINATOR", "DEPARTMENT_HEAD", "CREW", "CAST", "VIEWER"] as ProjectRole[]).map((role) => (
+                      <option key={role} value={role}>
+                        {PROJECT_ROLE_LABELS[role]}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleAddInvite}
+                    disabled={!inviteEmail.trim() || !inviteEmail.includes("@")}
+                  >
+                    <UserPlus className="h-4 w-4" />
+                  </Button>
+                </div>
 
-                <button
-                  onClick={() => handleCreate(false)}
-                  disabled={isSubmitting}
-                  className="w-full p-4 rounded-xl border-2 border-border hover:border-foreground bg-card transition-all text-left group"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium group-hover:text-foreground">
-                        Jump right in
-                      </h3>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        Go straight to your project dashboard and set things up your way
-                      </p>
-                    </div>
+                {/* Pending invites list */}
+                {crewInvites.length > 0 && (
+                  <div className="rounded-md border border-border divide-y divide-border">
+                    {crewInvites.map((invite) => (
+                      <div key={invite.email} className="flex items-center justify-between px-3 py-2">
+                        <div className="flex items-center gap-3">
+                          <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium uppercase">
+                            {invite.email.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-sm">{invite.email}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {PROJECT_ROLE_LABELS[invite.role]}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveInvite(invite.email)}
+                          className="h-7 w-7"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
-                </button>
+                )}
+
+                {crewInvites.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    No crew members added yet. You can always invite people later.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Review & Create */}
+          {step === 4 && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-2xl font-semibold">Ready to create</h1>
+                <p className="text-muted-foreground mt-1">
+                  Review your project details
+                </p>
               </div>
 
-              {isSubmitting && (
-                <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">Creating your project...</span>
+              {/* Summary */}
+              <div className="rounded-lg border border-border p-4 space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Project name</span>
+                  <span className="text-sm font-medium">{name}</span>
                 </div>
-              )}
+                {description && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Description</span>
+                    <span className="text-sm font-medium truncate max-w-[200px]">{description}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Status</span>
+                  <span className="text-sm font-medium">{statusOptions.find(s => s.value === status)?.label}</span>
+                </div>
+                {crewInvites.length > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Team invites</span>
+                    <span className="text-sm font-medium">{crewInvites.length} pending</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Button
+                  onClick={() => handleCreate(false)}
+                  disabled={isSubmitting}
+                  className="w-full"
+                >
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  Create project
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => handleCreate(true)}
+                  disabled={isSubmitting}
+                  className="w-full text-muted-foreground"
+                >
+                  Create with guided setup
+                </Button>
+              </div>
 
               {showUpgradePrompt && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
@@ -435,7 +506,7 @@ export default function NewProjectPage() {
       </div>
 
       {/* Footer Navigation */}
-      {step < 3 && (
+      {step < 4 && (
         <div className="border-t border-border px-6 py-4">
           <div className="mx-auto max-w-xl flex items-center justify-between">
             <div>
@@ -448,7 +519,7 @@ export default function NewProjectPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              {step === 2 && (
+              {(step === 2 || step === 3) && (
                 <Button variant="ghost" onClick={handleNext}>
                   Skip
                 </Button>

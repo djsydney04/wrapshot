@@ -16,7 +16,7 @@ CREATE TYPE "BudgetUnits" AS ENUM ('DAYS', 'WEEKS', 'FLAT', 'HOURS', 'EACH');
 -- =============================================
 CREATE TABLE "Budget" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "projectId" UUID NOT NULL REFERENCES "Project"("id") ON DELETE CASCADE,
+  "projectId" TEXT NOT NULL REFERENCES "Project"("id") ON DELETE CASCADE,
   "version" INTEGER NOT NULL DEFAULT 1,
   "versionName" TEXT NOT NULL DEFAULT 'Initial',
   "status" "BudgetStatus" NOT NULL DEFAULT 'DRAFT',
@@ -387,7 +387,7 @@ CREATE POLICY "Users can view budgets for their projects"
     EXISTS (
       SELECT 1 FROM "ProjectMember"
       WHERE "ProjectMember"."projectId" = "Budget"."projectId"
-      AND "ProjectMember"."userId" = auth.uid()
+      AND "ProjectMember"."userId" = auth.uid()::TEXT
     )
   );
 
@@ -397,7 +397,7 @@ CREATE POLICY "Project admins can insert budgets"
     EXISTS (
       SELECT 1 FROM "ProjectMember"
       WHERE "ProjectMember"."projectId" = "Budget"."projectId"
-      AND "ProjectMember"."userId" = auth.uid()
+      AND "ProjectMember"."userId" = auth.uid()::TEXT
       AND "ProjectMember"."role" IN ('ADMIN', 'COORDINATOR')
     )
   );
@@ -408,7 +408,7 @@ CREATE POLICY "Project admins can update budgets"
     EXISTS (
       SELECT 1 FROM "ProjectMember"
       WHERE "ProjectMember"."projectId" = "Budget"."projectId"
-      AND "ProjectMember"."userId" = auth.uid()
+      AND "ProjectMember"."userId" = auth.uid()::TEXT
       AND "ProjectMember"."role" IN ('ADMIN', 'COORDINATOR')
     )
   );
@@ -419,7 +419,7 @@ CREATE POLICY "Project admins can delete budgets"
     EXISTS (
       SELECT 1 FROM "ProjectMember"
       WHERE "ProjectMember"."projectId" = "Budget"."projectId"
-      AND "ProjectMember"."userId" = auth.uid()
+      AND "ProjectMember"."userId" = auth.uid()::TEXT
       AND "ProjectMember"."role" = 'ADMIN'
     )
   );
@@ -432,7 +432,7 @@ CREATE POLICY "Users can view categories for their budgets"
       SELECT 1 FROM "Budget"
       JOIN "ProjectMember" ON "ProjectMember"."projectId" = "Budget"."projectId"
       WHERE "Budget"."id" = "BudgetCategory"."budgetId"
-      AND "ProjectMember"."userId" = auth.uid()
+      AND "ProjectMember"."userId" = auth.uid()::TEXT
     )
   );
 
@@ -443,7 +443,7 @@ CREATE POLICY "Project admins can manage categories"
       SELECT 1 FROM "Budget"
       JOIN "ProjectMember" ON "ProjectMember"."projectId" = "Budget"."projectId"
       WHERE "Budget"."id" = "BudgetCategory"."budgetId"
-      AND "ProjectMember"."userId" = auth.uid()
+      AND "ProjectMember"."userId" = auth.uid()::TEXT
       AND "ProjectMember"."role" IN ('ADMIN', 'COORDINATOR')
     )
   );
@@ -457,7 +457,7 @@ CREATE POLICY "Users can view line items for their budgets"
       JOIN "Budget" ON "Budget"."id" = "BudgetCategory"."budgetId"
       JOIN "ProjectMember" ON "ProjectMember"."projectId" = "Budget"."projectId"
       WHERE "BudgetCategory"."id" = "BudgetLineItem"."categoryId"
-      AND "ProjectMember"."userId" = auth.uid()
+      AND "ProjectMember"."userId" = auth.uid()::TEXT
     )
   );
 
@@ -469,7 +469,7 @@ CREATE POLICY "Project admins can manage line items"
       JOIN "Budget" ON "Budget"."id" = "BudgetCategory"."budgetId"
       JOIN "ProjectMember" ON "ProjectMember"."projectId" = "Budget"."projectId"
       WHERE "BudgetCategory"."id" = "BudgetLineItem"."categoryId"
-      AND "ProjectMember"."userId" = auth.uid()
+      AND "ProjectMember"."userId" = auth.uid()::TEXT
       AND "ProjectMember"."role" IN ('ADMIN', 'COORDINATOR')
     )
   );
@@ -482,7 +482,7 @@ CREATE POLICY "Users can view transactions for their budgets"
       SELECT 1 FROM "Budget"
       JOIN "ProjectMember" ON "ProjectMember"."projectId" = "Budget"."projectId"
       WHERE "Budget"."id" = "Transaction"."budgetId"
-      AND "ProjectMember"."userId" = auth.uid()
+      AND "ProjectMember"."userId" = auth.uid()::TEXT
     )
   );
 
@@ -493,7 +493,7 @@ CREATE POLICY "Project members can insert transactions"
       SELECT 1 FROM "Budget"
       JOIN "ProjectMember" ON "ProjectMember"."projectId" = "Budget"."projectId"
       WHERE "Budget"."id" = "Transaction"."budgetId"
-      AND "ProjectMember"."userId" = auth.uid()
+      AND "ProjectMember"."userId" = auth.uid()::TEXT
       AND "ProjectMember"."role" IN ('ADMIN', 'COORDINATOR', 'DEPARTMENT_HEAD')
     )
   );
@@ -506,7 +506,7 @@ CREATE POLICY "Transaction creators and admins can update transactions"
       SELECT 1 FROM "Budget"
       JOIN "ProjectMember" ON "ProjectMember"."projectId" = "Budget"."projectId"
       WHERE "Budget"."id" = "Transaction"."budgetId"
-      AND "ProjectMember"."userId" = auth.uid()
+      AND "ProjectMember"."userId" = auth.uid()::TEXT
       AND "ProjectMember"."role" IN ('ADMIN', 'COORDINATOR')
     )
   );
@@ -519,7 +519,7 @@ CREATE POLICY "Transaction creators and admins can delete transactions"
       SELECT 1 FROM "Budget"
       JOIN "ProjectMember" ON "ProjectMember"."projectId" = "Budget"."projectId"
       WHERE "Budget"."id" = "Transaction"."budgetId"
-      AND "ProjectMember"."userId" = auth.uid()
+      AND "ProjectMember"."userId" = auth.uid()::TEXT
       AND "ProjectMember"."role" = 'ADMIN'
     )
   );
@@ -551,7 +551,7 @@ CREATE POLICY "Users can view alerts for their budgets"
       SELECT 1 FROM "Budget"
       JOIN "ProjectMember" ON "ProjectMember"."projectId" = "Budget"."projectId"
       WHERE "Budget"."id" = "BudgetAlert"."budgetId"
-      AND "ProjectMember"."userId" = auth.uid()
+      AND "ProjectMember"."userId" = auth.uid()::TEXT
     )
   );
 
@@ -562,7 +562,7 @@ CREATE POLICY "Project admins can manage alerts"
       SELECT 1 FROM "Budget"
       JOIN "ProjectMember" ON "ProjectMember"."projectId" = "Budget"."projectId"
       WHERE "Budget"."id" = "BudgetAlert"."budgetId"
-      AND "ProjectMember"."userId" = auth.uid()
+      AND "ProjectMember"."userId" = auth.uid()::TEXT
       AND "ProjectMember"."role" IN ('ADMIN', 'COORDINATOR')
     )
   );

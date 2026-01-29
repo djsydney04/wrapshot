@@ -1,12 +1,5 @@
 // Permission system for wrapshoot
-// Defines permissions and role mappings for organization and project access
-
-export type OrgPermission =
-  | "org:read"
-  | "org:write"
-  | "org:delete"
-  | "org:billing"
-  | "org:manage-team";
+// Defines permissions and role mappings for project access
 
 export type ProjectPermission =
   | "project:read"
@@ -22,12 +15,11 @@ export type ProjectPermission =
   | "scenes:read"
   | "scenes:write"
   | "locations:read"
-  | "locations:write";
+  | "locations:write"
+  | "budget:read"
+  | "budget:write";
 
-export type Permission = OrgPermission | ProjectPermission;
-
-// Organization roles
-export type OrgRole = "OWNER" | "ADMIN" | "MEMBER";
+export type Permission = ProjectPermission;
 
 // Project roles (from Prisma schema)
 export type ProjectRole =
@@ -37,26 +29,6 @@ export type ProjectRole =
   | "CREW"
   | "CAST"
   | "VIEWER";
-
-// Organization role permissions
-export const ORG_ROLE_PERMISSIONS: Record<OrgRole, OrgPermission[]> = {
-  OWNER: [
-    "org:read",
-    "org:write",
-    "org:delete",
-    "org:billing",
-    "org:manage-team",
-  ],
-  ADMIN: [
-    "org:read",
-    "org:write",
-    "org:billing",
-    "org:manage-team",
-  ],
-  MEMBER: [
-    "org:read",
-  ],
-};
 
 // Project role permissions
 export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, ProjectPermission[]> = {
@@ -75,6 +47,8 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, ProjectPermission[]> 
     "scenes:write",
     "locations:read",
     "locations:write",
+    "budget:read",
+    "budget:write",
   ],
   COORDINATOR: [
     "project:read",
@@ -90,6 +64,8 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, ProjectPermission[]> 
     "scenes:write",
     "locations:read",
     "locations:write",
+    "budget:read",
+    "budget:write",
   ],
   DEPARTMENT_HEAD: [
     "project:read",
@@ -100,6 +76,7 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, ProjectPermission[]> 
     "crew:write",
     "scenes:read",
     "locations:read",
+    "budget:read",
   ],
   CREW: [
     "project:read",
@@ -125,15 +102,6 @@ export const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, ProjectPermission[]> 
   ],
 };
 
-// Check if org role has permission
-export function orgRoleHasPermission(
-  role: OrgRole | null | undefined,
-  permission: OrgPermission
-): boolean {
-  if (!role) return false;
-  return ORG_ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
-}
-
 // Check if project role has permission
 export function projectRoleHasPermission(
   role: ProjectRole | null | undefined,
@@ -143,12 +111,6 @@ export function projectRoleHasPermission(
   return PROJECT_ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
 }
 
-// Get all permissions for org role
-export function getOrgPermissions(role: OrgRole | null | undefined): OrgPermission[] {
-  if (!role) return [];
-  return ORG_ROLE_PERMISSIONS[role] ?? [];
-}
-
 // Get all permissions for project role
 export function getProjectPermissions(role: ProjectRole | null | undefined): ProjectPermission[] {
   if (!role) return [];
@@ -156,12 +118,6 @@ export function getProjectPermissions(role: ProjectRole | null | undefined): Pro
 }
 
 // Role display names
-export const ORG_ROLE_LABELS: Record<OrgRole, string> = {
-  OWNER: "Owner",
-  ADMIN: "Admin",
-  MEMBER: "Member",
-};
-
 export const PROJECT_ROLE_LABELS: Record<ProjectRole, string> = {
   ADMIN: "Admin",
   COORDINATOR: "Coordinator",
@@ -172,12 +128,6 @@ export const PROJECT_ROLE_LABELS: Record<ProjectRole, string> = {
 };
 
 // Role descriptions
-export const ORG_ROLE_DESCRIPTIONS: Record<OrgRole, string> = {
-  OWNER: "Full access to all settings, billing, and team management",
-  ADMIN: "Can manage projects and team members",
-  MEMBER: "Can view and work on assigned projects",
-};
-
 export const PROJECT_ROLE_DESCRIPTIONS: Record<ProjectRole, string> = {
   ADMIN: "Full access to all project features and settings",
   COORDINATOR: "Can manage schedules, cast, crew, and scenes",

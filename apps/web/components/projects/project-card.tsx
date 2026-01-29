@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { MoreHorizontal, Film, Users, MapPin, Calendar } from "lucide-react";
+import { MoreHorizontal, Film, Users, MapPin, Calendar, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -120,17 +120,58 @@ export function ProjectCard({ project, className }: ProjectCardProps) {
 // Empty state component
 export function ProjectsEmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-12">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-        <Film className="h-6 w-6 text-muted-foreground" />
+    <div className="flex items-center justify-center min-h-[500px]">
+      <div className="text-center max-w-md">
+        <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-muted mb-6">
+          <Film className="h-10 w-10 text-muted-foreground" />
+        </div>
+        <h2 className="text-2xl font-semibold mb-2">
+          No projects yet
+        </h2>
+        <p className="text-muted-foreground mb-6">
+          Create your first project to start managing your production from script to screen.
+        </p>
+        <Button size="lg" asChild>
+          <Link href="/projects/new">Create Project</Link>
+        </Button>
+
+        {/* Feature Highlights */}
+        <div className="mt-12 grid gap-4 text-left">
+          <div className="flex gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <Film className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div>
+              <h4 className="font-medium mb-0.5">All-in-One Production Hub</h4>
+              <p className="text-sm text-muted-foreground">
+                Manage scenes, cast, crew, and locations in one place
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div>
+              <h4 className="font-medium mb-0.5">Team Collaboration</h4>
+              <p className="text-sm text-muted-foreground">
+                Invite your team and assign roles with granular permissions
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div>
+              <h4 className="font-medium mb-0.5">Production Tracking</h4>
+              <p className="text-sm text-muted-foreground">
+                Track progress from development through post-production
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
-      <h3 className="mt-4 text-sm font-medium">No projects yet</h3>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Create your first project to get started
-      </p>
-      <Button className="mt-4" size="sm" asChild>
-        <Link href="/projects/new">Create Project</Link>
-      </Button>
     </div>
   );
 }

@@ -1,104 +1,108 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ImageUpload } from "@/components/ui/image-upload";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  Briefcase,
-  Settings,
-  Sparkles,
-  Loader2,
-} from "lucide-react";
+import { ArrowRight, Loader2, X, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   saveOnboardingProfile,
+  sendOnboardingInvites,
   completeOnboarding,
 } from "@/lib/actions/onboarding";
 
 type Step = 1 | 2 | 3 | 4;
 
-const JOB_TITLES = [
-  { value: "producer", label: "Producer" },
-  { value: "executive_producer", label: "Executive Producer" },
-  { value: "director", label: "Director" },
-  { value: "assistant_director", label: "Assistant Director (AD)" },
-  { value: "unit_production_manager", label: "Unit Production Manager" },
-  { value: "production_coordinator", label: "Production Coordinator" },
-  { value: "production_assistant", label: "Production Assistant" },
-  { value: "cinematographer", label: "Cinematographer / DP" },
-  { value: "editor", label: "Editor" },
-  { value: "production_designer", label: "Production Designer" },
-  { value: "sound_designer", label: "Sound Designer" },
-  { value: "other", label: "Other" },
+const ROLES = [
+  "Producer",
+  "Executive Producer",
+  "Director",
+  "Assistant Director",
+  "Production Manager",
+  "Production Coordinator",
+  "Cinematographer",
+  "Editor",
+  "Other",
 ];
 
-const TIMEZONES = [
-  { value: "America/Los_Angeles", label: "Pacific Time (PT)" },
-  { value: "America/Denver", label: "Mountain Time (MT)" },
-  { value: "America/Chicago", label: "Central Time (CT)" },
-  { value: "America/New_York", label: "Eastern Time (ET)" },
-  { value: "Europe/London", label: "London (GMT/BST)" },
-  { value: "Europe/Paris", label: "Central European (CET)" },
-  { value: "Asia/Tokyo", label: "Japan (JST)" },
-  { value: "Australia/Sydney", label: "Sydney (AEST)" },
+const PRODUCTION_TYPES = [
+  { id: "feature", label: "Feature Film" },
+  { id: "short", label: "Short Film" },
+  { id: "tv_series", label: "TV Series" },
+  { id: "documentary", label: "Documentary" },
+  { id: "commercial", label: "Commercial" },
+  { id: "music_video", label: "Music Video" },
+  { id: "corporate", label: "Corporate Video" },
+  { id: "other", label: "Other" },
+];
+
+const REFERRAL_SOURCES = [
+  { id: "google", label: "Google search" },
+  { id: "friend", label: "Friend or colleague" },
+  { id: "social", label: "Social media" },
+  { id: "blog", label: "Blog or article" },
+  { id: "conference", label: "Conference or event" },
+  { id: "other", label: "Other" },
 ];
 
 export default function OnboardingPage() {
-  const router = useRouter();
   const [step, setStep] = React.useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Form state
+  // Step 1: Profile
   const [firstName, setFirstName] = React.useState("");
   const [lastName, setLastName] = React.useState("");
-  const [jobTitle, setJobTitle] = React.useState("");
+  const [role, setRole] = React.useState("");
   const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
-  const [timezone, setTimezone] = React.useState("America/Los_Angeles");
 
-  // Detect timezone on mount
-  React.useEffect(() => {
-    const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const match = TIMEZONES.find((tz) => tz.value === detected);
-    if (match) {
-      setTimezone(detected);
-    }
-  }, []);
+  // Step 2: Production type
+  const [productionType, setProductionType] = React.useState("");
+
+  // Step 3: Invite team
+  const [emails, setEmails] = React.useState<string[]>([""]);
+
+  // Step 4: Referral
+  const [referralSource, setReferralSource] = React.useState("");
 
   const canProceed = React.useMemo(() => {
     switch (step) {
       case 1:
         return firstName.trim().length > 0 && lastName.trim().length > 0;
       case 2:
-        return true; // Optional
+        return productionType !== "";
       case 3:
-        return true; // Has defaults
+        return true; // Optional
       case 4:
-        return true;
+        return referralSource !== "";
       default:
         return false;
     }
-  }, [step, firstName, lastName]);
+  }, [step, firstName, lastName, productionType, referralSource]);
 
-  const handleNext = async () => {
+  const handleNext = () => {
     setError(null);
-
     if (step < 4) {
       setStep((step + 1) as Step);
     }
   };
 
-  const handleBack = () => {
-    setError(null);
-    if (step > 1) {
-      setStep((step - 1) as Step);
+  const handleAddEmail = () => {
+    if (emails.length < 5) {
+      setEmails([...emails, ""]);
     }
+  };
+
+  const handleRemoveEmail = (index: number) => {
+    setEmails(emails.filter((_, i) => i !== index));
+  };
+
+  const handleEmailChange = (index: number, value: string) => {
+    const newEmails = [...emails];
+    newEmails[index] = value;
+    setEmails(newEmails);
   };
 
   const handleComplete = async (withTour: boolean) => {
@@ -106,286 +110,292 @@ export default function OnboardingPage() {
     setError(null);
 
     try {
-      // Save profile
       await saveOnboardingProfile({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        jobTitle: jobTitle || undefined,
+        jobTitle: role || undefined,
         avatarUrl: avatarUrl || undefined,
-        timezone,
+        productionType,
+        referralSource,
       });
 
-      // Complete onboarding
+      const validEmails = emails.filter((e) => e.trim() && e.includes("@"));
+      if (validEmails.length > 0) {
+        await sendOnboardingInvites(validEmails);
+      }
+
       await completeOnboarding();
 
-      // Small delay for UX
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       if (withTour) {
-        router.push("/?startTour=true");
+        window.location.href = "/?tour=1";
       } else {
-        router.push("/");
+        window.location.href = "/";
       }
-      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setIsSubmitting(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && canProceed && step < 5) {
-      e.preventDefault();
-      handleNext();
-    }
-  };
-
   return (
-    <div className="flex h-screen flex-col bg-background" onKeyDown={handleKeyDown}>
-      {/* Header */}
-      <div className="flex items-center justify-center border-b border-border px-6 py-4">
-        {/* Step Indicator */}
-        <div className="flex items-center gap-2">
-          {[1, 2, 3, 4].map((s) => (
-            <div
-              key={s}
-              className={cn(
-                "h-2 w-8 rounded-full transition-colors",
-                s <= step ? "bg-foreground" : "bg-muted"
-              )}
-            />
-          ))}
-        </div>
+    <div className="min-h-screen bg-background">
+      {/* Progress bar */}
+      <div className="fixed top-0 left-0 right-0 h-1 bg-muted">
+        <div
+          className="h-full bg-foreground transition-all duration-300"
+          style={{ width: `${(step / 4) * 100}%` }}
+        />
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-xl px-6 py-12">
-          {/* Step 1: Welcome + Name */}
-          {step === 1 && (
-            <div className="space-y-8">
-              <div className="text-center">
-                <h1 className="text-2xl font-semibold">Welcome to wrapshoot</h1>
-                <p className="text-muted-foreground mt-2">
-                  Let&apos;s set up your account. What&apos;s your name?
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">
-                      First Name <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="firstName"
-                      placeholder="John"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      className="h-12 text-lg"
-                      autoFocus
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">
-                      Last Name <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="lastName"
-                      placeholder="Doe"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      className="h-12 text-lg"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 2: Profile */}
-          {step === 2 && (
-            <div className="space-y-8">
-              <div className="text-center">
-                <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                  <Briefcase className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <h1 className="text-2xl font-semibold">Tell us about yourself</h1>
-                <p className="text-muted-foreground mt-2">
-                  This helps us personalize your experience
-                </p>
-              </div>
-
-              <div className="space-y-6">
-                <div className="flex flex-col items-center gap-4">
-                  <Label className="text-sm font-medium">Profile Photo</Label>
-                  <ImageUpload
-                    value={avatarUrl}
-                    onChange={setAvatarUrl}
-                    bucket="profile-photos"
-                    folder="avatars"
-                    aspectRatio="square"
-                    className="w-24 h-24"
-                  />
-                  <p className="text-xs text-muted-foreground">Optional</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="jobTitle">What&apos;s your role?</Label>
-                  <select
-                    id="jobTitle"
-                    value={jobTitle}
-                    onChange={(e) => setJobTitle(e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <option value="">Select your role...</option>
-                    {JOB_TITLES.map((job) => (
-                      <option key={job.value} value={job.value}>
-                        {job.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Preferences */}
-          {step === 3 && (
-            <div className="space-y-8">
-              <div className="text-center">
-                <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                  <Settings className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <h1 className="text-2xl font-semibold">Preferences</h1>
-                <p className="text-muted-foreground mt-2">
-                  Set your timezone for accurate scheduling
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="timezone">Timezone</Label>
-                  <select
-                    id="timezone"
-                    value={timezone}
-                    onChange={(e) => setTimezone(e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {TIMEZONES.map((tz) => (
-                      <option key={tz.value} value={tz.value}>
-                        {tz.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-muted-foreground">
-                    We detected your timezone automatically. Change it if needed.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 4: Ready */}
-          {step === 4 && (
-            <div className="space-y-8">
-              <div className="text-center">
-                <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-emerald-50 flex items-center justify-center">
-                  <Check className="h-6 w-6 text-emerald-600" />
-                </div>
-                <h1 className="text-2xl font-semibold">You&apos;re all set!</h1>
-                <p className="text-muted-foreground mt-2">
-                  Welcome aboard, <strong>{firstName}</strong>. Ready to get started?
-                </p>
-              </div>
-
-              {error && (
-                <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3">
-                  <p className="text-sm text-destructive">{error}</p>
-                </div>
-              )}
-
-              <div className="space-y-3">
-                <button
-                  onClick={() => handleComplete(true)}
-                  disabled={isSubmitting}
-                  className="w-full p-4 rounded-xl border-2 border-border hover:border-foreground bg-card transition-all text-left group"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                      <Sparkles className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium group-hover:text-foreground">
-                        Take a quick tour
-                      </h3>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        Learn the basics in under a minute
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => handleComplete(false)}
-                  disabled={isSubmitting}
-                  className="w-full p-4 rounded-xl border-2 border-border hover:border-foreground bg-card transition-all text-left group"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium group-hover:text-foreground">
-                        Jump right in
-                      </h3>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        I&apos;ll explore on my own
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              </div>
-
-              {isSubmitting && (
-                <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">Setting up your account...</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Footer Navigation */}
-      {step < 4 && (
-        <div className="border-t border-border px-6 py-4">
-          <div className="mx-auto max-w-xl flex items-center justify-between">
+      <div className="mx-auto max-w-lg px-6 pt-16 pb-12">
+        {/* Step 1: Profile */}
+        {step === 1 && (
+          <div className="space-y-8">
             <div>
-              {step > 1 && (
-                <Button variant="ghost" onClick={handleBack} disabled={isSubmitting}>
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
+              <p className="text-sm text-muted-foreground mb-1">Step 1 of 4</p>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                Let's set up your profile
+              </h1>
+            </div>
+
+            <div className="space-y-6">
+              <div className="flex items-center gap-4">
+                <ImageUpload
+                  value={avatarUrl}
+                  onChange={setAvatarUrl}
+                  bucket="profile-photos"
+                  folder="avatars"
+                  aspectRatio="square"
+                  className="w-20 h-20 rounded-full"
+                  placeholder=""
+                />
+                <p className="text-sm text-muted-foreground">
+                  Add a profile photo
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First name</Label>
+                  <Input
+                    id="firstName"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="Jane"
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last name</Label>
+                  <Input
+                    id="lastName"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Smith"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="role">What's your role?</Label>
+                <select
+                  id="role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">Select a role</option>
+                  {ROLES.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <Button
+              onClick={handleNext}
+              disabled={!canProceed}
+              className="w-full"
+            >
+              Continue
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
+        {/* Step 2: Production Type */}
+        {step === 2 && (
+          <div className="space-y-8">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Step 2 of 4</p>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                What are you working on?
+              </h1>
+              <p className="text-muted-foreground mt-2">
+                This helps us tailor the experience for you.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {PRODUCTION_TYPES.map((type) => (
+                <button
+                  key={type.id}
+                  type="button"
+                  onClick={() => setProductionType(type.id)}
+                  className={cn(
+                    "px-4 py-3 rounded-lg border text-left text-sm font-medium transition-colors",
+                    productionType === type.id
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border hover:border-foreground/50"
+                  )}
+                >
+                  {type.label}
+                </button>
+              ))}
+            </div>
+
+            <Button
+              onClick={handleNext}
+              disabled={!canProceed}
+              className="w-full"
+            >
+              Continue
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
+        {/* Step 3: Invite Team */}
+        {step === 3 && (
+          <div className="space-y-8">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Step 3 of 4</p>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                Invite your team
+              </h1>
+              <p className="text-muted-foreground mt-2">
+                Production is a team sport. Add collaborators now or later.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {emails.map((email, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => handleEmailChange(index, e.target.value)}
+                    placeholder="colleague@email.com"
+                    className="flex-1"
+                  />
+                  {emails.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleRemoveEmail(index)}
+                      className="shrink-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+
+              {emails.length < 5 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleAddEmail}
+                  className="w-full text-muted-foreground"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add another
                 </Button>
               )}
             </div>
 
-            <div className="flex items-center gap-3">
-              {(step === 2 || step === 3) && (
-                <Button variant="ghost" onClick={handleNext} disabled={isSubmitting}>
-                  Skip
-                </Button>
-              )}
-              <Button onClick={handleNext} disabled={!canProceed || isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Continue
-                <ArrowRight className="h-4 w-4 ml-2" />
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={handleNext}
+                className="flex-1"
+              >
+                Skip for now
+              </Button>
+              <Button
+                onClick={handleNext}
+                disabled={!emails.some((e) => e.trim() && e.includes("@"))}
+                className="flex-1"
+              >
+                Send invites
               </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Step 4: Referral */}
+        {step === 4 && (
+          <div className="space-y-8">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Step 4 of 4</p>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                How did you find us?
+              </h1>
+              <p className="text-muted-foreground mt-2">
+                We'd love to know what brought you here.
+              </p>
+            </div>
+
+            {error && (
+              <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3">
+                <p className="text-sm text-destructive">{error}</p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {REFERRAL_SOURCES.map((source) => (
+                <button
+                  key={source.id}
+                  type="button"
+                  onClick={() => setReferralSource(source.id)}
+                  className={cn(
+                    "w-full px-4 py-3 rounded-lg border text-left text-sm transition-colors",
+                    referralSource === source.id
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border hover:border-foreground/50"
+                  )}
+                >
+                  {source.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-3 pt-4">
+              <Button
+                onClick={() => handleComplete(false)}
+                disabled={!canProceed || isSubmitting}
+                className="w-full"
+              >
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Get started
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => handleComplete(true)}
+                disabled={!canProceed || isSubmitting}
+                className="w-full text-muted-foreground"
+              >
+                Take a quick tour first
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

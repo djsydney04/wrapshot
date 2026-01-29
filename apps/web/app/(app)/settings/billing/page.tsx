@@ -22,7 +22,6 @@ import {
   SettingsCardHeader,
   SettingsCardBody,
 } from "@/components/layout/settings-layout";
-import { BillingGate, NoAccess } from "@/components/ui/permission-gate";
 import { useSubscription } from "@/lib/hooks/use-permissions";
 import { useAuth } from "@/components/providers/auth-provider";
 
@@ -63,7 +62,7 @@ const plans = [
 function BillingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { currentOrg } = useAuth();
+  const { user } = useAuth();
   const subscription = useSubscription();
   const currentPlan = subscription?.plan ?? "FREE";
 
@@ -87,7 +86,7 @@ function BillingContent() {
   }, [searchParams, router]);
 
   const handleUpgrade = async (planId: string) => {
-    if (!currentOrg?.id) return;
+    if (!user?.id) return;
 
     setLoadingPlan(planId);
     setMessage(null);
@@ -98,7 +97,7 @@ function BillingContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           planId,
-          organizationId: currentOrg.id,
+          userId: user.id,
         }),
       });
 
@@ -123,7 +122,7 @@ function BillingContent() {
   };
 
   const handleManageSubscription = async () => {
-    if (!currentOrg?.id) return;
+    if (!user?.id) return;
 
     setLoadingPortal(true);
     setMessage(null);
@@ -133,7 +132,7 @@ function BillingContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          organizationId: currentOrg.id,
+          userId: user.id,
         }),
       });
 
@@ -381,50 +380,25 @@ function BillingContent() {
   );
 }
 
-function BillingGateWithDebug() {
-  const { currentOrg, loading, organizations } = useAuth();
+function BillingWrapper() {
+  const { user, loading } = useAuth();
 
   if (loading) {
     return <div className="animate-pulse bg-muted h-48 rounded-xl" />;
   }
 
-  // No organization at all
-  if (organizations.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <div className="rounded-full bg-amber-50 p-4 mb-4">
-          <AlertCircle className="h-8 w-8 text-amber-600" />
-        </div>
-        <h3 className="font-medium mb-2">No Organization Found</h3>
-        <p className="text-muted-foreground text-sm max-w-md">
-          You need to create or join an organization to access billing settings.
-          Please complete the onboarding process first.
-        </p>
-      </div>
-    );
-  }
-
-  // No current org selected (shouldn't happen but just in case)
-  if (!currentOrg) {
+  if (!user) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <div className="rounded-full bg-muted p-4 mb-4">
           <AlertCircle className="h-8 w-8 text-muted-foreground" />
         </div>
-        <p className="text-muted-foreground">Please select an organization to continue.</p>
+        <p className="text-muted-foreground">Please sign in to access billing settings.</p>
       </div>
     );
   }
 
-  return (
-    <BillingGate
-      fallback={
-        <NoAccess message="Only organization owners and admins can access billing settings." />
-      }
-    >
-      <BillingContent />
-    </BillingGate>
-  );
+  return <BillingContent />;
 }
 
 export default function BillingSettingsPage() {
@@ -435,7 +409,7 @@ export default function BillingSettingsPage() {
       breadcrumbs={[{ label: "Settings" }, { label: "Billing" }]}
     >
       <React.Suspense fallback={<div className="animate-pulse bg-muted h-48 rounded-xl" />}>
-        <BillingGateWithDebug />
+        <BillingWrapper />
       </React.Suspense>
     </SettingsLayout>
   );

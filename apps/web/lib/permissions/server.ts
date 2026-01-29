@@ -1,11 +1,8 @@
 // Server-side permission checking utilities
 import { createClient } from "@/lib/supabase/server";
 import {
-  type OrgRole,
   type ProjectRole,
-  type OrgPermission,
   type ProjectPermission,
-  orgRoleHasPermission,
   projectRoleHasPermission,
 } from "./index";
 
@@ -16,27 +13,6 @@ export async function getCurrentUserId(): Promise<string | null> {
     data: { user },
   } = await supabase.auth.getUser();
   return user?.id ?? null;
-}
-
-// Get user's role in an organization
-export async function getUserOrgRole(
-  userId: string,
-  organizationId: string
-): Promise<OrgRole | null> {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from("OrganizationMember")
-    .select("role")
-    .eq("organizationId", organizationId)
-    .eq("userId", userId)
-    .single();
-
-  if (error || !data) {
-    return null;
-  }
-
-  return data.role as OrgRole;
 }
 
 // Get user's role in a project
@@ -60,16 +36,6 @@ export async function getUserProjectRole(
   return data.role as ProjectRole;
 }
 
-// Check if user has org permission
-export async function hasOrgPermission(
-  userId: string,
-  organizationId: string,
-  permission: OrgPermission
-): Promise<boolean> {
-  const role = await getUserOrgRole(userId, organizationId);
-  return orgRoleHasPermission(role, permission);
-}
-
 // Check if user has project permission
 export async function hasProjectPermission(
   userId: string,
@@ -78,30 +44,6 @@ export async function hasProjectPermission(
 ): Promise<boolean> {
   const role = await getUserProjectRole(userId, projectId);
   return projectRoleHasPermission(role, permission);
-}
-
-// Require org permission - throws error if not authorized
-export async function requireOrgPermission(
-  organizationId: string,
-  permission: OrgPermission
-): Promise<{ userId: string; role: OrgRole }> {
-  const userId = await getCurrentUserId();
-
-  if (!userId) {
-    throw new Error("Unauthorized: Not logged in");
-  }
-
-  const role = await getUserOrgRole(userId, organizationId);
-
-  if (!role) {
-    throw new Error("Unauthorized: Not a member of this organization");
-  }
-
-  if (!orgRoleHasPermission(role, permission)) {
-    throw new Error(`Unauthorized: Missing permission ${permission}`);
-  }
-
-  return { userId, role };
 }
 
 // Require project permission - throws error if not authorized
@@ -128,35 +70,6 @@ export async function requireProjectPermission(
   return { userId, role };
 }
 
-// Get user's organization memberships
-export async function getUserOrganizations(userId: string) {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from("OrganizationMember")
-    .select(
-      `
-      role,
-      organization:Organization (
-        id,
-        name,
-        slug
-      )
-    `
-    )
-    .eq("userId", userId);
-
-  if (error) {
-    console.error("Error fetching user organizations:", error);
-    return [];
-  }
-
-  return data?.map((m) => ({
-    ...m.organization,
-    role: m.role as OrgRole,
-  })) ?? [];
-}
-
 // Get user's project memberships
 export async function getUserProjects(userId: string) {
   const supabase = await createClient();
@@ -169,7 +82,7 @@ export async function getUserProjects(userId: string) {
       project:Project (
         id,
         name,
-        organizationId,
+        ownerId,
         status
       )
     `
@@ -187,15 +100,15 @@ export async function getUserProjects(userId: string) {
   })) ?? [];
 }
 
-// Get organization's subscription status
-export async function getOrgSubscription(organizationId: string) {
+// Get user's subscription status
+export async function getUserSubscription(userId: string) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("Subscription")
     .select("*")
-    .eq("organizationId", organizationId)
-    .single();
+    .eq("userId", userId)
+    .maybeSingle();
 
   if (error || !data) {
     return {
@@ -210,13 +123,13 @@ export async function getOrgSubscription(organizationId: string) {
 
 // Check if action is allowed by plan
 export async function checkPlanLimit(
-  organizationId: string,
+  userId: string,
   limitType: "projects" | "team_members"
 ): Promise<boolean> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase.rpc("check_plan_limit", {
-    org_id: organizationId,
+  const { data, error } = await supabase.rpc("check_plan_limit_user", {
+    user_id: userId,
     limit_type: limitType,
   });
 

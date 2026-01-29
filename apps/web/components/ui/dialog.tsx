@@ -88,7 +88,7 @@ function DialogHeader({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("px-6 pt-6 pb-4", className)}
+      className={cn("p-6 pb-4", className)}
       {...props}
     >
       {children}
@@ -133,7 +133,7 @@ function DialogBody({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("px-6 py-4", className)}
+      className={cn("px-6 py-5", className)}
       {...props}
     >
       {children}
@@ -149,7 +149,7 @@ function DialogFooter({
   return (
     <div
       className={cn(
-        "flex items-center justify-end gap-2 border-t border-border px-6 py-4",
+        "flex items-center justify-end gap-2 border-t border-border p-5",
         className
       )}
       {...props}

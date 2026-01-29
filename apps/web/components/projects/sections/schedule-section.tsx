@@ -261,7 +261,7 @@ export function ScheduleSection({
             </div>
 
             <Button size="sm" onClick={() => setShowAddDay(true)}>
-              <Plus className="h-4 w-4 mr-1.5" />
+              <Plus className="h-4 w-4" />
               Add Day
             </Button>
           </div>
@@ -416,7 +416,7 @@ export function ScheduleSection({
                   Add shooting days to build your production schedule
                 </p>
                 <Button onClick={() => setShowAddDay(true)}>
-                  <Plus className="h-4 w-4 mr-1.5" />
+                  <Plus className="h-4 w-4" />
                   Schedule First Day
                 </Button>
               </div>

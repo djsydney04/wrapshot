@@ -23,7 +23,7 @@ export async function GET(request: Request) {
           .from("UserProfile")
           .select("onboardingCompletedAt")
           .eq("userId", user.id)
-          .single();
+          .maybeSingle();
 
         // Redirect to onboarding if not completed
         if (!profile?.onboardingCompletedAt) {
