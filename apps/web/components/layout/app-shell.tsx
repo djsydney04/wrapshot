@@ -25,7 +25,7 @@ export function AppShell({ children, user }: AppShellProps) {
   if (!mounted) {
     return (
       <div className="flex h-screen overflow-hidden bg-background">
-        <div className="w-[240px] border-r border-border bg-muted/30" />
+        <div className="w-[240px] border-r border-stone-800 bg-stone-900" />
         <main className="flex-1 overflow-auto">
           {children}
         </main>

@@ -1,4 +1,4 @@
-// Permission system for SetSync
+// Permission system for wrapshoot
 // Defines permissions and role mappings for organization and project access
 
 export type OrgPermission =

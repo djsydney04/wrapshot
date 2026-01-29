@@ -16,7 +16,6 @@ import {
   Settings,
   Sparkles,
   Loader2,
-  Clapperboard,
   Users,
   UserPlus,
 } from "lucide-react";
@@ -204,10 +203,7 @@ export default function OnboardingPage() {
           {step === 1 && (
             <div className="space-y-8">
               <div className="text-center">
-                <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-primary flex items-center justify-center">
-                  <Clapperboard className="h-6 w-6 text-primary-foreground" />
-                </div>
-                <h1 className="text-2xl font-semibold">Welcome to SetSync</h1>
+                <h1 className="text-2xl font-semibold">Welcome to wrapshoot</h1>
                 <p className="text-muted-foreground mt-2">
                   Let&apos;s set up your account. What&apos;s your name?
                 </p>

@@ -9,8 +9,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "SetSync - Film Production Scheduling",
-  description: "AI-powered movie production scheduling platform",
+  title: "wrapshoot - Film Production Scheduling",
+  description: "Production management for modern filmmakers",
 };
 
 export default function RootLayout({

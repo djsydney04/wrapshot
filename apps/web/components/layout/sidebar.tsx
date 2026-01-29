@@ -14,7 +14,6 @@ import {
   LogOut,
   User,
   LayoutDashboard,
-  Clapperboard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -79,25 +78,22 @@ export function Sidebar({ user }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "relative flex h-screen flex-col border-r border-border bg-background transition-all duration-200",
+        "relative flex h-screen flex-col border-r border-stone-800 bg-stone-900 text-white transition-all duration-200",
         sidebarOpen ? "w-[240px]" : "w-[48px]"
       )}
     >
       {/* Header */}
-      <div className="flex h-[45px] items-center justify-between px-3 border-b border-border">
+      <div className="flex h-[45px] items-center justify-between px-3 border-b border-stone-800">
         {sidebarOpen ? (
           <>
-            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <div className="flex h-6 w-6 items-center justify-center rounded bg-primary">
-                <Clapperboard className="h-4 w-4 text-primary-foreground" />
-              </div>
-              <span className="font-semibold text-sm">SetSync</span>
+            <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+              <span className="font-semibold text-sm">wrapshoot</span>
             </Link>
             <Button
               variant="ghost"
               size="icon-sm"
               onClick={toggleSidebar}
-              className="text-muted-foreground"
+              className="text-stone-400 hover:text-white hover:bg-stone-800"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -108,7 +104,7 @@ export function Sidebar({ user }: SidebarProps) {
               variant="ghost"
               size="icon-sm"
               onClick={toggleSidebar}
-              className="mx-auto text-muted-foreground"
+              className="mx-auto text-stone-400 hover:text-white hover:bg-stone-800"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -121,13 +117,13 @@ export function Sidebar({ user }: SidebarProps) {
         <div className="px-2 py-2">
           <Button
             variant="ghost"
-            className="w-full justify-start gap-2 text-muted-foreground font-normal h-8"
+            className="w-full justify-start gap-2 text-stone-400 hover:text-white hover:bg-stone-800 font-normal h-8"
             onClick={openCommandPalette}
             data-tour="command-palette"
           >
             <Search className="h-4 w-4" />
             <span className="flex-1 text-left">Search</span>
-            <kbd className="pointer-events-none h-5 select-none rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+            <kbd className="pointer-events-none h-5 select-none rounded border border-stone-700 bg-stone-800 px-1.5 font-mono text-[10px] font-medium text-stone-400">
               ⌘K
             </kbd>
           </Button>
@@ -149,8 +145,8 @@ export function Sidebar({ user }: SidebarProps) {
                       variant="ghost"
                       size="icon"
                       className={cn(
-                        "w-full",
-                        isActive && "bg-[hsl(var(--notion-hover))]"
+                        "w-full text-stone-400 hover:text-white hover:bg-stone-800",
+                        isActive && "bg-stone-800 text-white"
                       )}
                     >
                       <Icon className="h-4 w-4" />
@@ -165,8 +161,8 @@ export function Sidebar({ user }: SidebarProps) {
                 <Button
                   variant="ghost"
                   className={cn(
-                    "w-full justify-start gap-2 font-normal h-8",
-                    isActive && "bg-[hsl(var(--notion-hover))]"
+                    "w-full justify-start gap-2 font-normal h-8 text-stone-400 hover:text-white hover:bg-stone-800",
+                    isActive && "bg-stone-800 text-white"
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -180,13 +176,13 @@ export function Sidebar({ user }: SidebarProps) {
         {/* Projects Section */}
         {sidebarOpen && (
           <>
-            <Separator className="my-3" />
+            <Separator className="my-3 bg-stone-800" />
             <div className="space-y-1">
               <div className="flex items-center justify-between px-2 py-1">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <span className="text-xs font-medium text-stone-500 uppercase tracking-wider">
                   Projects
                 </span>
-                <Button variant="ghost" size="icon-sm" className="h-5 w-5 text-muted-foreground">
+                <Button variant="ghost" size="icon-sm" className="h-5 w-5 text-stone-500 hover:text-white hover:bg-stone-800">
                   <Plus className="h-3 w-3" />
                 </Button>
               </div>
@@ -197,11 +193,11 @@ export function Sidebar({ user }: SidebarProps) {
                     <Button
                       variant="ghost"
                       className={cn(
-                        "w-full justify-start gap-2 font-normal h-8 text-sm",
-                        isActive && "bg-[hsl(var(--notion-hover))]"
+                        "w-full justify-start gap-2 font-normal h-8 text-sm text-stone-400 hover:text-white hover:bg-stone-800",
+                        isActive && "bg-stone-800 text-white"
                       )}
                     >
-                      <Film className="h-3.5 w-3.5 text-muted-foreground" />
+                      <Film className="h-3.5 w-3.5 text-stone-500" />
                       <span className="truncate">{project.name}</span>
                     </Button>
                   </Link>
@@ -213,7 +209,7 @@ export function Sidebar({ user }: SidebarProps) {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-border p-2 space-y-1">
+      <div className="border-t border-stone-800 p-2 space-y-1">
         {sidebarOpen ? (
           <>
             {/* Settings Link */}
@@ -221,8 +217,8 @@ export function Sidebar({ user }: SidebarProps) {
               <Button
                 variant="ghost"
                 className={cn(
-                  "w-full justify-start gap-2 font-normal h-8",
-                  pathname.startsWith("/settings") && "bg-[hsl(var(--notion-hover))]"
+                  "w-full justify-start gap-2 font-normal h-8 text-stone-400 hover:text-white hover:bg-stone-800",
+                  pathname.startsWith("/settings") && "bg-stone-800 text-white"
                 )}
               >
                 <Settings className="h-4 w-4" />
@@ -237,7 +233,7 @@ export function Sidebar({ user }: SidebarProps) {
                 size="sm"
               />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">
+                <p className="text-sm font-medium truncate text-stone-300">
                   {user?.name || user?.email?.split("@")[0] || "User"}
                 </p>
               </div>
@@ -247,7 +243,7 @@ export function Sidebar({ user }: SidebarProps) {
                     type="submit"
                     variant="ghost"
                     size="icon-sm"
-                    className="text-muted-foreground"
+                    className="text-stone-500 hover:text-white hover:bg-stone-800"
                   >
                     <LogOut className="h-4 w-4" />
                   </Button>
@@ -263,8 +259,8 @@ export function Sidebar({ user }: SidebarProps) {
                   variant="ghost"
                   size="icon"
                   className={cn(
-                    "w-full",
-                    pathname.startsWith("/settings") && "bg-[hsl(var(--notion-hover))]"
+                    "w-full text-stone-400 hover:text-white hover:bg-stone-800",
+                    pathname.startsWith("/settings") && "bg-stone-800 text-white"
                   )}
                 >
                   <Settings className="h-4 w-4" />
@@ -272,7 +268,7 @@ export function Sidebar({ user }: SidebarProps) {
               </Link>
             </Tooltip>
             <Tooltip content="User menu" side="right">
-              <Button variant="ghost" size="icon" className="w-full">
+              <Button variant="ghost" size="icon" className="w-full text-stone-400 hover:text-white hover:bg-stone-800">
                 <User className="h-4 w-4" />
               </Button>
             </Tooltip>

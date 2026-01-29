@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import {
-  Clapperboard,
   Film,
   Calendar,
   Users,
@@ -69,11 +68,8 @@ export default function WelcomePage() {
         {/* Content */}
         <div className="relative z-10">
           {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
-              <Clapperboard className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-semibold">SetSync</span>
+          <div className="flex items-center">
+            <span className="text-xl font-semibold">wrapshoot</span>
           </div>
         </div>
 
@@ -155,12 +151,9 @@ export default function WelcomePage() {
         <div className="w-full max-w-sm space-y-8">
           {/* Mobile logo */}
           <div className="flex flex-col items-center lg:hidden">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary mb-3">
-              <Clapperboard className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <h1 className="text-xl font-semibold">SetSync</h1>
+            <h1 className="text-xl font-semibold">wrapshoot</h1>
             <p className="text-xs text-muted-foreground mt-1">
-              The all-in-one production platform
+              Production management for modern filmmakers
             </p>
           </div>
 
