@@ -21,7 +21,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
 import { useLayoutStore } from "@/lib/stores/layout-store";
-import { mockProjects } from "@/lib/mock-data";
+import { useProjectStore } from "@/lib/stores/project-store";
 
 interface SidebarProps {
   user?: {
@@ -33,6 +33,7 @@ interface SidebarProps {
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
   const { sidebarOpen, toggleSidebar, openCommandPalette } = useLayoutStore();
+  const projects = useProjectStore((state) => state.projects);
 
   // Keyboard shortcut for sidebar toggle
   React.useEffect(() => {
@@ -182,27 +183,35 @@ export function Sidebar({ user }: SidebarProps) {
                 <span className="text-xs font-medium text-stone-500 uppercase tracking-wider">
                   Projects
                 </span>
-                <Button variant="ghost" size="icon-sm" className="h-5 w-5 text-stone-500 hover:text-white hover:bg-stone-800">
-                  <Plus className="h-3 w-3" />
-                </Button>
+                <Link href="/projects/new">
+                  <Button variant="ghost" size="icon-sm" className="h-5 w-5 text-stone-500 hover:text-white hover:bg-stone-800">
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </Link>
               </div>
-              {mockProjects.slice(0, 5).map((project) => {
-                const isActive = pathname.includes(project.id);
-                return (
-                  <Link key={project.id} href={`/projects/${project.id}`}>
-                    <Button
-                      variant="ghost"
-                      className={cn(
-                        "w-full justify-start gap-2 font-normal h-8 text-sm text-stone-400 hover:text-white hover:bg-stone-800",
-                        isActive && "bg-stone-800 text-white"
-                      )}
-                    >
-                      <Film className="h-3.5 w-3.5 text-stone-500" />
-                      <span className="truncate">{project.name}</span>
-                    </Button>
-                  </Link>
-                );
-              })}
+              {projects.length === 0 ? (
+                <p className="px-2 py-2 text-xs text-stone-500">
+                  No projects yet
+                </p>
+              ) : (
+                projects.slice(0, 5).map((project) => {
+                  const isActive = pathname.includes(project.id);
+                  return (
+                    <Link key={project.id} href={`/projects/${project.id}`}>
+                      <Button
+                        variant="ghost"
+                        className={cn(
+                          "w-full justify-start gap-2 font-normal h-8 text-sm text-stone-400 hover:text-white hover:bg-stone-800",
+                          isActive && "bg-stone-800 text-white"
+                        )}
+                      >
+                        <Film className="h-3.5 w-3.5 text-stone-500" />
+                        <span className="truncate">{project.name}</span>
+                      </Button>
+                    </Link>
+                  );
+                })
+              )}
             </div>
           </>
         )}

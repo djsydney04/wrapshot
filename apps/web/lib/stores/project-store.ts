@@ -1,11 +1,5 @@
 import { create } from "zustand";
 import {
-  mockProjects,
-  mockScenes,
-  mockCast,
-  mockLocations,
-  mockShootingDays,
-  mockCrew,
   type Project,
   type Scene,
   type CastMember,
@@ -84,13 +78,13 @@ interface ProjectStore {
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({
-  // Initialize with mock data
-  projects: mockProjects,
-  scenes: mockScenes,
-  cast: mockCast,
-  locations: mockLocations,
-  shootingDays: mockShootingDays,
-  crew: mockCrew,
+  // Initialize with empty data - users will add their own
+  projects: [],
+  scenes: [],
+  cast: [],
+  locations: [],
+  shootingDays: [],
+  crew: [],
   gear: [],
   scripts: [],
 

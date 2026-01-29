@@ -19,21 +19,45 @@ export default async function AuthLayout({
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Left Panel - Branding */}
-      <div className="hidden lg:flex flex-col justify-between bg-stone-900 text-white p-10">
-        {/* Logo */}
-        <div className="flex items-center">
-          <span className="font-semibold text-lg">wrapshoot</span>
+      <div className="hidden lg:flex flex-col justify-between bg-stone-900 text-white p-12 relative overflow-hidden">
+        {/* Subtle gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-stone-900 via-stone-900 to-stone-800" />
+
+        {/* Decorative elements */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-stone-800/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-stone-800/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+
+        {/* Content */}
+        <div className="relative z-10">
+          <span className="font-semibold text-lg tracking-tight">wrapshoot</span>
         </div>
 
-        {/* Tagline */}
-        <div>
-          <p className="text-2xl font-light leading-relaxed">
-            Production management for modern filmmakers.
+        {/* Main copy */}
+        <div className="relative z-10 space-y-8">
+          <div className="space-y-4">
+            <h1 className="text-4xl font-medium tracking-tight leading-tight">
+              Schedule shoots.
+              <br />
+              Manage crew.
+              <br />
+              Ship on time.
+            </h1>
+          </div>
+
+          {/* Subtle divider */}
+          <div className="w-12 h-px bg-stone-700" />
+
+          <p className="text-stone-400 text-sm max-w-xs">
+            The production management platform built for modern filmmakers.
           </p>
         </div>
 
-        {/* Footer spacer */}
-        <div />
+        {/* Footer */}
+        <div className="relative z-10">
+          <p className="text-stone-600 text-xs">
+            © {new Date().getFullYear()} wrapshoot
+          </p>
+        </div>
       </div>
 
       {/* Right Panel - Form */}

@@ -15,11 +15,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLayoutStore } from "@/lib/stores/layout-store";
-import { mockProjects } from "@/lib/mock-data";
+import { useProjectStore } from "@/lib/stores/project-store";
 
 export function CommandPalette() {
   const router = useRouter();
   const { commandPaletteOpen, closeCommandPalette } = useLayoutStore();
+  const projects = useProjectStore((state) => state.projects);
   const [search, setSearch] = React.useState("");
 
   // Close on escape
@@ -114,21 +115,23 @@ export function CommandPalette() {
             </Command.Group>
 
             {/* Projects */}
-            <Command.Group heading="Projects" className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-              {mockProjects.map((project) => (
-                <Command.Item
-                  key={project.id}
-                  value={`project-${project.name}`}
-                  onSelect={() =>
-                    runCommand(() => router.push(`/projects/${project.id}`))
-                  }
-                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm aria-selected:bg-accent"
-                >
-                  <Film className="h-4 w-4 text-muted-foreground" />
-                  {project.name}
-                </Command.Item>
-              ))}
-            </Command.Group>
+            {projects.length > 0 && (
+              <Command.Group heading="Projects" className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                {projects.map((project) => (
+                  <Command.Item
+                    key={project.id}
+                    value={`project-${project.name}`}
+                    onSelect={() =>
+                      runCommand(() => router.push(`/projects/${project.id}`))
+                    }
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm aria-selected:bg-accent"
+                  >
+                    <Film className="h-4 w-4 text-muted-foreground" />
+                    {project.name}
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            )}
 
             {/* Navigation */}
             <Command.Group heading="Navigation" className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
