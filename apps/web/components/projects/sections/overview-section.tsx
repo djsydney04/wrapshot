@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
-import type { Project, Scene, CastMember, ShootingDay, CrewMember, GearItem, Script } from "@/lib/mock-data";
+import type { Scene, CastMember, ShootingDay, CrewMember, GearItem, Script } from "@/lib/mock-data";
+import type { Project } from "@/lib/actions/projects";
 
 interface OverviewSectionProps {
   project: Project;

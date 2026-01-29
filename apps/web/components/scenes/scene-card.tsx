@@ -8,17 +8,15 @@ import {
   FileText,
   Clock,
   Users,
-  Sparkles,
-  AlertTriangle,
   Image as ImageIcon,
-  MoreHorizontal,
   Trash2,
   Edit,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { Scene, CastMember } from "@/lib/mock-data";
+import type { Scene } from "@/lib/actions/scenes";
+import type { CastMember } from "@/lib/mock-data";
 
 interface SceneCardProps {
   scene: Scene;
@@ -37,7 +35,8 @@ export function SceneCard({
   isDragging,
   compact = false,
 }: SceneCardProps) {
-  const sceneCast = cast.filter((c) => scene.castIds.includes(c.id));
+  // Get cast count from joined data or fallback to filtering
+  const sceneCastCount = scene.cast?.length || 0;
 
   if (compact) {
     return (
@@ -47,19 +46,11 @@ export function SceneCard({
           isDragging && "shadow-lg ring-2 ring-primary"
         )}
       >
-        {/* Thumbnail or Placeholder */}
+        {/* Placeholder */}
         <div className="aspect-video rounded-md bg-muted mb-2 overflow-hidden relative">
-          {scene.imageUrl ? (
-            <img
-              src={scene.imageUrl}
-              alt={`Scene ${scene.sceneNumber}`}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
-            </div>
-          )}
+          <div className="w-full h-full flex items-center justify-center">
+            <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
+          </div>
           <div className="absolute top-1 left-1">
             <Badge className="bg-black/70 text-white text-xs font-mono">
               {scene.sceneNumber}
@@ -77,7 +68,7 @@ export function SceneCard({
               {scene.dayNight}
             </Badge>
           </div>
-          <p className="text-xs text-muted-foreground line-clamp-2">{scene.synopsis}</p>
+          <p className="text-xs text-muted-foreground line-clamp-2">{scene.synopsis || "No synopsis"}</p>
         </div>
       </div>
     );
@@ -93,17 +84,9 @@ export function SceneCard({
       <div className="flex">
         {/* Thumbnail */}
         <div className="w-32 md:w-40 flex-shrink-0 bg-muted relative">
-          {scene.imageUrl ? (
-            <img
-              src={scene.imageUrl}
-              alt={`Scene ${scene.sceneNumber}`}
-              className="w-full h-full object-cover aspect-video"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center aspect-video">
-              <ImageIcon className="h-8 w-8 text-muted-foreground/30" />
-            </div>
-          )}
+          <div className="w-full h-full flex items-center justify-center aspect-video">
+            <ImageIcon className="h-8 w-8 text-muted-foreground/30" />
+          </div>
           <div className="absolute top-2 left-2">
             <Badge className="bg-black/70 text-white font-mono">
               {scene.sceneNumber}
@@ -122,9 +105,11 @@ export function SceneCard({
                 <Badge variant={scene.dayNight === "DAY" ? "day" : "night"} className="text-[10px]">
                   {scene.dayNight}
                 </Badge>
-                <span className="text-xs text-muted-foreground">{scene.location}</span>
+                {scene.location && (
+                  <span className="text-xs text-muted-foreground">{scene.location.name}</span>
+                )}
               </div>
-              <p className="text-sm mt-1 line-clamp-2">{scene.synopsis}</p>
+              <p className="text-sm mt-1 line-clamp-2">{scene.synopsis || "No synopsis"}</p>
             </div>
             <Badge
               variant={
@@ -152,22 +137,10 @@ export function SceneCard({
                 {scene.estimatedMinutes}m
               </span>
             )}
-            {sceneCast.length > 0 && (
+            {sceneCastCount > 0 && (
               <span className="flex items-center gap-1">
                 <Users className="h-3 w-3" />
-                {sceneCast.length}
-              </span>
-            )}
-            {scene.vfxRequired && (
-              <span className="flex items-center gap-1 text-purple-500">
-                <Sparkles className="h-3 w-3" />
-                VFX
-              </span>
-            )}
-            {scene.stuntsRequired && (
-              <span className="flex items-center gap-1 text-orange-500">
-                <AlertTriangle className="h-3 w-3" />
-                Stunts
+                {sceneCastCount}
               </span>
             )}
           </div>

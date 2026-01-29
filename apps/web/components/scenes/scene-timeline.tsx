@@ -22,7 +22,8 @@ import { ChevronLeft, ChevronRight, FileText, Users, Image as ImageIcon } from "
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { Scene, CastMember, ShootingDay } from "@/lib/mock-data";
+import type { Scene } from "@/lib/actions/scenes";
+import type { CastMember, ShootingDay } from "@/lib/mock-data";
 
 interface SceneTimelineProps {
   scenes: Scene[];
@@ -234,7 +235,7 @@ function TimelineCard({
     transition,
   };
 
-  const sceneCast = cast.filter((c) => scene.castIds.includes(c.id));
+  const sceneCastCount = scene.cast?.length || 0;
 
   return (
     <div
@@ -256,17 +257,9 @@ function TimelineCard({
       >
         {/* Thumbnail */}
         <div className="aspect-video bg-muted relative">
-          {scene.imageUrl ? (
-            <img
-              src={scene.imageUrl}
-              alt={`Scene ${scene.sceneNumber}`}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
-            </div>
-          )}
+          <div className="w-full h-full flex items-center justify-center">
+            <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
+          </div>
           <div className="absolute top-1 left-1">
             <Badge className="bg-black/70 text-white text-xs font-mono">
               {scene.sceneNumber}
@@ -284,16 +277,16 @@ function TimelineCard({
 
         {/* Info */}
         <div className="p-2">
-          <p className="text-xs line-clamp-2 text-muted-foreground">{scene.synopsis}</p>
+          <p className="text-xs line-clamp-2 text-muted-foreground">{scene.synopsis || "No synopsis"}</p>
           <div className="flex items-center gap-2 mt-1.5 text-[10px] text-muted-foreground">
             <span className="flex items-center gap-0.5">
               <FileText className="h-2.5 w-2.5" />
               {scene.pageCount}p
             </span>
-            {sceneCast.length > 0 && (
+            {sceneCastCount > 0 && (
               <span className="flex items-center gap-0.5">
                 <Users className="h-2.5 w-2.5" />
-                {sceneCast.length}
+                {sceneCastCount}
               </span>
             )}
           </div>

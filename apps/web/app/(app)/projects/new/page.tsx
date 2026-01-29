@@ -6,7 +6,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useProjectStore } from "@/lib/stores/project-store";
+import { createProject } from "@/lib/actions/projects";
+import { useAuth } from "@/components/providers/auth-provider";
 import {
   ArrowLeft,
   ArrowRight,
@@ -15,6 +16,7 @@ import {
   Calendar,
   Sparkles,
   Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,9 +32,11 @@ const statusOptions = [
 
 export default function NewProjectPage() {
   const router = useRouter();
-  const { addProject } = useProjectStore();
+  const { currentOrg } = useAuth();
   const [step, setStep] = React.useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [showUpgradePrompt, setShowUpgradePrompt] = React.useState(false);
 
   // Form state
   const [name, setName] = React.useState("");
@@ -69,28 +73,39 @@ export default function NewProjectPage() {
   };
 
   const handleCreate = async (withSetup: boolean) => {
+    if (!currentOrg) {
+      setError("No organization selected. Please complete onboarding first.");
+      return;
+    }
+
     setIsSubmitting(true);
+    setError(null);
 
-    const newProject = addProject({
-      name: name.trim(),
-      description: description.trim() || "",
-      status: status as "DEVELOPMENT" | "PRE_PRODUCTION" | "PRODUCTION" | "POST_PRODUCTION" | "COMPLETED",
-      startDate: startDate || new Date().toISOString().split("T")[0],
-      endDate: endDate || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-      scenesCount: 0,
-      shootingDaysCount: 0,
-      castCount: 0,
-      locationsCount: 0,
-    });
+    try {
+      const newProject = await createProject(currentOrg.id, {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        status: status as "DEVELOPMENT" | "PRE_PRODUCTION" | "PRODUCTION" | "POST_PRODUCTION" | "COMPLETED" | "ON_HOLD",
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+      });
 
-    // Small delay for UX
-    await new Promise((resolve) => setTimeout(resolve, 500));
+      if (withSetup) {
+        router.push(`/projects/${newProject.id}?setup=true`);
+      } else {
+        router.push(`/projects/${newProject.id}`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to create project";
 
-    if (withSetup) {
-      // TODO: Open setup wizard on project page
-      router.push(`/projects/${newProject.id}?setup=true`);
-    } else {
-      router.push(`/projects/${newProject.id}`);
+      // Check if it's a plan limit error
+      if (message.startsWith("PLAN_LIMIT_REACHED:")) {
+        setShowUpgradePrompt(true);
+        setError(message.replace("PLAN_LIMIT_REACHED:", ""));
+      } else {
+        setError(message);
+      }
+      setIsSubmitting(false);
     }
   };
 
@@ -331,6 +346,33 @@ export default function NewProjectPage() {
                 <div className="flex items-center justify-center gap-2 text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span className="text-sm">Creating your project...</span>
+                </div>
+              )}
+
+              {showUpgradePrompt && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h3 className="font-medium text-amber-900">Project limit reached</h3>
+                      <p className="text-sm text-amber-800 mt-1">
+                        {error || "You've reached the project limit for your plan."}
+                      </p>
+                      <Button
+                        className="mt-3"
+                        size="sm"
+                        onClick={() => router.push("/settings/billing")}
+                      >
+                        Upgrade Plan
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {error && !showUpgradePrompt && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                  <p className="text-sm text-red-800">{error}</p>
                 </div>
               )}
             </div>

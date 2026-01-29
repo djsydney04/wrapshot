@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useParams } from "next/navigation";
-import { Film, MoreHorizontal } from "lucide-react";
+import { Film, MoreHorizontal, Loader2 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,8 @@ import { ScriptSection } from "@/components/projects/sections/script-section";
 import { TeamSection } from "@/components/projects/sections/team-section";
 import { SetupWizard } from "@/components/projects/setup-wizard";
 import { useProjectStore } from "@/lib/stores/project-store";
-import type { Project } from "@/lib/mock-data";
+import { getProject, type Project } from "@/lib/actions/projects";
+import { getScenes, type Scene as DBScene } from "@/lib/actions/scenes";
 
 const statusVariant: Record<Project["status"], "development" | "pre-production" | "production" | "post-production" | "completed" | "on-hold"> = {
   DEVELOPMENT: "development",
@@ -44,9 +45,14 @@ export default function ProjectDetailPage() {
   const [activeSection, setActiveSection] = React.useState<ProjectSection>("overview");
   const [showWizard, setShowWizard] = React.useState(false);
   const [wizardDismissed, setWizardDismissed] = React.useState(false);
+  const [project, setProject] = React.useState<Project | null>(null);
+  const [loading, setLoading] = React.useState(true);
 
+  // Database-backed scenes
+  const [dbScenes, setDbScenes] = React.useState<DBScene[]>([]);
+
+  // Still using store for other data (not yet migrated to DB)
   const {
-    getProjectById,
     getScenesForProject,
     getCastForProject,
     getLocationsForProject,
@@ -56,8 +62,27 @@ export default function ProjectDetailPage() {
     getScriptsForProject,
   } = useProjectStore();
 
-  const project = getProjectById(projectId);
-  const scenes = getScenesForProject(projectId);
+  // Fetch project and scenes from database
+  React.useEffect(() => {
+    async function loadProject() {
+      try {
+        const [projectData, scenesResult] = await Promise.all([
+          getProject(projectId),
+          getScenes(projectId),
+        ]);
+        setProject(projectData);
+        if (scenesResult.data) setDbScenes(scenesResult.data);
+      } catch (err) {
+        console.error("Error loading project:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadProject();
+  }, [projectId]);
+
+  // Store data (for sections not yet migrated to use DB types)
+  const storeScenes = getScenesForProject(projectId);
   const cast = getCastForProject(projectId);
   const locations = getLocationsForProject(projectId);
   const shootingDays = getShootingDaysForProject(projectId);
@@ -65,9 +90,13 @@ export default function ProjectDetailPage() {
   const gear = getGearForProject(projectId);
   const scripts = getScriptsForProject(projectId);
 
+  // Use DB scenes for the scenes section, store scenes for others (until migrated)
+  const scenes = dbScenes.length > 0 ? dbScenes : storeScenes;
+
   // Check if project is new (show wizard)
   React.useEffect(() => {
-    const isNewProject = scenes.length === 0 && cast.length === 0 && shootingDays.length === 0 && !wizardDismissed;
+    const totalScenes = dbScenes.length + storeScenes.length;
+    const isNewProject = totalScenes === 0 && cast.length === 0 && shootingDays.length === 0 && !wizardDismissed;
     // Check localStorage for wizard dismissal
     const dismissed = localStorage.getItem(`wizard-dismissed-${projectId}`);
     if (dismissed) {
@@ -75,7 +104,7 @@ export default function ProjectDetailPage() {
     } else if (isNewProject) {
       setShowWizard(true);
     }
-  }, [projectId, scenes.length, cast.length, shootingDays.length, wizardDismissed]);
+  }, [projectId, dbScenes.length, storeScenes.length, cast.length, shootingDays.length, wizardDismissed]);
 
   const handleWizardComplete = () => {
     setShowWizard(false);
@@ -88,6 +117,14 @@ export default function ProjectDetailPage() {
     setWizardDismissed(true);
     localStorage.setItem(`wizard-dismissed-${projectId}`, "true");
   };
+
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   if (!project) {
     return (
@@ -111,7 +148,7 @@ export default function ProjectDetailPage() {
         return (
           <OverviewSection
             project={project}
-            scenes={scenes}
+            scenes={storeScenes}
             cast={cast}
             crew={crew}
             shootingDays={shootingDays}
@@ -127,7 +164,7 @@ export default function ProjectDetailPage() {
           <ScheduleSection
             projectId={projectId}
             shootingDays={shootingDays}
-            scenes={scenes}
+            scenes={storeScenes}
             locations={locations}
           />
         );
@@ -139,7 +176,7 @@ export default function ProjectDetailPage() {
         return (
           <ScenesSection
             projectId={projectId}
-            scenes={scenes}
+            scenes={dbScenes}
             cast={cast}
             shootingDays={shootingDays}
           />
@@ -149,7 +186,7 @@ export default function ProjectDetailPage() {
           <GearSection
             projectId={projectId}
             gear={gear}
-            scenes={scenes}
+            scenes={storeScenes}
           />
         );
       case "team":
@@ -199,7 +236,7 @@ export default function ProjectDetailPage() {
             activeSection={activeSection}
             onSectionChange={setActiveSection}
             counts={{
-              scenes: scenes.length,
+              scenes: dbScenes.length || storeScenes.length,
               cast: cast.length,
               crew: crew.length,
               shootingDays: shootingDays.length,

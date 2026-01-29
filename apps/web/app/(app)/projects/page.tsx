@@ -5,11 +5,30 @@ import Link from "next/link";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ProjectCard, ProjectsEmptyState } from "@/components/projects/project-card";
-import { useProjectStore } from "@/lib/stores/project-store";
-import { Plus } from "lucide-react";
+import { getProjects, type Project } from "@/lib/actions/projects";
+import { Plus, Loader2 } from "lucide-react";
 
 export default function ProjectsPage() {
-  const { projects } = useProjectStore();
+  const [projects, setProjects] = React.useState<Project[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    async function loadProjects() {
+      try {
+        const data = await getProjects();
+        setProjects(data);
+      } catch (err) {
+        console.error("Error loading projects:", err);
+        setError("Failed to load projects");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadProjects();
+  }, []);
+
   const hasProjects = projects.length > 0;
 
   return (
@@ -34,21 +53,39 @@ export default function ProjectsPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-foreground">Projects</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {hasProjects
+            {loading
+              ? "Loading projects..."
+              : hasProjects
               ? `${projects.length} project${projects.length !== 1 ? "s" : ""}`
               : "Create your first project to get started"}
           </p>
         </div>
 
-        {/* Projects Grid */}
-        {hasProjects ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {projects.map((project) => (
-              <ProjectCard key={project.id} project={project} />
-            ))}
+        {/* Loading State */}
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : (
-          <ProjectsEmptyState />
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
+
+        {/* Projects Grid */}
+        {!loading && !error && (
+          hasProjects ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {projects.map((project) => (
+                <ProjectCard key={project.id} project={project} />
+              ))}
+            </div>
+          ) : (
+            <ProjectsEmptyState />
+          )
         )}
       </div>
     </div>

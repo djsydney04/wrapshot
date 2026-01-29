@@ -3,14 +3,19 @@
 import * as React from "react";
 import { Plus, LayoutGrid, Columns3, GanttChart, Clapperboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { SceneGrid } from "@/components/scenes/scene-grid";
 import { SceneKanban } from "@/components/scenes/scene-kanban";
 import { SceneTimeline } from "@/components/scenes/scene-timeline";
 import { AddSceneForm } from "@/components/forms/add-scene-form";
 import { cn } from "@/lib/utils";
-import { useProjectStore } from "@/lib/stores/project-store";
-import type { Scene, CastMember, ShootingDay } from "@/lib/mock-data";
+import {
+  reorderScenes as reorderScenesAction,
+  updateScene as updateSceneAction,
+  deleteScene as deleteSceneAction,
+  type Scene,
+  type SceneStatus
+} from "@/lib/actions/scenes";
+import type { CastMember, ShootingDay } from "@/lib/mock-data";
 
 type ViewMode = "grid" | "list" | "kanban" | "timeline";
 
@@ -30,36 +35,51 @@ export function ScenesSection({
   const [viewMode, setViewMode] = React.useState<ViewMode>("list");
   const [showAddScene, setShowAddScene] = React.useState(false);
   const [editingScene, setEditingScene] = React.useState<Scene | null>(null);
-  const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
+  const [localScenes, setLocalScenes] = React.useState(scenes);
 
-  const { reorderScenes, updateScene, deleteScene } = useProjectStore();
+  // Update local scenes when props change
+  React.useEffect(() => {
+    setLocalScenes(scenes);
+  }, [scenes]);
 
   // Sort scenes by sortOrder
   const sortedScenes = React.useMemo(() => {
-    return [...scenes].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-  }, [scenes]);
+    return [...localScenes].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  }, [localScenes]);
 
-  const handleReorder = (sceneIds: string[]) => {
-    reorderScenes(projectId, sceneIds);
-    forceUpdate();
+  const handleReorder = async (sceneIds: string[]) => {
+    // Optimistic update
+    const reorderedScenes = sceneIds.map((id, index) => {
+      const scene = localScenes.find((s) => s.id === id);
+      return scene ? { ...scene, sortOrder: index } : null;
+    }).filter(Boolean) as Scene[];
+    setLocalScenes(reorderedScenes);
+
+    await reorderScenesAction(projectId, sceneIds);
   };
 
-  const handleStatusChange = (sceneId: string, status: Scene["status"]) => {
-    updateScene(sceneId, { status });
-    forceUpdate();
+  const handleStatusChange = async (sceneId: string, status: SceneStatus) => {
+    // Optimistic update
+    setLocalScenes((prev) =>
+      prev.map((s) => (s.id === sceneId ? { ...s, status } : s))
+    );
+
+    await updateSceneAction(sceneId, { status });
   };
 
-  const handleDelete = (id: string) => {
-    deleteScene(id);
-    forceUpdate();
+  const handleDelete = async (id: string) => {
+    // Optimistic update
+    setLocalScenes((prev) => prev.filter((s) => s.id !== id));
+
+    await deleteSceneAction(id, projectId);
   };
 
   const handleEdit = (scene: Scene) => {
     setEditingScene(scene);
   };
 
-  const totalPages = scenes.reduce((sum, s) => sum + s.pageCount, 0);
-  const completedScenes = scenes.filter((s) => s.status === "COMPLETED").length;
+  const totalPages = localScenes.reduce((sum, s) => sum + s.pageCount, 0);
+  const completedScenes = localScenes.filter((s) => s.status === "COMPLETED").length;
 
   const viewModes: { id: ViewMode; label: string; icon: React.ElementType }[] = [
     { id: "list", label: "List", icon: LayoutGrid },
@@ -74,7 +94,7 @@ export function ScenesSection({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>{scenes.length} scenes</span>
+            <span>{localScenes.length} scenes</span>
             <span>·</span>
             <span>{totalPages.toFixed(1)} pages</span>
             <span>·</span>
@@ -113,7 +133,7 @@ export function ScenesSection({
       </div>
 
       {/* Content */}
-      {scenes.length > 0 ? (
+      {localScenes.length > 0 ? (
         <>
           {(viewMode === "grid" || viewMode === "list") && (
             <SceneGrid
@@ -173,7 +193,6 @@ export function ScenesSection({
         onSuccess={() => {
           setShowAddScene(false);
           setEditingScene(null);
-          forceUpdate();
         }}
         editScene={editingScene}
       />

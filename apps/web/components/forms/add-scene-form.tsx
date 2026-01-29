@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ImageUpload, MultiImageUpload } from "@/components/ui/image-upload";
 import {
   Dialog,
   DialogContent,
@@ -15,8 +14,8 @@ import {
   DialogBody,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { useProjectStore } from "@/lib/stores/project-store";
-import type { Scene } from "@/lib/mock-data";
+import { createScene, updateScene as updateSceneAction, type Scene, type IntExt, type DayNight } from "@/lib/actions/scenes";
+import { getLocations, type Location } from "@/lib/actions/locations";
 
 interface AddSceneFormProps {
   projectId: string;
@@ -26,6 +25,17 @@ interface AddSceneFormProps {
   editScene?: Scene | null;
 }
 
+const initialFormData = {
+  sceneNumber: "",
+  synopsis: "",
+  intExt: "INT" as IntExt,
+  dayNight: "DAY" as DayNight,
+  locationId: "",
+  pageCount: "1",
+  estimatedMinutes: "",
+  notes: "",
+};
+
 export function AddSceneForm({
   projectId,
   open,
@@ -33,87 +43,74 @@ export function AddSceneForm({
   onSuccess,
   editScene,
 }: AddSceneFormProps) {
-  const { addScene, updateScene, getLocationsForProject } = useProjectStore();
   const [loading, setLoading] = React.useState(false);
-
-  const locations = getLocationsForProject(projectId);
+  const [error, setError] = React.useState<string | null>(null);
+  const [locations, setLocations] = React.useState<Location[]>([]);
+  const [formData, setFormData] = React.useState(initialFormData);
   const isEditing = !!editScene;
 
-  const [formData, setFormData] = React.useState({
-    sceneNumber: "",
-    synopsis: "",
-    intExt: "INT" as "INT" | "EXT" | "BOTH",
-    dayNight: "DAY" as "DAY" | "NIGHT" | "DAWN" | "DUSK",
-    location: "",
-    pageCount: "1",
-    estimatedMinutes: "",
-    notes: "",
-    imageUrl: null as string | null,
-    images: [] as string[],
-  });
+  // Load locations when dialog opens
+  React.useEffect(() => {
+    if (open) {
+      getLocations(projectId).then(({ data }) => {
+        if (data) setLocations(data);
+      });
+    }
+  }, [open, projectId]);
 
   // Reset form when dialog opens/closes or when editing a different scene
   React.useEffect(() => {
     if (open && editScene) {
       setFormData({
         sceneNumber: editScene.sceneNumber,
-        synopsis: editScene.synopsis,
+        synopsis: editScene.synopsis || "",
         intExt: editScene.intExt,
         dayNight: editScene.dayNight,
-        location: editScene.location,
+        locationId: editScene.locationId || "",
         pageCount: editScene.pageCount.toString(),
         estimatedMinutes: editScene.estimatedMinutes?.toString() || "",
         notes: editScene.notes || "",
-        imageUrl: editScene.imageUrl || null,
-        images: editScene.images || [],
       });
+      setError(null);
     } else if (open && !editScene) {
-      setFormData({
-        sceneNumber: "",
-        synopsis: "",
-        intExt: "INT",
-        dayNight: "DAY",
-        location: "",
-        pageCount: "1",
-        estimatedMinutes: "",
-        notes: "",
-        imageUrl: null,
-        images: [],
-      });
+      setFormData(initialFormData);
+      setError(null);
     }
   }, [open, editScene]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
-    const sceneData = {
-      projectId,
-      sceneNumber: formData.sceneNumber,
-      synopsis: formData.synopsis,
-      intExt: formData.intExt,
-      dayNight: formData.dayNight,
-      location: formData.location,
-      pageCount: parseFloat(formData.pageCount),
-      estimatedMinutes: formData.estimatedMinutes ? parseInt(formData.estimatedMinutes) : undefined,
-      notes: formData.notes || undefined,
-      imageUrl: formData.imageUrl || undefined,
-      images: formData.images.length > 0 ? formData.images : undefined,
-    };
+    try {
+      const sceneData = {
+        projectId,
+        sceneNumber: formData.sceneNumber,
+        synopsis: formData.synopsis || undefined,
+        intExt: formData.intExt,
+        dayNight: formData.dayNight,
+        locationId: formData.locationId || undefined,
+        pageCount: parseFloat(formData.pageCount),
+        estimatedMinutes: formData.estimatedMinutes ? parseInt(formData.estimatedMinutes) : undefined,
+        notes: formData.notes || undefined,
+      };
 
-    if (isEditing && editScene) {
-      updateScene(editScene.id, sceneData);
-    } else {
-      addScene({
-        ...sceneData,
-        status: "NOT_SCHEDULED",
-        castIds: [],
-      });
+      if (isEditing && editScene) {
+        const { error: updateError } = await updateSceneAction(editScene.id, sceneData);
+        if (updateError) throw new Error(updateError);
+      } else {
+        const { error: createError } = await createScene(sceneData);
+        if (createError) throw new Error(createError);
+      }
+
+      onOpenChange(false);
+      onSuccess?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save scene");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
-    onOpenChange(false);
-    onSuccess?.();
   };
 
   return (
@@ -128,21 +125,6 @@ export function AddSceneForm({
 
         <form onSubmit={handleSubmit}>
           <DialogBody className="space-y-4 max-h-[60vh] overflow-y-auto">
-            {/* Storyboard Image */}
-            <div>
-              <label className="block text-sm font-medium mb-1.5">
-                Storyboard Image
-              </label>
-              <ImageUpload
-                value={formData.imageUrl}
-                onChange={(url) => setFormData({ ...formData, imageUrl: url })}
-                bucket="scene-photos"
-                folder={projectId}
-                aspectRatio="video"
-                placeholder="Drop a storyboard image or click to upload"
-              />
-            </div>
-
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium mb-1.5">
@@ -198,7 +180,7 @@ export function AddSceneForm({
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      intExt: e.target.value as typeof formData.intExt,
+                      intExt: e.target.value as IntExt,
                     })
                   }
                   options={[
@@ -217,7 +199,7 @@ export function AddSceneForm({
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      dayNight: e.target.value as typeof formData.dayNight,
+                      dayNight: e.target.value as DayNight,
                     })
                   }
                   options={[
@@ -225,6 +207,9 @@ export function AddSceneForm({
                     { value: "NIGHT", label: "Night" },
                     { value: "DAWN", label: "Dawn" },
                     { value: "DUSK", label: "Dusk" },
+                    { value: "MORNING", label: "Morning" },
+                    { value: "AFTERNOON", label: "Afternoon" },
+                    { value: "EVENING", label: "Evening" },
                   ]}
                 />
               </div>
@@ -248,19 +233,19 @@ export function AddSceneForm({
               <label className="block text-sm font-medium mb-1.5">
                 Location
               </label>
-              <Input
-                value={formData.location}
+              <Select
+                value={formData.locationId}
                 onChange={(e) =>
-                  setFormData({ ...formData, location: e.target.value })
+                  setFormData({ ...formData, locationId: e.target.value })
                 }
-                placeholder="e.g., Coffee Shop - Downtown"
-                list="locations-list"
+                options={[
+                  { value: "", label: "Select a location..." },
+                  ...locations.map((loc) => ({
+                    value: loc.id,
+                    label: loc.name,
+                  })),
+                ]}
               />
-              <datalist id="locations-list">
-                {locations.map((loc) => (
-                  <option key={loc.id} value={loc.name} />
-                ))}
-              </datalist>
             </div>
 
             <div>
@@ -277,19 +262,11 @@ export function AddSceneForm({
               />
             </div>
 
-            {/* Additional Images */}
-            <div>
-              <label className="block text-sm font-medium mb-1.5">
-                Additional Reference Images
-              </label>
-              <MultiImageUpload
-                value={formData.images}
-                onChange={(urls) => setFormData({ ...formData, images: urls })}
-                bucket="scene-photos"
-                folder={`${projectId}/references`}
-                maxImages={6}
-              />
-            </div>
+            {error && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
+                {error}
+              </div>
+            )}
           </DialogBody>
 
           <DialogFooter>

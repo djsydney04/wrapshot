@@ -4,7 +4,6 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +13,7 @@ import {
   DialogBody,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { useProjectStore } from "@/lib/stores/project-store";
+import { createCastMember, type CastWorkStatus } from "@/lib/actions/cast";
 
 interface AddCastFormProps {
   projectId: string;
@@ -23,51 +22,56 @@ interface AddCastFormProps {
   onSuccess?: () => void;
 }
 
+const initialFormData = {
+  characterName: "",
+  actorName: "",
+  workStatus: "ON_HOLD" as CastWorkStatus,
+  email: "",
+  phone: "",
+};
+
 export function AddCastForm({
   projectId,
   open,
   onOpenChange,
   onSuccess,
 }: AddCastFormProps) {
-  const { addCastMember, getCastForProject } = useProjectStore();
   const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [formData, setFormData] = React.useState(initialFormData);
 
-  const [formData, setFormData] = React.useState({
-    characterName: "",
-    actorName: "",
-    status: "ON_HOLD" as const,
-    email: "",
-    phone: "",
-  });
+  // Reset form when dialog opens
+  React.useEffect(() => {
+    if (open) {
+      setFormData(initialFormData);
+      setError(null);
+    }
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
-    // Get next cast number
-    const existingCast = getCastForProject(projectId);
-    const nextCastNumber = existingCast.length + 1;
+    try {
+      const { error: createError } = await createCastMember({
+        projectId,
+        characterName: formData.characterName,
+        actorName: formData.actorName || undefined,
+        workStatus: formData.workStatus,
+        email: formData.email || undefined,
+        phone: formData.phone || undefined,
+      });
 
-    addCastMember({
-      projectId,
-      characterName: formData.characterName,
-      actorName: formData.actorName,
-      castNumber: nextCastNumber,
-      status: formData.status,
-      email: formData.email || undefined,
-      phone: formData.phone || undefined,
-    });
+      if (createError) throw new Error(createError);
 
-    setLoading(false);
-    setFormData({
-      characterName: "",
-      actorName: "",
-      status: "ON_HOLD",
-      email: "",
-      phone: "",
-    });
-    onOpenChange(false);
-    onSuccess?.();
+      onOpenChange(false);
+      onSuccess?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add cast member");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -114,11 +118,11 @@ export function AddCastForm({
             <div>
               <label className="block text-sm font-medium mb-1.5">Status</label>
               <Select
-                value={formData.status}
+                value={formData.workStatus}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    status: e.target.value as typeof formData.status,
+                    workStatus: e.target.value as CastWorkStatus,
                   })
                 }
                 options={[
@@ -126,6 +130,7 @@ export function AddCastForm({
                   { value: "CONFIRMED", label: "Confirmed" },
                   { value: "WORKING", label: "Working" },
                   { value: "WRAPPED", label: "Wrapped" },
+                  { value: "DROPPED", label: "Dropped" },
                 ]}
               />
             </div>
@@ -154,6 +159,12 @@ export function AddCastForm({
                 />
               </div>
             </div>
+
+            {error && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
+                {error}
+              </div>
+            )}
           </DialogBody>
 
           <DialogFooter>

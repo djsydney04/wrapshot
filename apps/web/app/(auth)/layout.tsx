@@ -40,7 +40,7 @@ export default async function AuthLayout({
               <br />
               Manage crew.
               <br />
-              Ship on time.
+              Wrap on time.
             </h1>
           </div>
 

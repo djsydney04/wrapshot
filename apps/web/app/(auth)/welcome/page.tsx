@@ -16,7 +16,7 @@ const features = [
   {
     icon: Film,
     title: "Replace Final Draft Breakdowns",
-    description: "AI-powered script analysis and scene breakdowns in seconds",
+    description: "Streamlined scene breakdowns and element tracking",
   },
   {
     icon: Calendar,

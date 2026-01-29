@@ -29,6 +29,16 @@ const departmentOptions = Object.entries(DEPARTMENT_LABELS).map(([value, label])
   label,
 }));
 
+const initialFormData = {
+  name: "",
+  role: "",
+  department: "PRODUCTION" as DepartmentType,
+  email: "",
+  phone: "",
+  isHead: false,
+  profilePhotoUrl: null as string | null,
+};
+
 export function AddCrewForm({
   projectId,
   open,
@@ -37,44 +47,41 @@ export function AddCrewForm({
 }: AddCrewFormProps) {
   const { addCrewMember } = useProjectStore();
   const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [formData, setFormData] = React.useState(initialFormData);
 
-  const [formData, setFormData] = React.useState({
-    name: "",
-    role: "",
-    department: "PRODUCTION" as DepartmentType,
-    email: "",
-    phone: "",
-    isHead: false,
-    profilePhotoUrl: null as string | null,
-  });
+  // Reset form when dialog opens
+  React.useEffect(() => {
+    if (open) {
+      setFormData(initialFormData);
+      setError(null);
+    }
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
-    addCrewMember({
-      projectId,
-      name: formData.name,
-      role: formData.role,
-      department: formData.department,
-      email: formData.email || undefined,
-      phone: formData.phone || undefined,
-      isHead: formData.isHead,
-      profilePhotoUrl: formData.profilePhotoUrl || undefined,
-    });
+    try {
+      addCrewMember({
+        projectId,
+        name: formData.name,
+        role: formData.role,
+        department: formData.department,
+        email: formData.email || undefined,
+        phone: formData.phone || undefined,
+        isHead: formData.isHead,
+        profilePhotoUrl: formData.profilePhotoUrl || undefined,
+      });
 
-    setLoading(false);
-    setFormData({
-      name: "",
-      role: "",
-      department: "PRODUCTION",
-      email: "",
-      phone: "",
-      isHead: false,
-      profilePhotoUrl: null,
-    });
-    onOpenChange(false);
-    onSuccess?.();
+      onOpenChange(false);
+      onSuccess?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add crew member");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -196,6 +203,12 @@ export function AddCrewForm({
                 />
               </div>
             </div>
+
+            {error && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
+                {error}
+              </div>
+            )}
           </DialogBody>
 
           <DialogFooter>

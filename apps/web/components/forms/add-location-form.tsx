@@ -4,7 +4,6 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +13,7 @@ import {
   DialogBody,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { useProjectStore } from "@/lib/stores/project-store";
+import { createLocation, type LocationType, type IntExt, type PermitStatus } from "@/lib/actions/locations";
 
 interface AddLocationFormProps {
   projectId: string;
@@ -23,46 +22,56 @@ interface AddLocationFormProps {
   onSuccess?: () => void;
 }
 
+const initialFormData = {
+  name: "",
+  address: "",
+  locationType: "PRACTICAL" as LocationType,
+  interiorExterior: "BOTH" as IntExt,
+  permitStatus: "NOT_STARTED" as PermitStatus,
+};
+
 export function AddLocationForm({
   projectId,
   open,
   onOpenChange,
   onSuccess,
 }: AddLocationFormProps) {
-  const { addLocation } = useProjectStore();
   const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [formData, setFormData] = React.useState(initialFormData);
 
-  const [formData, setFormData] = React.useState({
-    name: "",
-    address: "",
-    type: "PRACTICAL" as "PRACTICAL" | "STUDIO" | "BACKLOT",
-    intExt: "INT" as "INT" | "EXT" | "BOTH",
-    permitStatus: "NOT_STARTED" as "NOT_STARTED" | "APPLIED" | "APPROVED" | "DENIED",
-  });
+  // Reset form when dialog opens
+  React.useEffect(() => {
+    if (open) {
+      setFormData(initialFormData);
+      setError(null);
+    }
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
-    addLocation({
-      projectId,
-      name: formData.name,
-      address: formData.address,
-      type: formData.type,
-      intExt: formData.intExt,
-      permitStatus: formData.permitStatus,
-    });
+    try {
+      const { error: createError } = await createLocation({
+        projectId,
+        name: formData.name,
+        address: formData.address || undefined,
+        locationType: formData.locationType,
+        interiorExterior: formData.interiorExterior,
+        permitStatus: formData.permitStatus,
+      });
 
-    setLoading(false);
-    setFormData({
-      name: "",
-      address: "",
-      type: "PRACTICAL",
-      intExt: "INT",
-      permitStatus: "NOT_STARTED",
-    });
-    onOpenChange(false);
-    onSuccess?.();
+      if (createError) throw new Error(createError);
+
+      onOpenChange(false);
+      onSuccess?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add location");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -109,17 +118,18 @@ export function AddLocationForm({
               <div>
                 <label className="block text-sm font-medium mb-1.5">Type</label>
                 <Select
-                  value={formData.type}
+                  value={formData.locationType}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      type: e.target.value as typeof formData.type,
+                      locationType: e.target.value as LocationType,
                     })
                   }
                   options={[
                     { value: "PRACTICAL", label: "Practical Location" },
                     { value: "STUDIO", label: "Studio" },
                     { value: "BACKLOT", label: "Backlot" },
+                    { value: "VIRTUAL", label: "Virtual" },
                   ]}
                 />
               </div>
@@ -128,11 +138,11 @@ export function AddLocationForm({
                   INT/EXT
                 </label>
                 <Select
-                  value={formData.intExt}
+                  value={formData.interiorExterior}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      intExt: e.target.value as typeof formData.intExt,
+                      interiorExterior: e.target.value as IntExt,
                     })
                   }
                   options={[
@@ -153,7 +163,7 @@ export function AddLocationForm({
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    permitStatus: e.target.value as typeof formData.permitStatus,
+                    permitStatus: e.target.value as PermitStatus,
                   })
                 }
                 options={[
@@ -164,6 +174,12 @@ export function AddLocationForm({
                 ]}
               />
             </div>
+
+            {error && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
+                {error}
+              </div>
+            )}
           </DialogBody>
 
           <DialogFooter>

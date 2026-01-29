@@ -22,7 +22,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { SceneCard } from "./scene-card";
 import { cn } from "@/lib/utils";
-import type { Scene, CastMember } from "@/lib/mock-data";
+import type { Scene, SceneStatus } from "@/lib/actions/scenes";
+import type { CastMember } from "@/lib/mock-data";
 
 const COLUMNS = [
   { id: "NOT_SCHEDULED", label: "Not Scheduled", color: "bg-muted" },
@@ -36,7 +37,7 @@ type ColumnId = (typeof COLUMNS)[number]["id"];
 interface SceneKanbanProps {
   scenes: Scene[];
   cast: CastMember[];
-  onStatusChange: (sceneId: string, status: Scene["status"]) => void;
+  onStatusChange: (sceneId: string, status: SceneStatus) => void;
   onEdit?: (scene: Scene) => void;
   onDelete?: (id: string) => void;
 }

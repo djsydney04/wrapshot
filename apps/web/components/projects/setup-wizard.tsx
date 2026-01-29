@@ -20,7 +20,7 @@ import { AddCastForm } from "@/components/forms/add-cast-form";
 import { AddCrewForm } from "@/components/forms/add-crew-form";
 import { useProjectStore } from "@/lib/stores/project-store";
 import { cn } from "@/lib/utils";
-import type { Project } from "@/lib/mock-data";
+import type { Project } from "@/lib/actions/projects";
 
 interface SetupWizardProps {
   projectId: string;

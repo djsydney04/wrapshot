@@ -6,7 +6,7 @@ import { MoreHorizontal, Film, Users, MapPin, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { Project } from "@/lib/mock-data";
+import type { Project } from "@/lib/actions/projects";
 
 interface ProjectCardProps {
   project: Project;
@@ -107,9 +107,11 @@ export function ProjectCard({ project, className }: ProjectCardProps) {
         </div>
 
         {/* Dates */}
-        <div className="mt-3 text-xs text-muted-foreground">
-          {formatDate(project.startDate)} — {formatDate(project.endDate)}
-        </div>
+        {(project.startDate || project.endDate) && (
+          <div className="mt-3 text-xs text-muted-foreground">
+            {project.startDate ? formatDate(project.startDate) : "TBD"} — {project.endDate ? formatDate(project.endDate) : "TBD"}
+          </div>
+        )}
       </div>
     </Link>
   );

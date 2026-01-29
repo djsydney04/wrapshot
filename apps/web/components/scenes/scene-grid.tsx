@@ -18,7 +18,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SortableSceneCard } from "./scene-card";
-import type { Scene, CastMember } from "@/lib/mock-data";
+import type { Scene } from "@/lib/actions/scenes";
+import type { CastMember } from "@/lib/mock-data";
 
 interface SceneGridProps {
   scenes: Scene[];
