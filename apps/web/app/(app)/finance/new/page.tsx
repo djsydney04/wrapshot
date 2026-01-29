@@ -167,7 +167,6 @@ export default function NewBudgetPage() {
         projectId: selectedProjectId,
         versionName: budgetName.trim(),
         templateId: selectedTemplate?.id,
-        notes: budgetDescription || undefined,
       });
 
       // Redirect to the new budget
