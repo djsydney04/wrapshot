@@ -173,8 +173,8 @@ function DroppableDay({
         isOver && "bg-primary/10 ring-2 ring-primary ring-inset"
       )}
     >
-      {/* Hour Lines */}
-      {HOURS.map((_, i) => (
+      {/* Hour Lines - includes line at midnight end (24th hour) */}
+      {[...HOURS, 24].map((_, i) => (
         <div
           key={i}
           className="absolute left-0 right-0 border-t border-border/50"
@@ -290,32 +290,40 @@ function DraggableEvent({
         zIndex: isDragging ? 100 : 10,
       }}
       className={cn(
-        "group rounded-lg text-white overflow-hidden",
+        "group rounded-lg text-white overflow-hidden cursor-grab active:cursor-grabbing",
         STATUS_COLORS[shootingDay.status],
-        isDragging && "opacity-50 shadow-lg",
+        isDragging && "opacity-50 shadow-lg ring-2 ring-primary",
         isOver && "ring-2 ring-yellow-400"
       )}
+      {...attributes}
+      {...listeners}
     >
-      {/* Header with drag handle */}
-      <div className="flex items-center justify-between px-2 py-1 border-b border-white/20">
-        <div className="flex items-center gap-1" onClick={onClick}>
+      {/* Header with drag indicator */}
+      <div
+        className="flex items-center justify-between px-2 py-1 border-b border-white/20"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick?.();
+        }}
+      >
+        <div className="flex items-center gap-1.5">
+          <GripVertical className="h-3.5 w-3.5 text-white/50" />
           <span className="font-semibold text-xs">Day {shootingDay.dayNumber}</span>
-          <span className="text-[10px] opacity-70">
-            {shootingDay.generalCall} - {shootingDay.wrapTime || "?"}
-          </span>
         </div>
-        <div
-          {...attributes}
-          {...listeners}
-          className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-white/20 cursor-grab active:cursor-grabbing"
-        >
-          <GripVertical className="h-3 w-3 text-white/70" />
-        </div>
+        <span className="text-[10px] opacity-70">
+          {shootingDay.generalCall} - {shootingDay.wrapTime || "?"}
+        </span>
       </div>
 
       {/* Scenes list */}
       {showScenes && height > 80 && (
-        <div className="flex-1 py-1 space-y-0.5 overflow-hidden">
+        <div
+          className="flex-1 py-1 space-y-0.5 overflow-hidden"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick?.();
+          }}
+        >
           {dayScenes.length > 0 ? (
             dayScenes.slice(0, Math.floor((height - 50) / 24)).map((scene, i) => (
               <MiniSceneBlock
@@ -589,15 +597,15 @@ export function DraggableWeekCalendar({
             <div ref={scrollRef} className="flex-1 overflow-auto">
               <div
                 className="grid grid-cols-[56px_repeat(7,1fr)] relative"
-                style={{ minHeight: `${HOURS.length * HOUR_HEIGHT}px` }}
+                style={{ height: `${(HOURS.length + 1) * HOUR_HEIGHT}px` }}
               >
                 {/* Time Labels */}
                 <div className="relative border-r border-border">
                   {HOURS.map((hour, i) => (
                     <div
                       key={hour}
-                      className="absolute right-2 -translate-y-1/2 text-[11px] text-muted-foreground"
-                      style={{ top: `${i * HOUR_HEIGHT}px` }}
+                      className="absolute right-2 text-[11px] text-muted-foreground"
+                      style={{ top: `${i * HOUR_HEIGHT + 4}px` }}
                     >
                       {hour === 0
                         ? "12 AM"
@@ -608,6 +616,13 @@ export function DraggableWeekCalendar({
                         : `${hour} AM`}
                     </div>
                   ))}
+                  {/* End of day label */}
+                  <div
+                    className="absolute right-2 text-[11px] text-muted-foreground"
+                    style={{ top: `${24 * HOUR_HEIGHT + 4}px` }}
+                  >
+                    12 AM
+                  </div>
                 </div>
 
                 {/* Day Columns */}
