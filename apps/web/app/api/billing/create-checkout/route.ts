@@ -11,27 +11,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { planId, organizationId } = await request.json();
+    const { planId } = await request.json();
 
-    if (!planId || !organizationId) {
+    if (!planId) {
       return NextResponse.json(
-        { error: "Missing planId or organizationId" },
+        { error: "Missing planId" },
         { status: 400 }
-      );
-    }
-
-    // Verify user is owner/admin of the organization
-    const { data: membership } = await supabase
-      .from("OrganizationMember")
-      .select("role")
-      .eq("organizationId", organizationId)
-      .eq("userId", user.id)
-      .single();
-
-    if (!membership || !["OWNER", "ADMIN"].includes(membership.role)) {
-      return NextResponse.json(
-        { error: "You don't have permission to manage billing" },
-        { status: 403 }
       );
     }
 
@@ -50,44 +35,37 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if organization already has a Stripe customer
+    // Check if user already has a subscription with a Stripe customer
     const { data: subscription } = await supabase
       .from("Subscription")
       .select("stripeCustomerId")
-      .eq("organizationId", organizationId)
-      .single();
+      .eq("userId", user.id)
+      .maybeSingle();
 
     const stripe = getStripe();
     let customerId = subscription?.stripeCustomerId;
 
     // Create customer if doesn't exist
     if (!customerId) {
-      const { data: org } = await supabase
-        .from("Organization")
-        .select("name")
-        .eq("id", organizationId)
-        .single();
-
       const customer = await stripe.customers.create({
         email: user.email,
         metadata: {
-          organizationId,
           userId: user.id,
         },
-        name: org?.name,
+        name: user.email,
       });
       customerId = customer.id;
 
-      // Save customer ID to subscription record
+      // Save customer ID to subscription record (upsert to handle race conditions)
       await supabase
         .from("Subscription")
         .upsert({
-          organizationId,
+          userId: user.id,
           stripeCustomerId: customerId,
           plan: "FREE",
-          status: "TRIALING",
+          status: "ACTIVE",
         }, {
-          onConflict: "organizationId",
+          onConflict: "userId",
         });
     }
 
@@ -105,7 +83,6 @@ export async function POST(request: Request) {
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings/billing?success=true`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings/billing?canceled=true`,
       metadata: {
-        organizationId,
         userId: user.id,
       },
     });

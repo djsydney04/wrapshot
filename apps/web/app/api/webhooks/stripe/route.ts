@@ -85,10 +85,10 @@ type SupabaseClientType = Awaited<ReturnType<typeof createClient>>;
 async function handleCheckoutCompleted(supabase: SupabaseClientType, session: Stripe.Checkout.Session) {
   const customerId = session.customer as string;
   const subscriptionId = session.subscription as string;
-  const organizationId = session.metadata?.organizationId;
+  const userId = session.metadata?.userId;
 
-  if (!organizationId) {
-    console.error("No organizationId in checkout session metadata");
+  if (!userId) {
+    console.error("No userId in checkout session metadata");
     return;
   }
 
@@ -101,7 +101,7 @@ async function handleCheckoutCompleted(supabase: SupabaseClientType, session: St
   const { error } = await supabase
     .from("Subscription")
     .upsert({
-      organizationId,
+      userId,
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscriptionId,
       stripePriceId: priceId,
@@ -110,7 +110,7 @@ async function handleCheckoutCompleted(supabase: SupabaseClientType, session: St
       plan,
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
     }, {
-      onConflict: "organizationId",
+      onConflict: "userId",
     });
 
   if (error) {
@@ -118,7 +118,7 @@ async function handleCheckoutCompleted(supabase: SupabaseClientType, session: St
     throw error;
   }
 
-  console.log(`Checkout completed for org ${organizationId}, plan: ${plan}`);
+  console.log(`Checkout completed for user ${userId}, plan: ${plan}`);
 }
 
 async function handleSubscriptionChange(supabase: SupabaseClientType, subscription: Stripe.Subscription) {
@@ -129,7 +129,7 @@ async function handleSubscriptionChange(supabase: SupabaseClientType, subscripti
   // Find subscription by customer ID
   const { data: existingSub } = await supabase
     .from("Subscription")
-    .select("id, organizationId")
+    .select("id, userId")
     .eq("stripeCustomerId", customerId)
     .single();
 
@@ -156,7 +156,7 @@ async function handleSubscriptionChange(supabase: SupabaseClientType, subscripti
     throw error;
   }
 
-  console.log(`Subscription updated for org ${existingSub.organizationId}, status: ${subscription.status}`);
+  console.log(`Subscription updated for user ${existingSub.userId}, status: ${subscription.status}`);
 }
 
 async function handleSubscriptionDeleted(supabase: SupabaseClientType, subscription: Stripe.Subscription) {

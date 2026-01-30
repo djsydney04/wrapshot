@@ -165,25 +165,24 @@ export function ImageUpload({
           onDrop={handleDrop}
           onClick={() => !disabled && inputRef.current?.click()}
         >
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 p-2 overflow-hidden">
             {isUploading ? (
               <>
-                <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
-                <p className="text-sm text-muted-foreground">Uploading...</p>
+                <Loader2 className="h-6 w-6 shrink-0 text-muted-foreground animate-spin" />
+                <p className="text-xs text-muted-foreground truncate">Uploading...</p>
               </>
             ) : (
               <>
                 {isDragging ? (
-                  <Upload className="h-8 w-8 text-primary" />
+                  <Upload className="h-6 w-6 shrink-0 text-primary" />
                 ) : (
-                  <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                  <ImageIcon className="h-6 w-6 shrink-0 text-muted-foreground" />
                 )}
-                <p className="text-sm text-muted-foreground text-center">
-                  {placeholder}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  PNG, JPG, WebP up to 10MB
-                </p>
+                {placeholder && (
+                  <p className="text-xs text-muted-foreground text-center line-clamp-2">
+                    {placeholder}
+                  </p>
+                )}
               </>
             )}
           </div>

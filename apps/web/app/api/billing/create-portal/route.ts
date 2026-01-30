@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe/client";
 
-export async function POST(request: Request) {
+export async function POST() {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -11,36 +11,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { organizationId } = await request.json();
-
-    if (!organizationId) {
-      return NextResponse.json(
-        { error: "Missing organizationId" },
-        { status: 400 }
-      );
-    }
-
-    // Verify user is owner/admin of the organization
-    const { data: membership } = await supabase
-      .from("OrganizationMember")
-      .select("role")
-      .eq("organizationId", organizationId)
-      .eq("userId", user.id)
-      .single();
-
-    if (!membership || !["OWNER", "ADMIN"].includes(membership.role)) {
-      return NextResponse.json(
-        { error: "You don't have permission to manage billing" },
-        { status: 403 }
-      );
-    }
-
-    // Get the Stripe customer ID
+    // Get the user's Stripe customer ID
     const { data: subscription } = await supabase
       .from("Subscription")
       .select("stripeCustomerId")
-      .eq("organizationId", organizationId)
-      .single();
+      .eq("userId", user.id)
+      .maybeSingle();
 
     if (!subscription?.stripeCustomerId) {
       return NextResponse.json(

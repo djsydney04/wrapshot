@@ -150,6 +150,10 @@ export default function OnboardingPage() {
       </div>
 
       <div className="mx-auto max-w-lg px-6 pt-16 pb-12">
+        {/* Branding */}
+        <div className="flex justify-center mb-12">
+          <span className="text-xl font-semibold tracking-tight">wrapshoot</span>
+        </div>
         {/* Step 1: Profile */}
         {step === 1 && (
           <div className="space-y-8">

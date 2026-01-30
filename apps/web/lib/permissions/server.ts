@@ -121,14 +121,14 @@ export async function getUserSubscription(userId: string) {
   return data;
 }
 
-// Check if action is allowed by plan
+// Check if action is allowed by plan (e.g., can user join another project?)
 export async function checkPlanLimit(
   userId: string,
-  limitType: "projects" | "team_members"
+  limitType: "projects"
 ): Promise<boolean> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase.rpc("check_plan_limit_user", {
+  const { data, error } = await supabase.rpc("check_user_plan_limit", {
     user_id: userId,
     limit_type: limitType,
   });

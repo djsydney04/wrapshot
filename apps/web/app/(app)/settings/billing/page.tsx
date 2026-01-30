@@ -31,7 +31,7 @@ const plans = [
     name: "Free",
     price: "$0",
     description: "For individuals getting started",
-    features: ["1 project", "3 team members", "Basic scheduling", "7-day history"],
+    features: ["Join 1 project", "Basic scheduling", "7-day history"],
     icon: Zap,
     color: "text-muted-foreground",
     bg: "bg-muted",
@@ -40,8 +40,8 @@ const plans = [
     id: "PRO",
     name: "Pro",
     price: "$29",
-    description: "For growing production teams",
-    features: ["Unlimited projects", "25 team members", "Advanced scheduling", "Call sheet generation", "30-day history"],
+    description: "For professionals on multiple productions",
+    features: ["Join unlimited projects", "Advanced scheduling", "Call sheet generation", "30-day history"],
     icon: Sparkles,
     color: "text-blue-600",
     bg: "bg-blue-50",
@@ -51,8 +51,8 @@ const plans = [
     id: "STUDIO",
     name: "Studio",
     price: "$99",
-    description: "For large productions",
-    features: ["Everything in Pro", "Unlimited team members", "Priority support", "Custom integrations", "Unlimited history", "API access"],
+    description: "For power users and studios",
+    features: ["Everything in Pro", "Priority support", "Custom integrations", "Unlimited history", "API access"],
     icon: Crown,
     color: "text-amber-600",
     bg: "bg-amber-50",
@@ -95,10 +95,7 @@ function BillingContent() {
       const response = await fetch("/api/billing/create-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          planId,
-          userId: user.id,
-        }),
+        body: JSON.stringify({ planId }),
       });
 
       const data = await response.json();
@@ -131,9 +128,6 @@ function BillingContent() {
       const response = await fetch("/api/billing/create-portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.id,
-        }),
       });
 
       const data = await response.json();

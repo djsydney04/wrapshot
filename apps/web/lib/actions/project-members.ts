@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { requireProjectPermission, getCurrentUserId } from "@/lib/permissions/server";
+import { requireProjectPermission, getCurrentUserId, checkPlanLimit } from "@/lib/permissions/server";
 import type { ProjectRole } from "@/lib/permissions";
 
 // Get project members
@@ -73,6 +73,12 @@ export async function addProjectMember(
 ) {
   // Check permission
   await requireProjectPermission(projectId, "project:manage-team");
+
+  // Check if the user being added can join another project based on their plan
+  const canJoin = await checkPlanLimit(userId, "projects");
+  if (!canJoin) {
+    throw new Error("This user has reached their project limit. They need to upgrade their plan to join more projects.");
+  }
 
   const supabase = await createClient();
 
@@ -268,6 +274,12 @@ export async function acceptProjectInvite(token: string) {
 
   if (!userId) {
     throw new Error("You must be logged in to accept an invite");
+  }
+
+  // Check if the user can join another project based on their plan
+  const canJoin = await checkPlanLimit(userId, "projects");
+  if (!canJoin) {
+    throw new Error("You've reached your project limit on the Free plan. Upgrade to Pro to join unlimited projects.");
   }
 
   const supabase = await createClient();

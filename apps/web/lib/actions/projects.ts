@@ -54,11 +54,11 @@ export async function createProject(
     throw new Error("Not authenticated");
   }
 
-  // Check plan limit
+  // Check plan limit - users on Free plan can only be part of 1 project
   const canCreate = await checkPlanLimit(userId, "projects");
   if (!canCreate) {
     throw new Error(
-      "PLAN_LIMIT_REACHED:You've reached the project limit for your plan. Upgrade to create more projects."
+      "PLAN_LIMIT_REACHED:You've reached your project limit on the Free plan. Upgrade to Pro to join unlimited projects."
     );
   }
 
