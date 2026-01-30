@@ -466,7 +466,7 @@ export async function inviteUserToProject(
     throw new Error("Failed to create invite");
   }
 
-  // Get project name for the email
+  // Get project name and inviter email for the email
   const { data: project } = await supabase
     .from("Project")
     .select("name")
@@ -474,6 +474,10 @@ export async function inviteUserToProject(
     .single();
 
   const projectName = project?.name || "a project";
+
+  // Get inviter's email
+  const { data: { user: inviter } } = await supabase.auth.getUser();
+  const inviterEmail = inviter?.email || "A team member";
 
   if (userCheck.exists) {
     // User exists on platform - they just need to accept the invite
@@ -501,6 +505,7 @@ export async function inviteUserToProject(
           invite_token: invite.token,
           project_id: projectId,
           project_name: projectName,
+          inviter_email: inviterEmail,
           role: role,
         },
       }
