@@ -61,6 +61,7 @@ model Project {
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   scripts      Script[]
   castMembers  CastMember[]
+  crewMembers  CrewMember[]
   locations    Location[]
   scenes       Scene[]
   shootingDays ShootingDay[]
@@ -68,6 +69,7 @@ model Project {
   elements     Element[]
   members      ProjectMember[]
   invites      ProjectInvite[]
+  castCrewInvites CastCrewInvite[]
 }
 
 enum ProjectStatus {
@@ -122,6 +124,7 @@ model Script {
 model CastMember {
   id               String         @id @default(cuid())
   projectId        String
+  userId           String?        // Optional link to auth.users (platform user)
   characterName    String
   actorName        String?
   castNumber       Int? // Traditional cast ID number
@@ -145,6 +148,8 @@ model CastMember {
   sceneAppearances   SceneCastMember[]
   shootingDayEntries ShootingDayCast[]
   availabilities     CastAvailability[]
+
+  @@index([userId])
 }
 
 enum CastWorkStatus {
@@ -505,4 +510,70 @@ model ProjectInvite {
 
   @@unique([projectId, email])
   @@index([token])
+}
+
+// ============== CREW MEMBERS ==============
+
+enum DepartmentType {
+  PRODUCTION
+  DIRECTION
+  CAMERA
+  SOUND
+  LIGHTING
+  ART
+  COSTUME
+  HAIR_MAKEUP
+  LOCATIONS
+  STUNTS
+  VFX
+  TRANSPORTATION
+  CATERING
+  ACCOUNTING
+  POST_PRODUCTION
+}
+
+model CrewMember {
+  id              String         @id @default(cuid())
+  projectId       String
+  userId          String?        // Optional link to auth.users (platform user)
+  name            String
+  role            String         // Job title, e.g., "Director of Photography"
+  department      DepartmentType
+  email           String?
+  phone           String?
+  isHead          Boolean        @default(false) // Department head flag
+  profilePhotoUrl String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([userId])
+}
+
+// ============== CAST/CREW INVITES ==============
+
+enum CastCrewType {
+  CAST
+  CREW
+}
+
+model CastCrewInvite {
+  id         String       @id @default(cuid())
+  projectId  String
+  email      String
+  inviteType CastCrewType
+  targetId   String       // castMemberId or crewMemberId depending on inviteType
+  token      String       @unique @default(cuid())
+  expiresAt  DateTime
+  acceptedAt DateTime?    // Track when invite was accepted
+  createdAt  DateTime     @default(now())
+  createdBy  String       // userId who created the invite
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, email, targetId])
+  @@index([token])
+  @@index([email])
 }
