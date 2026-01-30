@@ -25,11 +25,13 @@ export interface CastMemberInput {
   agentContact?: string;
   notes?: string;
   hairMakeupMins?: number;
+  userId?: string; // Optional link to platform user
 }
 
 export interface CastMember {
   id: string;
   projectId: string;
+  userId: string | null;
   characterName: string;
   actorName: string | null;
   castNumber: number | null;
@@ -152,6 +154,7 @@ export async function createCastMember(input: CastMemberInput) {
       agentContact: input.agentContact || null,
       notes: input.notes || null,
       hairMakeupMins: input.hairMakeupMins ?? 60,
+      userId: input.userId || null,
     })
     .select()
     .single();
@@ -366,4 +369,58 @@ export async function getCastMembersWithSceneCounts(projectId: string) {
   }));
 
   return { data: castWithCounts as CastMember[], error: null };
+}
+
+// Link an existing cast member to a platform user
+export async function linkCastMemberToUser(castMemberId: string, linkedUserId: string) {
+  const supabase = await createClient();
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return { data: null, error: "Not authenticated" };
+  }
+
+  const { data, error } = await supabase
+    .from("CastMember")
+    .update({
+      userId: linkedUserId,
+      updatedAt: new Date().toISOString(),
+    })
+    .eq("id", castMemberId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error linking cast member to user:", error);
+    return { data: null, error: error.message };
+  }
+
+  revalidatePath(`/projects/${data.projectId}`);
+
+  return { data: data as CastMember, error: null };
+}
+
+// Get cast member by userId for a project
+export async function getCastMemberByUserId(projectId: string, linkedUserId: string) {
+  const supabase = await createClient();
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return { data: null, error: "Not authenticated" };
+  }
+
+  const { data, error } = await supabase
+    .from("CastMember")
+    .select("*")
+    .eq("projectId", projectId)
+    .eq("userId", linkedUserId)
+    .single();
+
+  if (error && error.code !== "PGRST116") {
+    // PGRST116 = no rows returned, which is fine
+    console.error("Error fetching cast member by userId:", error);
+    return { data: null, error: error.message };
+  }
+
+  return { data: data as CastMember | null, error: null };
 }

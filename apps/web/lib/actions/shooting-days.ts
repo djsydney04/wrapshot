@@ -192,6 +192,302 @@ export async function deleteShootingDay(id: string, projectId: string) {
   return { success: true, error: null };
 }
 
+// Reschedule a shooting day to a new date
+export async function rescheduleShootingDay(
+  id: string,
+  newDate: string,
+  newCallTime?: string
+) {
+  const supabase = await createClient();
+
+  const updateData: Record<string, unknown> = {
+    date: newDate,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (newCallTime) {
+    updateData.generalCall = newCallTime;
+  }
+
+  const { data, error } = await supabase
+    .from("ShootingDay")
+    .update(updateData)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error rescheduling shooting day:", error);
+    return { data: null, error: error.message };
+  }
+
+  revalidatePath(`/projects/${data.projectId}`);
+  revalidatePath("/schedule");
+
+  return { data, error: null };
+}
+
+// Update scene order within a shooting day
+export async function updateSceneOrder(
+  shootingDayId: string,
+  sceneIds: string[]
+) {
+  const supabase = await createClient();
+
+  // Delete existing scene associations
+  const { error: deleteError } = await supabase
+    .from("ShootingDayScene")
+    .delete()
+    .eq("shootingDayId", shootingDayId);
+
+  if (deleteError) {
+    console.error("Error deleting scene associations:", deleteError);
+    return { success: false, error: deleteError.message };
+  }
+
+  // Insert new associations with updated sort order
+  if (sceneIds.length > 0) {
+    const sceneInserts = sceneIds.map((sceneId, index) => ({
+      shootingDayId,
+      sceneId,
+      sortOrder: index,
+    }));
+
+    const { error: insertError } = await supabase
+      .from("ShootingDayScene")
+      .insert(sceneInserts);
+
+    if (insertError) {
+      console.error("Error inserting scene associations:", insertError);
+      return { success: false, error: insertError.message };
+    }
+  }
+
+  // Get the shooting day to revalidate the project path
+  const { data: shootingDay } = await supabase
+    .from("ShootingDay")
+    .select("projectId")
+    .eq("id", shootingDayId)
+    .single();
+
+  if (shootingDay) {
+    revalidatePath(`/projects/${shootingDay.projectId}`);
+  }
+  revalidatePath("/schedule");
+
+  return { success: true, error: null };
+}
+
+// Cast call time type
+export interface CastCallTime {
+  castMemberId: string;
+  workStatus: "W" | "SW" | "WF" | "SWF" | "H" | "R" | "T" | "WD";
+  pickupTime?: string;
+  muHairCall?: string;
+  onSetCall?: string;
+  remarks?: string;
+}
+
+// Update cast call times for a shooting day
+export async function updateCastCallTimes(
+  shootingDayId: string,
+  castTimes: CastCallTime[]
+) {
+  const supabase = await createClient();
+
+  // Delete existing cast associations
+  const { error: deleteError } = await supabase
+    .from("ShootingDayCast")
+    .delete()
+    .eq("shootingDayId", shootingDayId);
+
+  if (deleteError) {
+    console.error("Error deleting cast associations:", deleteError);
+    return { success: false, error: deleteError.message };
+  }
+
+  // Insert new associations
+  if (castTimes.length > 0) {
+    const castInserts = castTimes.map((ct) => ({
+      shootingDayId,
+      castMemberId: ct.castMemberId,
+      workStatus: ct.workStatus,
+      pickupTime: ct.pickupTime || null,
+      muHairCall: ct.muHairCall || null,
+      onSetCall: ct.onSetCall || null,
+      remarks: ct.remarks || null,
+    }));
+
+    const { error: insertError } = await supabase
+      .from("ShootingDayCast")
+      .insert(castInserts);
+
+    if (insertError) {
+      console.error("Error inserting cast associations:", insertError);
+      return { success: false, error: insertError.message };
+    }
+  }
+
+  // Get the shooting day to revalidate the project path
+  const { data: shootingDay } = await supabase
+    .from("ShootingDay")
+    .select("projectId")
+    .eq("id", shootingDayId)
+    .single();
+
+  if (shootingDay) {
+    revalidatePath(`/projects/${shootingDay.projectId}`);
+  }
+  revalidatePath("/schedule");
+
+  return { success: true, error: null };
+}
+
+// Department call time type
+export interface DepartmentCallTime {
+  department: string;
+  callTime: string;
+  notes?: string;
+}
+
+// Update department call times for a shooting day
+export async function updateDepartmentCallTimes(
+  shootingDayId: string,
+  deptTimes: DepartmentCallTime[]
+) {
+  const supabase = await createClient();
+
+  // First get or create the call sheet for this shooting day
+  let { data: callSheet, error: fetchError } = await supabase
+    .from("CallSheet")
+    .select("id")
+    .eq("shootingDayId", shootingDayId)
+    .single();
+
+  if (fetchError && fetchError.code !== "PGRST116") {
+    // PGRST116 = no rows returned
+    console.error("Error fetching call sheet:", fetchError);
+    return { success: false, error: fetchError.message };
+  }
+
+  // Create call sheet if it doesn't exist
+  if (!callSheet) {
+    const { data: newCallSheet, error: createError } = await supabase
+      .from("CallSheet")
+      .insert({ shootingDayId })
+      .select("id")
+      .single();
+
+    if (createError) {
+      console.error("Error creating call sheet:", createError);
+      return { success: false, error: createError.message };
+    }
+    callSheet = newCallSheet;
+  }
+
+  // Delete existing department calls
+  const { error: deleteError } = await supabase
+    .from("CallSheetDepartment")
+    .delete()
+    .eq("callSheetId", callSheet.id);
+
+  if (deleteError) {
+    console.error("Error deleting department calls:", deleteError);
+    return { success: false, error: deleteError.message };
+  }
+
+  // Insert new department calls
+  if (deptTimes.length > 0) {
+    const deptInserts = deptTimes.map((dt) => ({
+      callSheetId: callSheet!.id,
+      department: dt.department,
+      callTime: dt.callTime,
+      notes: dt.notes || null,
+    }));
+
+    const { error: insertError } = await supabase
+      .from("CallSheetDepartment")
+      .insert(deptInserts);
+
+    if (insertError) {
+      console.error("Error inserting department calls:", insertError);
+      return { success: false, error: insertError.message };
+    }
+  }
+
+  // Get the shooting day to revalidate the project path
+  const { data: shootingDay } = await supabase
+    .from("ShootingDay")
+    .select("projectId")
+    .eq("id", shootingDayId)
+    .single();
+
+  if (shootingDay) {
+    revalidatePath(`/projects/${shootingDay.projectId}`);
+  }
+  revalidatePath("/schedule");
+
+  return { success: true, error: null };
+}
+
+// Get cast call times for a shooting day
+export async function getShootingDayCast(shootingDayId: string) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("ShootingDayCast")
+    .select(
+      `
+      *,
+      castMember:CastMember(
+        id,
+        characterName,
+        actorName,
+        castNumber
+      )
+    `
+    )
+    .eq("shootingDayId", shootingDayId);
+
+  if (error) {
+    console.error("Error fetching shooting day cast:", error);
+    return { data: null, error: error.message };
+  }
+
+  return { data, error: null };
+}
+
+// Get department call times for a shooting day
+export async function getShootingDayDepartments(shootingDayId: string) {
+  const supabase = await createClient();
+
+  const { data: callSheet, error: fetchError } = await supabase
+    .from("CallSheet")
+    .select(
+      `
+      id,
+      departmentCalls:CallSheetDepartment(
+        department,
+        callTime,
+        notes
+      )
+    `
+    )
+    .eq("shootingDayId", shootingDayId)
+    .single();
+
+  if (fetchError) {
+    if (fetchError.code === "PGRST116") {
+      // No call sheet exists yet
+      return { data: [], error: null };
+    }
+    console.error("Error fetching department calls:", fetchError);
+    return { data: null, error: fetchError.message };
+  }
+
+  return { data: callSheet?.departmentCalls || [], error: null };
+}
+
 // Get scenes for a project (for the form)
 export async function getProjectScenes(projectId: string) {
   const supabase = await createClient();

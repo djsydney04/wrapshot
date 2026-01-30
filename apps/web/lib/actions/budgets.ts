@@ -280,3 +280,121 @@ export async function deleteBudget(budgetId: string): Promise<void> {
 
   revalidatePath("/finance");
 }
+
+// Budget category interface
+export interface BudgetCategory {
+  id: string;
+  budgetId: string;
+  code: string;
+  name: string;
+  parentCategoryId: string | null;
+  subtotalEstimated: number;
+  subtotalActual: number;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Budget line item interface
+export interface BudgetLineItem {
+  id: string;
+  categoryId: string;
+  accountCode: string;
+  description: string;
+  units: "DAYS" | "WEEKS" | "FLAT" | "HOURS" | "EACH";
+  quantity: number;
+  rate: number;
+  subtotal: number;
+  fringePercent: number;
+  fringeAmount: number;
+  estimatedTotal: number;
+  actualCost: number;
+  committedCost: number;
+  variance: number;
+  notes: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Get categories for a budget
+export async function getBudgetCategories(budgetId: string): Promise<BudgetCategory[]> {
+  const supabase = await createClient();
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    throw new Error("Not authenticated");
+  }
+
+  const { data, error } = await supabase
+    .from("BudgetCategory")
+    .select("*")
+    .eq("budgetId", budgetId)
+    .order("sortOrder", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching budget categories:", error);
+    return [];
+  }
+
+  return data || [];
+}
+
+// Get line items for a budget (via categories)
+export async function getBudgetLineItems(budgetId: string): Promise<BudgetLineItem[]> {
+  const supabase = await createClient();
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    throw new Error("Not authenticated");
+  }
+
+  // First get all category IDs for this budget
+  const { data: categories, error: catError } = await supabase
+    .from("BudgetCategory")
+    .select("id")
+    .eq("budgetId", budgetId);
+
+  if (catError || !categories || categories.length === 0) {
+    return [];
+  }
+
+  const categoryIds = categories.map((c) => c.id);
+
+  // Then get all line items for these categories
+  const { data, error } = await supabase
+    .from("BudgetLineItem")
+    .select("*")
+    .in("categoryId", categoryIds)
+    .order("sortOrder", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching budget line items:", error);
+    return [];
+  }
+
+  return data || [];
+}
+
+// Get line items for a specific category
+export async function getCategoryLineItems(categoryId: string): Promise<BudgetLineItem[]> {
+  const supabase = await createClient();
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    throw new Error("Not authenticated");
+  }
+
+  const { data, error } = await supabase
+    .from("BudgetLineItem")
+    .select("*")
+    .eq("categoryId", categoryId)
+    .order("sortOrder", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching category line items:", error);
+    return [];
+  }
+
+  return data || [];
+}

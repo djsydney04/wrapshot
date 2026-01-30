@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { ImageUpload } from "@/components/ui/image-upload";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -14,8 +16,11 @@ import {
   DialogBody,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { useProjectStore } from "@/lib/stores/project-store";
-import { DEPARTMENT_LABELS, type DepartmentType } from "@/lib/mock-data";
+import { createCrewMember, type DepartmentType } from "@/lib/actions/crew";
+import { inviteCrewMember } from "@/lib/actions/cast-crew-invites";
+import { CastCrewUserPicker } from "@/components/ui/cast-crew-user-picker";
+import { type UserSelection } from "@/components/ui/user-search-combobox";
+import { DEPARTMENT_LABELS } from "@/lib/mock-data";
 
 interface AddCrewFormProps {
   projectId: string;
@@ -45,18 +50,35 @@ export function AddCrewForm({
   onOpenChange,
   onSuccess,
 }: AddCrewFormProps) {
-  const { addCrewMember } = useProjectStore();
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [formData, setFormData] = React.useState(initialFormData);
+  const [selectedUser, setSelectedUser] = React.useState<UserSelection | null>(null);
+  const [sendInvite, setSendInvite] = React.useState(false);
 
   // Reset form when dialog opens
   React.useEffect(() => {
     if (open) {
       setFormData(initialFormData);
       setError(null);
+      setSelectedUser(null);
+      setSendInvite(false);
     }
   }, [open]);
+
+  const handleUserSelect = React.useCallback((selection: UserSelection | null) => {
+    setSelectedUser(selection);
+    // Reset send invite when user selection changes
+    setSendInvite(false);
+  }, []);
+
+  const handleManualEntry = React.useCallback((name: string, email: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      name: name,
+      email: email,
+    }));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +86,14 @@ export function AddCrewForm({
     setError(null);
 
     try {
-      addCrewMember({
+      // Determine userId if an existing user was selected
+      const userId =
+        selectedUser?.type === "existing_user"
+          ? selectedUser.user.userId
+          : undefined;
+
+      // Create the crew member using server action
+      const { data: crewMember, error: createError } = await createCrewMember({
         projectId,
         name: formData.name,
         role: formData.role,
@@ -73,7 +102,21 @@ export function AddCrewForm({
         phone: formData.phone || undefined,
         isHead: formData.isHead,
         profilePhotoUrl: formData.profilePhotoUrl || undefined,
+        userId,
       });
+
+      if (createError) throw new Error(createError);
+
+      // If sendInvite is checked and we have an email (but not linked to existing user)
+      // send the invite
+      if (crewMember && formData.email && sendInvite && !userId) {
+        try {
+          await inviteCrewMember(crewMember.id, projectId);
+        } catch (inviteError) {
+          console.error("Failed to send invite:", inviteError);
+          // Don't fail the whole operation if invite fails
+        }
+      }
 
       onOpenChange(false);
       onSuccess?.();
@@ -83,6 +126,14 @@ export function AddCrewForm({
       setLoading(false);
     }
   };
+
+  // Show invite checkbox if email is provided and user is not already linked
+  const showInviteOption =
+    formData.email &&
+    (!selectedUser || selectedUser.type === "new_email");
+
+  // Show linked user indicator
+  const isUserLinked = selectedUser?.type === "existing_user";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -115,33 +166,33 @@ export function AddCrewForm({
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  Name *
-                </label>
-                <Input
-                  required
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  placeholder="e.g., John Smith"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  Role *
-                </label>
-                <Input
-                  required
-                  value={formData.role}
-                  onChange={(e) =>
-                    setFormData({ ...formData, role: e.target.value })
-                  }
-                  placeholder="e.g., Director of Photography"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium mb-3">
+                Crew Member Details
+              </label>
+              <CastCrewUserPicker
+                projectId={projectId}
+                onUserSelect={handleUserSelect}
+                onManualEntry={handleManualEntry}
+                nameLabel="Name"
+                namePlaceholder="e.g., John Smith"
+                emailPlaceholder="email@example.com (optional)"
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1.5">
+                Role / Job Title *
+              </label>
+              <Input
+                required
+                value={formData.role}
+                onChange={(e) =>
+                  setFormData({ ...formData, role: e.target.value })
+                }
+                placeholder="e.g., Director of Photography"
+              />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -175,34 +226,53 @@ export function AddCrewForm({
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  Email
-                </label>
-                <Input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  placeholder="email@example.com"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  Phone
-                </label>
-                <Input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
-                  placeholder="+1 555 123 4567"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5">
+                Phone
+              </label>
+              <Input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) =>
+                  setFormData({ ...formData, phone: e.target.value })
+                }
+                placeholder="+1 555 123 4567"
+              />
             </div>
+
+            {showInviteOption && (
+              <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3">
+                <Checkbox
+                  id="send-crew-invite"
+                  checked={sendInvite}
+                  onCheckedChange={(checked) => setSendInvite(checked === true)}
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="send-crew-invite" className="cursor-pointer">
+                    Send platform invite
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    They&apos;ll receive an email to create an account and link to
+                    this crew role.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {isUserLinked && (
+              <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm">
+                <div className="h-2 w-2 rounded-full bg-green-500" />
+                <span>
+                  This crew member will be linked to{" "}
+                  <strong>
+                    {selectedUser.user.displayName ||
+                      `${selectedUser.user.firstName || ""} ${selectedUser.user.lastName || ""}`.trim() ||
+                      selectedUser.user.email}
+                  </strong>
+                  &apos;s account
+                </span>
+              </div>
+            )}
 
             {error && (
               <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">

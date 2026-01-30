@@ -16,7 +16,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useProjectStore } from "@/lib/stores/project-store";
-import { createShootingDay } from "@/lib/actions/shooting-days";
+import { createShootingDay, updateShootingDay } from "@/lib/actions/shooting-days";
+import type { ShootingDay } from "@/lib/mock-data";
 
 interface AddShootingDayFormProps {
   projectId: string;
@@ -24,7 +25,9 @@ interface AddShootingDayFormProps {
   onOpenChange: (open: boolean) => void;
   defaultDate?: Date;
   onSuccess?: () => void;
-  useMockData?: boolean; // Flag to use mock data instead of database
+  useMockData?: boolean;
+  // Edit mode props
+  editingDay?: ShootingDay | null;
 }
 
 export function AddShootingDayForm({
@@ -33,82 +36,138 @@ export function AddShootingDayForm({
   onOpenChange,
   defaultDate,
   onSuccess,
-  useMockData = true, // Default to mock data for now
+  useMockData = true,
+  editingDay,
 }: AddShootingDayFormProps) {
-  const { addShootingDay: addShootingDayToStore, getShootingDaysForProject, getScenesForProject } = useProjectStore();
+  const {
+    addShootingDay: addShootingDayToStore,
+    updateShootingDay: updateShootingDayInStore,
+    getShootingDaysForProject,
+    getScenesForProject,
+  } = useProjectStore();
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   const existingDays = getShootingDaysForProject(projectId);
   const scenes = getScenesForProject(projectId);
 
-  const [formData, setFormData] = React.useState({
-    date: defaultDate ? format(defaultDate, "yyyy-MM-dd") : "",
-    unit: "MAIN" as "MAIN" | "SECOND",
-    status: "TENTATIVE" as "TENTATIVE" | "SCHEDULED" | "CONFIRMED",
-    generalCall: "07:00",
-    wrapTime: "19:00",
-    crewCall: "06:30",
-    talentCall: "08:00",
-    lunchTime: "12:30",
-    notes: "",
-    selectedScenes: [] as string[],
+  const isEditMode = !!editingDay;
+
+  const getInitialFormData = () => ({
+    date: editingDay
+      ? editingDay.date
+      : defaultDate
+      ? format(defaultDate, "yyyy-MM-dd")
+      : "",
+    unit: (editingDay?.unit || "MAIN") as "MAIN" | "SECOND",
+    status: (editingDay?.status || "TENTATIVE") as
+      | "TENTATIVE"
+      | "SCHEDULED"
+      | "CONFIRMED"
+      | "COMPLETED"
+      | "CANCELLED",
+    generalCall: editingDay?.generalCall || "07:00",
+    wrapTime: editingDay?.wrapTime || editingDay?.expectedWrap || "19:00",
+    crewCall: editingDay?.crewCall || "06:30",
+    talentCall: editingDay?.talentCall || "08:00",
+    lunchTime: editingDay?.lunchTime || "12:30",
+    notes: editingDay?.notes || "",
+    selectedScenes: editingDay?.scenes || ([] as string[]),
   });
 
-  // Update date when defaultDate changes
+  const [formData, setFormData] = React.useState(getInitialFormData);
+
+  // Reset form when editingDay changes
   React.useEffect(() => {
-    if (defaultDate) {
+    setFormData(getInitialFormData());
+    setError(null);
+  }, [editingDay, defaultDate]);
+
+  // Update date when defaultDate changes (for add mode only)
+  React.useEffect(() => {
+    if (defaultDate && !isEditMode) {
       setFormData((prev) => ({
         ...prev,
         date: format(defaultDate, "yyyy-MM-dd"),
       }));
     }
-  }, [defaultDate]);
+  }, [defaultDate, isEditMode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    // Calculate next day number
-    const nextDayNumber = existingDays.length + 1;
-
     try {
-      if (useMockData) {
-        // Use local store (mock data)
-        addShootingDayToStore({
-          projectId,
-          date: formData.date,
-          dayNumber: nextDayNumber,
-          unit: formData.unit,
-          status: formData.status,
-          generalCall: formData.generalCall,
-          wrapTime: formData.wrapTime || undefined,
-          crewCall: formData.crewCall || undefined,
-          talentCall: formData.talentCall || undefined,
-          lunchTime: formData.lunchTime || undefined,
-          scenes: formData.selectedScenes,
-          notes: formData.notes || undefined,
-        });
-      } else {
-        // Use server action (database)
-        const result = await createShootingDay({
-          projectId,
-          date: formData.date,
-          dayNumber: nextDayNumber,
-          unit: formData.unit,
-          status: formData.status,
-          generalCall: formData.generalCall,
-          estimatedWrap: formData.wrapTime || undefined,
-          scenes: formData.selectedScenes,
-          notes: formData.notes || undefined,
-        });
+      if (isEditMode && editingDay) {
+        // Update existing shooting day
+        if (useMockData) {
+          updateShootingDayInStore(editingDay.id, {
+            date: formData.date,
+            unit: formData.unit,
+            status: formData.status,
+            generalCall: formData.generalCall,
+            wrapTime: formData.wrapTime || undefined,
+            crewCall: formData.crewCall || undefined,
+            talentCall: formData.talentCall || undefined,
+            lunchTime: formData.lunchTime || undefined,
+            scenes: formData.selectedScenes,
+            notes: formData.notes || undefined,
+          });
+        } else {
+          const result = await updateShootingDay(editingDay.id, {
+            date: formData.date,
+            unit: formData.unit,
+            status: formData.status,
+            generalCall: formData.generalCall,
+            estimatedWrap: formData.wrapTime || undefined,
+            scenes: formData.selectedScenes,
+            notes: formData.notes || undefined,
+          });
 
-        if (result.error) {
-          throw new Error(result.error);
+          if (result.error) {
+            throw new Error(result.error);
+          }
+        }
+      } else {
+        // Create new shooting day
+        const nextDayNumber = existingDays.length + 1;
+
+        if (useMockData) {
+          addShootingDayToStore({
+            projectId,
+            date: formData.date,
+            dayNumber: nextDayNumber,
+            unit: formData.unit,
+            status: formData.status,
+            generalCall: formData.generalCall,
+            wrapTime: formData.wrapTime || undefined,
+            crewCall: formData.crewCall || undefined,
+            talentCall: formData.talentCall || undefined,
+            lunchTime: formData.lunchTime || undefined,
+            scenes: formData.selectedScenes,
+            notes: formData.notes || undefined,
+          });
+        } else {
+          const result = await createShootingDay({
+            projectId,
+            date: formData.date,
+            dayNumber: nextDayNumber,
+            unit: formData.unit,
+            status: formData.status,
+            generalCall: formData.generalCall,
+            estimatedWrap: formData.wrapTime || undefined,
+            scenes: formData.selectedScenes,
+            notes: formData.notes || undefined,
+          });
+
+          if (result.error) {
+            throw new Error(result.error);
+          }
         }
       }
 
+      // Reset form
       setFormData({
         date: "",
         unit: "MAIN",
@@ -124,7 +183,11 @@ export function AddShootingDayForm({
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create shooting day");
+      setError(
+        err instanceof Error
+          ? err.message
+          : `Failed to ${isEditMode ? "update" : "create"} shooting day`
+      );
     } finally {
       setLoading(false);
     }
@@ -168,9 +231,15 @@ export function AddShootingDayForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent onClose={() => onOpenChange(false)} className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Add Shooting Day</DialogTitle>
+          <DialogTitle>
+            {isEditMode
+              ? `Edit Day ${editingDay?.dayNumber}`
+              : "Add Shooting Day"}
+          </DialogTitle>
           <DialogDescription>
-            Schedule a new shooting day for your production
+            {isEditMode
+              ? "Update the details for this shooting day"
+              : "Schedule a new shooting day for your production"}
           </DialogDescription>
         </DialogHeader>
 
@@ -223,6 +292,12 @@ export function AddShootingDayForm({
                       { value: "TENTATIVE", label: "Tentative" },
                       { value: "SCHEDULED", label: "Scheduled" },
                       { value: "CONFIRMED", label: "Confirmed" },
+                      ...(isEditMode
+                        ? [
+                            { value: "COMPLETED", label: "Completed" },
+                            { value: "CANCELLED", label: "Cancelled" },
+                          ]
+                        : []),
                     ]}
                   />
                 </div>
@@ -345,12 +420,14 @@ export function AddShootingDayForm({
                 </div>
                 {formData.selectedScenes.length > 0 && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    {formData.selectedScenes.length} scene{formData.selectedScenes.length !== 1 ? 's' : ''} selected
-                    {' • '}
+                    {formData.selectedScenes.length} scene
+                    {formData.selectedScenes.length !== 1 ? "s" : ""} selected
+                    {" • "}
                     {scenes
                       .filter((s) => formData.selectedScenes.includes(s.id))
                       .reduce((sum, s) => sum + s.pageCount, 0)
-                      .toFixed(2)} pages
+                      .toFixed(2)}{" "}
+                    pages
                   </p>
                 )}
               </div>
@@ -384,7 +461,13 @@ export function AddShootingDayForm({
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Adding..." : "Add Shooting Day"}
+              {loading
+                ? isEditMode
+                  ? "Saving..."
+                  : "Adding..."
+                : isEditMode
+                ? "Save Changes"
+                : "Add Shooting Day"}
             </Button>
           </DialogFooter>
         </form>

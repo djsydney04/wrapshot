@@ -5,7 +5,7 @@ import { Mail, Phone, UserCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-import type { CrewMember } from "@/lib/mock-data";
+import { type CrewMember } from "@/lib/actions/crew";
 
 interface CrewCardProps {
   member: CrewMember;

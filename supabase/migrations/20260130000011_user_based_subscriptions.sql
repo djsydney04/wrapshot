@@ -7,7 +7,8 @@
 -- ============================================
 
 -- Add userId column to Subscription table
-ALTER TABLE "Subscription" ADD COLUMN IF NOT EXISTS "userId" TEXT REFERENCES auth.users(id) ON DELETE CASCADE;
+-- Note: Using UUID type to match auth.users.id, with TEXT casts in queries for consistency
+ALTER TABLE "Subscription" ADD COLUMN IF NOT EXISTS "userId" UUID REFERENCES auth.users(id) ON DELETE CASCADE;
 
 -- Drop the organizationId requirement (make it nullable for backwards compat)
 ALTER TABLE "Subscription" ALTER COLUMN "organizationId" DROP NOT NULL;
@@ -30,18 +31,18 @@ DROP POLICY IF EXISTS "Org admins can manage subscription" ON "Subscription";
 -- New policies: Users can manage their own subscriptions
 CREATE POLICY "Users can view their own subscription"
   ON "Subscription" FOR SELECT
-  USING ("userId" = auth.uid()::TEXT);
+  USING ("userId" = auth.uid());
 
 CREATE POLICY "Users can manage their own subscription"
   ON "Subscription" FOR ALL
-  USING ("userId" = auth.uid()::TEXT);
+  USING ("userId" = auth.uid());
 
 -- ============================================
 -- HELPER FUNCTIONS
 -- ============================================
 
 -- Function to get user's plan (replaces org-based function)
-CREATE OR REPLACE FUNCTION get_user_plan(user_id TEXT)
+CREATE OR REPLACE FUNCTION get_user_plan(user_id UUID)
 RETURNS plan_type AS $$
 DECLARE
   sub_plan plan_type;
@@ -75,7 +76,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Function to check user's plan limits
 -- This version checks user's PROJECT MEMBERSHIP count (how many projects they're part of)
-CREATE OR REPLACE FUNCTION check_user_plan_limit(user_id TEXT, limit_type TEXT)
+CREATE OR REPLACE FUNCTION check_user_plan_limit(user_id UUID, limit_type TEXT)
 RETURNS BOOLEAN AS $$
 DECLARE
   current_plan plan_type;
@@ -91,7 +92,7 @@ BEGIN
       -- Count how many projects this user is a member of
       SELECT COUNT(*) INTO current_count
       FROM "ProjectMember"
-      WHERE "userId" = user_id;
+      WHERE "userId" = user_id::TEXT;
 
       max_allowed := CASE current_plan
         WHEN 'FREE' THEN 1      -- Free users can be on 1 project
@@ -107,10 +108,10 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Function to get or create user subscription
-CREATE OR REPLACE FUNCTION get_or_create_user_subscription(user_id TEXT)
+CREATE OR REPLACE FUNCTION get_or_create_user_subscription(user_id UUID)
 RETURNS TABLE (
   id TEXT,
-  "userId" TEXT,
+  "userId" UUID,
   plan plan_type,
   status subscription_status,
   "stripeCustomerId" TEXT,
@@ -147,7 +148,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- This creates user subscriptions for org owners who had org subscriptions
 INSERT INTO "Subscription" ("userId", plan, status, "stripeCustomerId", "stripeSubscriptionId", "stripePriceId", "stripeCurrentPeriodEnd", "cancelAtPeriodEnd", "trialEndsAt")
 SELECT
-  om."userId",
+  om."userId"::UUID,
   s.plan,
   s.status,
   s."stripeCustomerId",
@@ -160,7 +161,7 @@ FROM "Subscription" s
 JOIN "OrganizationMember" om ON om."organizationId" = s."organizationId" AND om.role = 'OWNER'
 WHERE s."userId" IS NULL
   AND NOT EXISTS (
-    SELECT 1 FROM "Subscription" existing WHERE existing."userId" = om."userId"
+    SELECT 1 FROM "Subscription" existing WHERE existing."userId" = om."userId"::UUID
   )
 ON CONFLICT ("userId") DO NOTHING;
 
@@ -168,6 +169,6 @@ ON CONFLICT ("userId") DO NOTHING;
 -- GRANTS
 -- ============================================
 
-GRANT EXECUTE ON FUNCTION get_user_plan(TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION check_user_plan_limit(TEXT, TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION get_or_create_user_subscription(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_plan(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION check_user_plan_limit(UUID, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_or_create_user_subscription(UUID) TO authenticated;

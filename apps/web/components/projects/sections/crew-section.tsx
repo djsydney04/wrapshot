@@ -8,8 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { CrewCard } from "@/components/crew/crew-card";
 import { CrewProfileModal } from "@/components/crew/crew-profile-modal";
 import { AddCrewForm } from "@/components/forms/add-crew-form";
-import { DEPARTMENT_LABELS, type CrewMember, type DepartmentType } from "@/lib/mock-data";
-import { useProjectStore } from "@/lib/stores/project-store";
+import { DEPARTMENT_LABELS, type DepartmentType } from "@/lib/mock-data";
+import { deleteCrewMember, updateCrewMember, type CrewMember, type CrewMemberInput } from "@/lib/actions/crew";
 import { cn } from "@/lib/utils";
 
 interface CrewSectionProps {
@@ -22,21 +22,24 @@ export function CrewSection({ projectId, crew }: CrewSectionProps) {
   const [selectedMember, setSelectedMember] = React.useState<CrewMember | null>(null);
   const [collapsedDepts, setCollapsedDepts] = React.useState<Set<DepartmentType>>(new Set());
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
+  const [localCrew, setLocalCrew] = React.useState<CrewMember[]>(crew);
 
-  const { deleteCrewMember, updateCrewMember } = useProjectStore();
+  // Sync local state with props when crew changes
+  React.useEffect(() => {
+    setLocalCrew(crew);
+  }, [crew]);
 
   // Filter crew by search query
   const filteredCrew = React.useMemo(() => {
-    if (!searchQuery) return crew;
+    if (!searchQuery) return localCrew;
     const query = searchQuery.toLowerCase();
-    return crew.filter(
+    return localCrew.filter(
       (c) =>
         c.name.toLowerCase().includes(query) ||
         c.role.toLowerCase().includes(query) ||
         c.email?.toLowerCase().includes(query)
     );
-  }, [crew, searchQuery]);
+  }, [localCrew, searchQuery]);
 
   // Group crew by department
   const crewByDepartment = React.useMemo(() => {
@@ -70,15 +73,34 @@ export function CrewSection({ projectId, crew }: CrewSectionProps) {
     });
   };
 
-  const handleDelete = (id: string) => {
-    deleteCrewMember(id);
-    setSelectedMember(null);
-    forceUpdate();
+  const handleDelete = async (id: string) => {
+    const { success, error } = await deleteCrewMember(id, projectId);
+    if (success) {
+      setLocalCrew((prev) => prev.filter((c) => c.id !== id));
+      setSelectedMember(null);
+    } else {
+      console.error("Failed to delete crew member:", error);
+    }
   };
 
-  const handleUpdate = (id: string, updates: Partial<CrewMember>) => {
-    updateCrewMember(id, updates);
-    forceUpdate();
+  const handleUpdate = async (id: string, updates: Partial<CrewMemberInput>) => {
+    const { data, error } = await updateCrewMember(id, updates);
+    if (data) {
+      setLocalCrew((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, ...data } : c))
+      );
+      // Update selected member if it's the one being edited
+      if (selectedMember?.id === id) {
+        setSelectedMember({ ...selectedMember, ...data });
+      }
+    } else {
+      console.error("Failed to update crew member:", error);
+    }
+  };
+
+  const handleCrewAdded = () => {
+    // The page will revalidate and pass new crew data
+    // This is handled by the server action's revalidatePath
   };
 
   return (
@@ -179,7 +201,7 @@ export function CrewSection({ projectId, crew }: CrewSectionProps) {
         projectId={projectId}
         open={showAddCrew}
         onOpenChange={setShowAddCrew}
-        onSuccess={forceUpdate}
+        onSuccess={handleCrewAdded}
       />
 
       {/* Crew Profile Modal */}

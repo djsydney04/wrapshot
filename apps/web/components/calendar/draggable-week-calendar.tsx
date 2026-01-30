@@ -1,0 +1,705 @@
+"use client";
+
+import * as React from "react";
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDroppable,
+  useDraggable,
+  rectIntersection,
+} from "@dnd-kit/core";
+import {
+  addDays,
+  addWeeks,
+  subWeeks,
+  startOfWeek,
+  format,
+  isSameDay,
+  isToday,
+  parseISO,
+} from "date-fns";
+import { ChevronLeft, ChevronRight, Plus, GripVertical, FileText, PanelRightOpen, PanelRightClose, Clock } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ShootingDayCard } from "./shooting-day-card";
+import type { ShootingDay, Scene, CastMember, Location } from "@/lib/mock-data";
+
+interface DraggableWeekCalendarProps {
+  shootingDays: ShootingDay[];
+  scenes: Scene[];
+  cast?: CastMember[];
+  locations?: Location[];
+  onDayClick?: (date: Date, events: ShootingDay[]) => void;
+  onAddClick?: (date: Date) => void;
+  onReschedule?: (shootingDayId: string, newDate: string) => Promise<void>;
+  onAddSceneToDay?: (sceneId: string, shootingDayId: string) => Promise<void>;
+  onRemoveSceneFromDay?: (sceneId: string, shootingDayId: string) => Promise<void>;
+  selectedDate?: Date;
+  className?: string;
+}
+
+const HOURS = Array.from({ length: 24 }, (_, i) => i); // Full 24 hours (midnight to midnight)
+const HOUR_HEIGHT = 52; // pixels per hour
+
+// Draggable scene card for the sidebar
+function DraggableSceneItem({
+  scene,
+  isDragging,
+}: {
+  scene: Scene;
+  isDragging?: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: `scene-${scene.id}`,
+    data: { scene, type: "scene" },
+  });
+
+  const style = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        zIndex: 100,
+      }
+    : undefined;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={cn(
+        "flex items-start gap-2 p-2 rounded-lg border border-border bg-card cursor-grab active:cursor-grabbing transition-all hover:bg-muted/50",
+        isDragging && "opacity-50 shadow-lg ring-2 ring-primary"
+      )}
+    >
+      <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <span className="flex h-5 w-5 items-center justify-center rounded bg-muted text-[10px] font-semibold">
+            {scene.sceneNumber}
+          </span>
+          <Badge
+            variant={scene.intExt === "INT" ? "int" : "ext"}
+            className="text-[9px] px-1 py-0"
+          >
+            {scene.intExt}
+          </Badge>
+          <Badge
+            variant={scene.dayNight === "DAY" ? "day" : "night"}
+            className="text-[9px] px-1 py-0"
+          >
+            {scene.dayNight}
+          </Badge>
+        </div>
+        <p className="text-[11px] text-muted-foreground line-clamp-1">
+          {scene.synopsis || "No synopsis"}
+        </p>
+        <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+          <span>{scene.pageCount} pg</span>
+          {scene.estimatedMinutes && (
+            <span className="flex items-center gap-0.5">
+              <Clock className="h-2.5 w-2.5" />
+              {scene.estimatedMinutes}m
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Scene card overlay for dragging
+function SceneCardOverlay({ scene }: { scene: Scene }) {
+  return (
+    <div className="w-[180px] p-2 rounded-lg border-2 border-primary bg-card shadow-xl">
+      <div className="flex items-center gap-1.5 mb-1">
+        <span className="flex h-5 w-5 items-center justify-center rounded bg-muted text-[10px] font-semibold">
+          {scene.sceneNumber}
+        </span>
+        <Badge
+          variant={scene.intExt === "INT" ? "int" : "ext"}
+          className="text-[9px] px-1 py-0"
+        >
+          {scene.intExt}
+        </Badge>
+        <Badge
+          variant={scene.dayNight === "DAY" ? "day" : "night"}
+          className="text-[9px] px-1 py-0"
+        >
+          {scene.dayNight}
+        </Badge>
+      </div>
+      <p className="text-[11px] text-muted-foreground line-clamp-2">
+        {scene.synopsis || "No synopsis"}
+      </p>
+    </div>
+  );
+}
+
+// Droppable day column component
+function DroppableDay({
+  date,
+  isCurrentDay,
+  shootingDayId,
+  children,
+  onAddClick,
+}: {
+  date: Date;
+  isCurrentDay: boolean;
+  shootingDayId?: string;
+  children: React.ReactNode;
+  onAddClick?: (date: Date) => void;
+}) {
+  const dateStr = format(date, "yyyy-MM-dd");
+  const dropId = shootingDayId ? `shootingday-${shootingDayId}` : `day-${dateStr}`;
+
+  const { isOver, setNodeRef } = useDroppable({
+    id: dropId,
+    data: { date: dateStr, shootingDayId, type: shootingDayId ? "shootingday" : "day" },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "relative border-l border-border h-full",
+        isCurrentDay && "bg-blue-50/30 dark:bg-blue-950/10",
+        isOver && "bg-primary/10 ring-2 ring-primary ring-inset"
+      )}
+    >
+      {/* Hour Lines */}
+      {HOURS.map((_, i) => (
+        <div
+          key={i}
+          className="absolute left-0 right-0 border-t border-border/50"
+          style={{ top: `${i * HOUR_HEIGHT}px` }}
+        />
+      ))}
+
+      {/* Click to add overlay */}
+      <button
+        className="absolute inset-0 hover:bg-muted/20 transition-colors group z-0"
+        onClick={() => onAddClick?.(date)}
+      >
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+          <Plus className="h-5 w-5 text-muted-foreground" />
+        </div>
+      </button>
+
+      {children}
+    </div>
+  );
+}
+
+// Mini scene block inside a shooting day
+function MiniSceneBlock({
+  scene,
+  index,
+  totalScenes,
+  shootingDayHeight,
+}: {
+  scene: Scene;
+  index: number;
+  totalScenes: number;
+  shootingDayHeight: number;
+}) {
+  const blockHeight = Math.max(
+    20,
+    (shootingDayHeight - 50) / Math.max(totalScenes, 1)
+  );
+
+  return (
+    <div
+      className="mx-1 px-1.5 py-0.5 rounded text-[9px] bg-white/20 truncate flex items-center gap-1"
+      style={{ height: `${Math.min(blockHeight, 24)}px` }}
+    >
+      <span className="font-semibold">{scene.sceneNumber}</span>
+      <span className="opacity-70 truncate">{scene.synopsis?.slice(0, 20)}</span>
+    </div>
+  );
+}
+
+// Enhanced draggable event card component with scenes
+function DraggableEvent({
+  shootingDay,
+  scenes,
+  cast,
+  locations,
+  top,
+  height,
+  onClick,
+  showScenes = true,
+}: {
+  shootingDay: ShootingDay;
+  scenes: Scene[];
+  cast?: CastMember[];
+  locations?: Location[];
+  top: number;
+  height: number;
+  onClick?: () => void;
+  showScenes?: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id: shootingDay.id,
+      data: { shootingDay, type: "shootingday" },
+    });
+
+  const { isOver, setNodeRef: setDropRef } = useDroppable({
+    id: `shootingday-drop-${shootingDay.id}`,
+    data: { shootingDayId: shootingDay.id, type: "shootingday-drop" },
+  });
+
+  const style = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+      }
+    : undefined;
+
+  // Get scenes for this shooting day
+  const dayScenes = scenes.filter((s) => shootingDay.scenes.includes(s.id));
+
+  const STATUS_COLORS: Record<ShootingDay["status"], string> = {
+    COMPLETED: "bg-emerald-500",
+    CONFIRMED: "bg-blue-500",
+    SCHEDULED: "bg-amber-500",
+    TENTATIVE: "bg-neutral-400",
+    CANCELLED: "bg-red-400",
+  };
+
+  return (
+    <div
+      ref={(node) => {
+        setNodeRef(node);
+        setDropRef(node);
+      }}
+      style={{
+        ...style,
+        position: "absolute",
+        top: `${top}px`,
+        height: `${Math.max(height, HOUR_HEIGHT)}px`,
+        minHeight: "48px",
+        left: "4px",
+        right: "4px",
+        zIndex: isDragging ? 100 : 10,
+      }}
+      className={cn(
+        "group rounded-lg text-white overflow-hidden",
+        STATUS_COLORS[shootingDay.status],
+        isDragging && "opacity-50 shadow-lg",
+        isOver && "ring-2 ring-yellow-400"
+      )}
+    >
+      {/* Header with drag handle */}
+      <div className="flex items-center justify-between px-2 py-1 border-b border-white/20">
+        <div className="flex items-center gap-1" onClick={onClick}>
+          <span className="font-semibold text-xs">Day {shootingDay.dayNumber}</span>
+          <span className="text-[10px] opacity-70">
+            {shootingDay.generalCall} - {shootingDay.wrapTime || "?"}
+          </span>
+        </div>
+        <div
+          {...attributes}
+          {...listeners}
+          className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-white/20 cursor-grab active:cursor-grabbing"
+        >
+          <GripVertical className="h-3 w-3 text-white/70" />
+        </div>
+      </div>
+
+      {/* Scenes list */}
+      {showScenes && height > 80 && (
+        <div className="flex-1 py-1 space-y-0.5 overflow-hidden">
+          {dayScenes.length > 0 ? (
+            dayScenes.slice(0, Math.floor((height - 50) / 24)).map((scene, i) => (
+              <MiniSceneBlock
+                key={scene.id}
+                scene={scene}
+                index={i}
+                totalScenes={dayScenes.length}
+                shootingDayHeight={height}
+              />
+            ))
+          ) : (
+            <div className="px-2 py-1 text-[10px] opacity-60 italic">
+              Drop scenes here
+            </div>
+          )}
+          {dayScenes.length > Math.floor((height - 50) / 24) && (
+            <div className="px-2 text-[9px] opacity-60">
+              +{dayScenes.length - Math.floor((height - 50) / 24)} more
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function DraggableWeekCalendar({
+  shootingDays,
+  scenes,
+  cast = [],
+  locations = [],
+  onDayClick,
+  onAddClick,
+  onReschedule,
+  onAddSceneToDay,
+  onRemoveSceneFromDay,
+  selectedDate,
+  className,
+}: DraggableWeekCalendarProps) {
+  const [currentWeek, setCurrentWeek] = React.useState(() =>
+    startOfWeek(new Date(), { weekStartsOn: 0 })
+  );
+  const [activeId, setActiveId] = React.useState<string | null>(null);
+  const [activeType, setActiveType] = React.useState<"scene" | "shootingday" | null>(null);
+  const [showScenesSidebar, setShowScenesSidebar] = React.useState(true);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeek, i));
+
+  // Get unassigned scenes (not in any shooting day)
+  const assignedSceneIds = new Set(shootingDays.flatMap((d) => d.scenes));
+  const unassignedScenes = scenes.filter((s) => !assignedSceneIds.has(s.id));
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
+  const getDayEvents = (date: Date) => {
+    return shootingDays.filter((day) =>
+      isSameDay(parseISO(day.date), date)
+    );
+  };
+
+  const getEventPosition = (callTime: string) => {
+    const [hours, minutes] = callTime.split(":").map(Number);
+    const startHour = 0; // Calendar starts at midnight
+    const top = ((hours - startHour) * 60 + minutes) * (HOUR_HEIGHT / 60);
+    return Math.max(0, top);
+  };
+
+  const getEventDuration = (event: ShootingDay) => {
+    const [startHours, startMinutes] = event.generalCall.split(":").map(Number);
+
+    if (event.wrapTime) {
+      const [endHours, endMinutes] = event.wrapTime.split(":").map(Number);
+      let startTotal = startHours * 60 + startMinutes;
+      let endTotal = endHours * 60 + endMinutes;
+
+      // Handle overnight shoots
+      if (endTotal <= startTotal) {
+        endTotal += 24 * 60;
+      }
+
+      const durationMinutes = endTotal - startTotal;
+      return (durationMinutes / 60) * HOUR_HEIGHT;
+    }
+
+    // Default to 10 hours if no wrap time
+    return 10 * HOUR_HEIGHT;
+  };
+
+  // Scroll to working hours (6 AM) on mount
+  React.useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 6 * HOUR_HEIGHT;
+    }
+  }, []);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const id = event.active.id as string;
+    setActiveId(id);
+
+    if (id.startsWith("scene-")) {
+      setActiveType("scene");
+    } else {
+      setActiveType("shootingday");
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+    setActiveType(null);
+
+    if (!over) return;
+
+    const activeIdStr = active.id as string;
+    const overIdStr = over.id as string;
+    const overData = over.data.current;
+
+    // Handle scene drop
+    if (activeIdStr.startsWith("scene-")) {
+      const sceneId = activeIdStr.replace("scene-", "");
+
+      // Dropped on a shooting day
+      if (overIdStr.startsWith("shootingday-drop-") || overData?.type === "shootingday-drop") {
+        const targetShootingDayId = overIdStr.replace("shootingday-drop-", "");
+        await onAddSceneToDay?.(sceneId, targetShootingDayId);
+      }
+    }
+    // Handle shooting day reschedule
+    else {
+      const shootingDayId = activeIdStr;
+
+      if (overIdStr.startsWith("day-")) {
+        const newDate = overIdStr.replace("day-", "");
+        const shootingDay = shootingDays.find((d) => d.id === shootingDayId);
+
+        if (shootingDay && shootingDay.date !== newDate) {
+          await onReschedule?.(shootingDayId, newDate);
+        }
+      }
+    }
+  };
+
+  const handleDragCancel = () => {
+    setActiveId(null);
+    setActiveType(null);
+  };
+
+  const activeShootingDay = activeType === "shootingday" && activeId
+    ? shootingDays.find((d) => d.id === activeId)
+    : null;
+
+  const activeScene = activeType === "scene" && activeId
+    ? scenes.find((s) => s.id === activeId.replace("scene-", ""))
+    : null;
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={rectIntersection}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <div className={cn("flex gap-4 h-full", className)}>
+        {/* Main Calendar */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-semibold">
+                {format(currentWeek, "MMMM yyyy")}
+              </h2>
+              <span className="text-sm text-muted-foreground">
+                Week of {format(currentWeek, "MMM d")}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2"
+                  onClick={() => setCurrentWeek((prev) => subWeeks(prev, 1))}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-3 text-sm"
+                  onClick={() =>
+                    setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 0 }))
+                  }
+                >
+                  Today
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2"
+                  onClick={() => setCurrentWeek((prev) => addWeeks(prev, 1))}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={() => setShowScenesSidebar(!showScenesSidebar)}
+              >
+                {showScenesSidebar ? (
+                  <PanelRightClose className="h-4 w-4" />
+                ) : (
+                  <PanelRightOpen className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Calendar Grid */}
+          <div className="flex-1 border border-border rounded-lg overflow-hidden flex flex-col min-h-0">
+            {/* Day Headers */}
+            <div className="grid grid-cols-[56px_repeat(7,1fr)] border-b border-border bg-muted/30 flex-shrink-0">
+              <div className="p-2" />
+              {weekDays.map((day, index) => {
+                const isCurrentDay = isToday(day);
+                const events = getDayEvents(day);
+                return (
+                  <div
+                    key={index}
+                    className={cn(
+                      "py-3 px-2 text-center border-l border-border",
+                      isCurrentDay && "bg-blue-50/50 dark:bg-blue-950/20"
+                    )}
+                  >
+                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      {format(day, "EEE")}
+                    </div>
+                    <div
+                      className={cn(
+                        "text-lg font-semibold mt-0.5",
+                        isCurrentDay && "text-blue-600 dark:text-blue-400"
+                      )}
+                    >
+                      {format(day, "d")}
+                    </div>
+                    {events.length > 0 && (
+                      <div className="flex items-center justify-center gap-1 mt-1">
+                        {events.slice(0, 3).map((_, i) => (
+                          <div
+                            key={i}
+                            className="h-1.5 w-1.5 rounded-full bg-blue-500"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Time Grid */}
+            <div ref={scrollRef} className="flex-1 overflow-auto">
+              <div
+                className="grid grid-cols-[56px_repeat(7,1fr)] relative"
+                style={{ minHeight: `${HOURS.length * HOUR_HEIGHT}px` }}
+              >
+                {/* Time Labels */}
+                <div className="relative border-r border-border">
+                  {HOURS.map((hour, i) => (
+                    <div
+                      key={hour}
+                      className="absolute right-2 -translate-y-1/2 text-[11px] text-muted-foreground"
+                      style={{ top: `${i * HOUR_HEIGHT}px` }}
+                    >
+                      {hour === 0
+                        ? "12 AM"
+                        : hour === 12
+                        ? "12 PM"
+                        : hour > 12
+                        ? `${hour - 12} PM`
+                        : `${hour} AM`}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Day Columns */}
+                {weekDays.map((day, dayIndex) => {
+                  const events = getDayEvents(day);
+                  const isCurrentDay = isToday(day);
+
+                  return (
+                    <DroppableDay
+                      key={dayIndex}
+                      date={day}
+                      isCurrentDay={isCurrentDay}
+                      onAddClick={onAddClick}
+                    >
+                      {events.map((event) => {
+                        const top = getEventPosition(event.generalCall);
+                        const height = getEventDuration(event);
+
+                        return (
+                          <DraggableEvent
+                            key={event.id}
+                            shootingDay={event}
+                            scenes={scenes}
+                            cast={cast}
+                            locations={locations}
+                            top={top}
+                            height={height}
+                            onClick={() => onDayClick?.(day, [event])}
+                          />
+                        );
+                      })}
+                    </DroppableDay>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Scenes Sidebar */}
+        {showScenesSidebar && (
+          <div className="w-64 flex-shrink-0 border border-border rounded-lg flex flex-col bg-card">
+            <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium text-sm">Unassigned Scenes</span>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {unassignedScenes.length}
+              </span>
+            </div>
+            <div className="flex-1 overflow-auto p-2 space-y-2">
+              {unassignedScenes.length > 0 ? (
+                unassignedScenes.map((scene) => (
+                  <DraggableSceneItem
+                    key={scene.id}
+                    scene={scene}
+                    isDragging={activeId === `scene-${scene.id}`}
+                  />
+                ))
+              ) : (
+                <div className="text-center py-8 text-sm text-muted-foreground">
+                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  <p>All scenes assigned</p>
+                </div>
+              )}
+            </div>
+            <div className="px-3 py-2 border-t border-border">
+              <p className="text-[10px] text-muted-foreground text-center">
+                Drag scenes onto shooting days
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Drag Overlay */}
+      <DragOverlay>
+        {activeShootingDay && (
+          <div className="w-[200px]">
+            <ShootingDayCard
+              shootingDay={activeShootingDay}
+              scenes={scenes}
+              cast={cast}
+              locations={locations}
+              variant="expanded"
+              className="shadow-xl ring-2 ring-primary"
+            />
+          </div>
+        )}
+        {activeScene && <SceneCardOverlay scene={activeScene} />}
+      </DragOverlay>
+    </DndContext>
+  );
+}

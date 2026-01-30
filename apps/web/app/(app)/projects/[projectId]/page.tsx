@@ -22,6 +22,7 @@ import { useProjectStore } from "@/lib/stores/project-store";
 import { getProject, type Project } from "@/lib/actions/projects";
 import { getScenes, type Scene as DBScene } from "@/lib/actions/scenes";
 import { getBudgetsForProject, type Budget } from "@/lib/actions/budgets";
+import { getCrewMembers, type CrewMember } from "@/lib/actions/crew";
 
 const statusVariant: Record<Project["status"], "development" | "pre-production" | "production" | "post-production" | "completed" | "on-hold"> = {
   DEVELOPMENT: "development",
@@ -54,6 +55,7 @@ export default function ProjectDetailPage() {
   // Database-backed data
   const [dbScenes, setDbScenes] = React.useState<DBScene[]>([]);
   const [budgets, setBudgets] = React.useState<Budget[]>([]);
+  const [crew, setCrew] = React.useState<CrewMember[]>([]);
 
   // Still using store for other data (not yet migrated to DB)
   const {
@@ -61,23 +63,24 @@ export default function ProjectDetailPage() {
     getCastForProject,
     getLocationsForProject,
     getShootingDaysForProject,
-    getCrewForProject,
     getGearForProject,
     getScriptsForProject,
   } = useProjectStore();
 
-  // Fetch project, scenes, and budgets from database
+  // Fetch project, scenes, budgets, and crew from database
   React.useEffect(() => {
     async function loadProject() {
       try {
-        const [projectData, scenesResult, budgetsData] = await Promise.all([
+        const [projectData, scenesResult, budgetsData, crewResult] = await Promise.all([
           getProject(projectId),
           getScenes(projectId),
           getBudgetsForProject(projectId),
+          getCrewMembers(projectId),
         ]);
         setProject(projectData);
         if (scenesResult.data) setDbScenes(scenesResult.data);
         setBudgets(budgetsData);
+        if (crewResult.data) setCrew(crewResult.data);
       } catch (err) {
         console.error("Error loading project:", err);
       } finally {
@@ -92,7 +95,6 @@ export default function ProjectDetailPage() {
   const cast = getCastForProject(projectId);
   const locations = getLocationsForProject(projectId);
   const shootingDays = getShootingDaysForProject(projectId);
-  const crew = getCrewForProject(projectId);
   const gear = getGearForProject(projectId);
   const scripts = getScriptsForProject(projectId);
 

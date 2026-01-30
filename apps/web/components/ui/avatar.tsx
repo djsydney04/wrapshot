@@ -62,4 +62,25 @@ function Avatar({
   );
 }
 
-export { Avatar };
+// AvatarFallback for use as a child component pattern
+interface AvatarFallbackProps extends React.HTMLAttributes<HTMLSpanElement> {}
+
+function AvatarFallback({
+  children,
+  className,
+  ...props
+}: AvatarFallbackProps) {
+  return (
+    <span
+      className={cn(
+        "flex h-full w-full items-center justify-center rounded-full bg-muted font-medium text-muted-foreground",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </span>
+  );
+}
+
+export { Avatar, AvatarFallback };
