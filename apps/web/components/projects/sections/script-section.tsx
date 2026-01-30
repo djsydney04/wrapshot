@@ -185,14 +185,14 @@ export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
           <DialogHeader>
             <DialogTitle>Upload Script</DialogTitle>
             <DialogDescription>
-              Upload a new version of your script (PDF)
+              Upload a new version of your script (PDF, FDX, DOC, or JSON)
             </DialogDescription>
           </DialogHeader>
 
           <DialogBody className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-1.5">
-                Script PDF
+                Script File
               </label>
               <FileUpload
                 value={uploadData.fileUrl}
@@ -201,8 +201,8 @@ export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
                 }
                 bucket="scripts"
                 folder={projectId}
-                accept="application/pdf"
-                placeholder="Drop your script PDF here"
+                accept=".pdf,.fdx,.doc,.docx,.json"
+                placeholder="Drop your script file here (PDF, FDX, DOC, JSON)"
                 fileName={uploadData.fileName}
               />
             </div>

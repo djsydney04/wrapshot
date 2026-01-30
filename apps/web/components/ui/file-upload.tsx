@@ -123,6 +123,11 @@ export function FileUpload({
   };
 
   const getFileTypeLabel = () => {
+    const ext = uploadedFileName?.split(".").pop()?.toLowerCase();
+    if (ext === "pdf") return "PDF";
+    if (ext === "fdx") return "Final Draft";
+    if (ext === "doc" || ext === "docx") return "Word Document";
+    if (ext === "json") return "JSON";
     if (accept.includes("pdf")) return "PDF";
     if (accept.includes("video")) return "Video";
     return "File";
