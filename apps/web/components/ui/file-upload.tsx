@@ -180,7 +180,7 @@ export function FileUpload({
       ) : (
         <div
           className={cn(
-            "relative rounded-lg border-2 border-dashed transition-colors cursor-pointer p-6",
+            "relative rounded-lg border-2 border-dashed transition-colors cursor-pointer p-4",
             isDragging
               ? "border-primary bg-primary/5"
               : "border-border hover:border-muted-foreground/50",
@@ -191,26 +191,13 @@ export function FileUpload({
           onDrop={handleDrop}
           onClick={() => !disabled && inputRef.current?.click()}
         >
-          <div className="flex flex-col items-center justify-center gap-2">
+          <div className="flex items-center justify-center">
             {isUploading ? (
-              <>
-                <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
-                <p className="text-sm text-muted-foreground">Uploading...</p>
-              </>
+              <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
+            ) : isDragging ? (
+              <Upload className="h-6 w-6 text-primary" />
             ) : (
-              <>
-                {isDragging ? (
-                  <Upload className="h-8 w-8 text-primary" />
-                ) : (
-                  <FileText className="h-8 w-8 text-muted-foreground" />
-                )}
-                <p className="text-sm text-muted-foreground text-center">
-                  {placeholder}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {getFileTypeLabel()} up to {maxSizeMB}MB
-                </p>
-              </>
+              <Upload className="h-6 w-6 text-muted-foreground" />
             )}
           </div>
 

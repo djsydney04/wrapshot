@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUserId } from "@/lib/permissions/server";
 
 export interface UserSearchResult {
@@ -122,4 +123,177 @@ export async function isUserProjectMember(
     .single();
 
   return !!data;
+}
+
+// Search for users to invite to a project (excludes current members and pending invites)
+export async function searchUsersForInvite(
+  query: string,
+  projectId: string
+): Promise<UserSearchResult[]> {
+  const supabase = await createClient();
+  const currentUserId = await getCurrentUserId();
+
+  if (!currentUserId) {
+    throw new Error("Not authenticated");
+  }
+
+  if (!query || query.trim().length < 2) {
+    return [];
+  }
+
+  const searchTerm = query.trim().toLowerCase();
+
+  // Get current project members to exclude
+  const { data: members } = await supabase
+    .from("ProjectMember")
+    .select("userId")
+    .eq("projectId", projectId);
+
+  const memberUserIds = members?.map((m) => m.userId) || [];
+
+  // Get pending invites to exclude
+  const { data: invites } = await supabase
+    .from("ProjectInvite")
+    .select("email")
+    .eq("projectId", projectId)
+    .gt("expiresAt", new Date().toISOString());
+
+  const pendingEmails = invites?.map((i) => i.email.toLowerCase()) || [];
+
+  // Search UserProfile for matching users
+  const { data: profiles, error } = await supabase
+    .from("UserProfile")
+    .select(`
+      id,
+      userId,
+      firstName,
+      lastName,
+      displayName,
+      avatarUrl
+    `)
+    .or(
+      `displayName.ilike.%${searchTerm}%,firstName.ilike.%${searchTerm}%,lastName.ilike.%${searchTerm}%`
+    )
+    .limit(20);
+
+  if (error) {
+    console.error("Error searching users:", error);
+    return [];
+  }
+
+  if (!profiles || profiles.length === 0) {
+    return [];
+  }
+
+  // Get emails for found users using admin client
+  const adminClient = createAdminClient();
+  const userIds = profiles.map((p) => p.userId);
+
+  // Fetch user emails from auth.users
+  const results: UserSearchResult[] = [];
+
+  for (const profile of profiles) {
+    // Skip if already a member
+    if (memberUserIds.includes(profile.userId)) {
+      continue;
+    }
+
+    // Get user email from auth
+    const { data: authUser } = await adminClient.auth.admin.getUserById(
+      profile.userId
+    );
+
+    if (authUser?.user?.email) {
+      const email = authUser.user.email.toLowerCase();
+
+      // Skip if there's a pending invite for this email
+      if (pendingEmails.includes(email)) {
+        continue;
+      }
+
+      results.push({
+        id: profile.id,
+        userId: profile.userId,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        displayName: profile.displayName,
+        email: authUser.user.email,
+        avatarUrl: profile.avatarUrl,
+      });
+    }
+  }
+
+  return results.slice(0, 10);
+}
+
+// Check if a user exists by email in the auth system
+export async function checkUserExistsByEmail(
+  email: string
+): Promise<{ exists: boolean; userId?: string; profile?: UserSearchResult }> {
+  const currentUserId = await getCurrentUserId();
+
+  if (!currentUserId) {
+    throw new Error("Not authenticated");
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // Use admin client to search users by email
+  const adminClient = createAdminClient();
+
+  const { data, error } = await adminClient.auth.admin.listUsers({
+    page: 1,
+    perPage: 1,
+  });
+
+  if (error) {
+    console.error("Error checking user exists:", error);
+    return { exists: false };
+  }
+
+  // Search through users to find matching email
+  // Note: Supabase admin API doesn't have a direct "get by email" so we need to filter
+  const { data: allUsers } = await adminClient.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
+  });
+
+  const matchingUser = allUsers?.users?.find(
+    (u) => u.email?.toLowerCase() === normalizedEmail
+  );
+
+  if (!matchingUser) {
+    return { exists: false };
+  }
+
+  // Get the user's profile if they exist
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from("UserProfile")
+    .select(`
+      id,
+      userId,
+      firstName,
+      lastName,
+      displayName,
+      avatarUrl
+    `)
+    .eq("userId", matchingUser.id)
+    .single();
+
+  return {
+    exists: true,
+    userId: matchingUser.id,
+    profile: profile
+      ? {
+          id: profile.id,
+          userId: profile.userId,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          displayName: profile.displayName,
+          email: matchingUser.email!,
+          avatarUrl: profile.avatarUrl,
+        }
+      : undefined,
+  };
 }

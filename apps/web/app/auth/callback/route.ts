@@ -17,17 +17,52 @@ export async function GET(request: Request) {
 
       let redirectTo = next ?? "/";
 
-      // Check if user has completed onboarding
       if (user) {
-        const { data: profile } = await supabase
-          .from("UserProfile")
-          .select("onboardingCompletedAt")
-          .eq("userId", user.id)
-          .maybeSingle();
+        // Check if this user came from a project invite (metadata from invite email)
+        const inviteToken = user.user_metadata?.invite_token;
 
-        // Redirect to onboarding if not completed
-        if (!profile?.onboardingCompletedAt) {
-          redirectTo = "/onboarding";
+        if (inviteToken) {
+          // Check if there's a valid pending invite for this token
+          const { data: invite } = await supabase
+            .from("ProjectInvite")
+            .select("id, token")
+            .eq("token", inviteToken)
+            .gt("expiresAt", new Date().toISOString())
+            .single();
+
+          if (invite) {
+            // Redirect to accept the invite
+            redirectTo = `/invites/${invite.token}`;
+          }
+        }
+
+        // If no invite redirect, check for pending invites by email
+        if (redirectTo === (next ?? "/") && user.email) {
+          const { data: pendingInvite } = await supabase
+            .from("ProjectInvite")
+            .select("token")
+            .eq("email", user.email.toLowerCase())
+            .gt("expiresAt", new Date().toISOString())
+            .limit(1)
+            .single();
+
+          if (pendingInvite) {
+            redirectTo = `/invites/${pendingInvite.token}`;
+          }
+        }
+
+        // Check if user has completed onboarding (only if not redirecting to invite)
+        if (!redirectTo.startsWith("/invites/")) {
+          const { data: profile } = await supabase
+            .from("UserProfile")
+            .select("onboardingCompletedAt")
+            .eq("userId", user.id)
+            .maybeSingle();
+
+          // Redirect to onboarding if not completed
+          if (!profile?.onboardingCompletedAt) {
+            redirectTo = "/onboarding";
+          }
         }
       }
 

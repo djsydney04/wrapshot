@@ -114,7 +114,7 @@ export function SettingsSection({ projectId, project }: SettingsSectionProps) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 px-6 pb-2">
             <div className="space-y-2">
               <Label htmlFor="confirm-delete">
                 Type <span className="font-semibold">{project.name}</span> to confirm

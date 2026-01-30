@@ -37,14 +37,19 @@ import { cn } from "@/lib/utils";
 import {
   getProjectMembers,
   getProjectInvites,
-  createProjectInvite,
+  inviteUserToProject,
   updateProjectMemberRole,
   removeProjectMember,
   cancelProjectInvite,
   resendProjectInvite,
+  type InviteResult,
 } from "@/lib/actions/project-members";
 import { ProjectEditGate } from "@/components/ui/permission-gate";
 import type { ProjectRole } from "@/lib/permissions";
+import {
+  UserSearchCombobox,
+  type UserSelection,
+} from "@/components/ui/user-search-combobox";
 
 interface ProjectMember {
   id: string;
@@ -111,11 +116,16 @@ export function TeamSection({ projectId }: TeamSectionProps) {
   const [loading, setLoading] = React.useState(true);
   const [showAddMember, setShowAddMember] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [inviteEmail, setInviteEmail] = React.useState("");
+  const [selectedUser, setSelectedUser] = React.useState<UserSelection | null>(
+    null
+  );
   const [inviteRole, setInviteRole] = React.useState<ProjectRole>("CREW");
   const [inviteDepartment, setInviteDepartment] = React.useState("");
   const [inviting, setInviting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = React.useState<string | null>(
+    null
+  );
 
   // Fetch members and invites
   const fetchData = React.useCallback(async () => {
@@ -161,26 +171,46 @@ export function TeamSection({ projectId }: TeamSectionProps) {
   }, [filteredMembers]);
 
   const handleInvite = async () => {
+    if (!selectedUser) return;
+
     setInviting(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
-      await createProjectInvite(
+      const email =
+        selectedUser.type === "existing_user"
+          ? selectedUser.user.email
+          : selectedUser.email;
+
+      const result: InviteResult = await inviteUserToProject(
         projectId,
-        inviteEmail,
+        email,
         inviteRole,
         inviteDepartment || undefined
       );
-      setShowAddMember(false);
-      setInviteEmail("");
+
+      setSuccessMessage(result.message);
+      setSelectedUser(null);
       setInviteRole("CREW");
       setInviteDepartment("");
       fetchData();
+
+      // Close modal after short delay to show success
+      setTimeout(() => {
+        setShowAddMember(false);
+        setSuccessMessage(null);
+      }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send invite");
     } finally {
       setInviting(false);
     }
+  };
+
+  const handleUserSelect = (selection: UserSelection) => {
+    setSelectedUser(selection);
+    setError(null);
   };
 
   const handleRemoveMember = async (memberId: string) => {
@@ -400,22 +430,34 @@ export function TeamSection({ projectId }: TeamSectionProps) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 px-6 pb-6">
             {error && (
               <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
                 {error}
               </div>
             )}
 
+            {successMessage && (
+              <div className="p-3 rounded-lg bg-emerald-500/10 text-emerald-600 text-sm">
+                {successMessage}
+              </div>
+            )}
+
             <div className="space-y-2">
-              <Label htmlFor="memberEmail">Email Address</Label>
-              <Input
-                id="memberEmail"
-                type="email"
-                placeholder="colleague@example.com"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
+              <Label>Find or Invite User</Label>
+              <UserSearchCombobox
+                projectId={projectId}
+                onSelect={handleUserSelect}
+                placeholder="Search by name or enter email..."
+                disabled={inviting}
               />
+              {selectedUser && (
+                <p className="text-sm text-muted-foreground">
+                  {selectedUser.type === "existing_user"
+                    ? `Selected: ${selectedUser.user.displayName || selectedUser.user.email}`
+                    : `Will invite: ${selectedUser.email}`}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -467,13 +509,13 @@ export function TeamSection({ projectId }: TeamSectionProps) {
             </div>
           </div>
 
-          <div className="flex justify-end gap-3">
+          <div className="flex justify-end gap-3 px-6 pb-6 pt-2">
             <Button variant="outline" onClick={() => setShowAddMember(false)}>
               Cancel
             </Button>
             <Button
               onClick={handleInvite}
-              disabled={!inviteEmail || inviting}
+              disabled={!selectedUser || inviting || !!successMessage}
               className="gap-2"
             >
               {inviting ? (
@@ -481,7 +523,9 @@ export function TeamSection({ projectId }: TeamSectionProps) {
               ) : (
                 <Mail className="h-4 w-4" />
               )}
-              Send Invite
+              {selectedUser?.type === "new_email"
+                ? "Send Registration Invite"
+                : "Send Invite"}
             </Button>
           </div>
         </DialogContent>
