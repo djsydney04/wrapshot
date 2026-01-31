@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ProjectSidebar, type ProjectSection } from "@/components/projects/project-sidebar";
 import { OverviewSection } from "@/components/projects/sections/overview-section";
-import { ScenesSection } from "@/components/projects/sections/scenes-section";
+import { StripeboardSection } from "@/components/projects/sections/stripeboard-section";
 import { CastSection } from "@/components/projects/sections/cast-section";
 import { CrewSection } from "@/components/projects/sections/crew-section";
 import { ScheduleSection } from "@/components/projects/sections/schedule-section";
@@ -182,7 +182,7 @@ export default function ProjectDetailPage() {
         return <CrewSection projectId={projectId} crew={crew} />;
       case "scenes":
         return (
-          <ScenesSection
+          <StripeboardSection
             projectId={projectId}
             scenes={dbScenes}
             cast={cast}

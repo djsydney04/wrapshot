@@ -27,9 +27,9 @@ export const stripe = {
 
 // Price IDs for subscription plans
 export const PRICE_IDS = {
-  PRO_MONTHLY: process.env.STRIPE_PRO_MONTHLY_PRICE_ID,
+  PRO_MONTHLY: process.env.STRIPE_PRO_PRICE_ID,
   PRO_YEARLY: process.env.STRIPE_PRO_YEARLY_PRICE_ID,
-  STUDIO_MONTHLY: process.env.STRIPE_STUDIO_MONTHLY_PRICE_ID,
+  STUDIO_MONTHLY: process.env.STRIPE_STUDIO_PRICE_ID,
   STUDIO_YEARLY: process.env.STRIPE_STUDIO_YEARLY_PRICE_ID,
 } as const;
 

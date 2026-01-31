@@ -444,7 +444,7 @@ export function TeamSection({ projectId }: TeamSectionProps) {
             )}
 
             <div className="space-y-2">
-              <Label>Find or Invite User</Label>
+              <Label>Invite to Project</Label>
               <UserSearchCombobox
                 projectId={projectId}
                 onSelect={handleUserSelect}

@@ -106,17 +106,29 @@ enum ProjectRole {
 // ============== SCRIPTS ==============
 
 model Script {
-  id         String   @id @default(cuid())
-  projectId  String
-  version    String
-  color      String? // Industry standard: White, Blue, Pink, etc.
-  uploadedAt DateTime @default(now())
-  fileUrl    String?
-  content    String?  @db.Text
-  isActive   Boolean  @default(false)
+  id                   String                @id @default(cuid())
+  projectId            String
+  version              String
+  color                String? // Industry standard: White, Blue, Pink, etc.
+  uploadedAt           DateTime              @default(now())
+  fileUrl              String?
+  content              String?               @db.Text
+  isActive             Boolean               @default(false)
+  // AI Breakdown tracking
+  breakdownStatus      ScriptBreakdownStatus @default(NOT_STARTED)
+  breakdownStartedAt   DateTime?
+  breakdownCompletedAt DateTime?
+  parsedContent        Json?                 // Parsed script structure from AI
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   scenes  Scene[]
+}
+
+enum ScriptBreakdownStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
 }
 
 // ============== CAST ==============
@@ -235,22 +247,32 @@ enum PermitStatus {
 // ============== SCENES ==============
 
 model Scene {
-  id               String      @id @default(cuid())
+  id               String          @id @default(cuid())
   projectId        String
   scriptId         String?
   sceneNumber      String
-  synopsis         String?     @db.Text
-  intExt           IntExt      @default(INT)
-  dayNight         DayNight    @default(DAY)
+  synopsis         String?         @db.Text
+  intExt           IntExt          @default(INT)
+  dayNight         DayNight        @default(DAY)
   locationId       String?
-  pageCount        Decimal     @default(1) @db.Decimal(4, 3) // In 1/8ths
-  scriptDay        String? // Story continuity
+  pageCount        Decimal         @default(1) @db.Decimal(4, 3) // In 1/8ths
+  scriptDay        String?         // Story continuity
   estimatedMinutes Int?
-  notes            String?     @db.Text
-  status           SceneStatus @default(NOT_SCHEDULED)
-  sortOrder        Int         @default(0)
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  notes            String?         @db.Text
+  status           SceneStatus     @default(NOT_SCHEDULED)
+  sortOrder        Int             @default(0)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  // Stripeboard / breakdown fields
+  episode          String?         // Episode number for TV
+  scenePartNumber  Int?            // For split scenes (1A=1, 1B=2)
+  setName          String?         // Set name from slugline
+  scriptPageStart  Decimal?        @db.Decimal(6, 3) // Starting page number
+  scriptPageEnd    Decimal?        @db.Decimal(6, 3) // Ending page number
+  pageEighths      Int?            // Page count in 1/8ths (1-8)
+  sequence         String?         // Production sequence grouping
+  estimatedHours   Decimal?        @db.Decimal(4, 2) // Estimated shoot duration
+  breakdownStatus  BreakdownStatus @default(PENDING)
 
   project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   script   Script?   @relation(fields: [scriptId], references: [id])
@@ -259,6 +281,27 @@ model Scene {
   castMembers      SceneCastMember[]
   elements         SceneElement[]
   scheduledEntries ShootingDayScene[]
+  images           SceneImage[]
+}
+
+enum BreakdownStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  NEEDS_REVIEW
+}
+
+model SceneImage {
+  id        String   @id @default(cuid())
+  sceneId   String
+  url       String
+  caption   String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  scene Scene @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  @@index([sceneId])
 }
 
 enum DayNight {
@@ -307,6 +350,7 @@ model Element {
 }
 
 enum ElementCategory {
+  // Original categories
   PROP
   WARDROBE
   VEHICLE
@@ -323,6 +367,20 @@ enum ElementCategory {
   MUSIC
   BACKGROUND
   OTHER
+  // Extended categories for stripeboard breakdown
+  CAMERA
+  GRIP
+  ELECTRIC
+  SET_DRESSING
+  ADDITIONAL_LABOR
+  ANIMAL_WRANGLER
+  MECHANICAL_EFFECTS
+  VIDEO_PLAYBACK
+  LOCATION_NOTES
+  SAFETY_NOTES
+  SECURITY
+  QUESTIONS
+  COMMENTS
 }
 
 model SceneElement {

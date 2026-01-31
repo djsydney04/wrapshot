@@ -47,6 +47,9 @@ const badgeVariants = cva(
           "bg-yellow-50 text-yellow-700",
         night:
           "bg-slate-700 text-slate-100",
+        // Status
+        success:
+          "bg-green-100 text-green-700",
       },
     },
     defaultVariants: {

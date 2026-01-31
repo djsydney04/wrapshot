@@ -24,6 +24,8 @@ interface AddShootingDayFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultDate?: Date;
+  defaultStartTime?: string;  // e.g., "08:00" - from drag-to-create
+  defaultEndTime?: string;    // e.g., "18:00" - from drag-to-create
   onSuccess?: () => void;
   useMockData?: boolean;
   // Edit mode props
@@ -35,6 +37,8 @@ export function AddShootingDayForm({
   open,
   onOpenChange,
   defaultDate,
+  defaultStartTime,
+  defaultEndTime,
   onSuccess,
   useMockData = true,
   editingDay,
@@ -66,8 +70,8 @@ export function AddShootingDayForm({
       | "CONFIRMED"
       | "COMPLETED"
       | "CANCELLED",
-    generalCall: editingDay?.generalCall || "07:00",
-    wrapTime: editingDay?.wrapTime || editingDay?.expectedWrap || "19:00",
+    generalCall: editingDay?.generalCall || defaultStartTime || "07:00",
+    wrapTime: editingDay?.wrapTime || editingDay?.expectedWrap || defaultEndTime || "19:00",
     crewCall: editingDay?.crewCall || "06:30",
     talentCall: editingDay?.talentCall || "08:00",
     lunchTime: editingDay?.lunchTime || "12:30",
@@ -81,7 +85,7 @@ export function AddShootingDayForm({
   React.useEffect(() => {
     setFormData(getInitialFormData());
     setError(null);
-  }, [editingDay, defaultDate]);
+  }, [editingDay, defaultDate, defaultStartTime, defaultEndTime]);
 
   // Update date when defaultDate changes (for add mode only)
   React.useEffect(() => {

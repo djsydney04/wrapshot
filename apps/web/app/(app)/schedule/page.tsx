@@ -22,6 +22,8 @@ export default function SchedulePage() {
   const [viewMode, setViewMode] = React.useState<"week" | "month" | "list">("week");
   const [showAddForm, setShowAddForm] = React.useState(false);
   const [addFormDate, setAddFormDate] = React.useState<Date | undefined>();
+  const [addFormStartTime, setAddFormStartTime] = React.useState<string | undefined>();
+  const [addFormEndTime, setAddFormEndTime] = React.useState<string | undefined>();
   const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
 
   // Default to first project for now
@@ -40,8 +42,10 @@ export default function SchedulePage() {
     setSelectedDay(null);
   };
 
-  const handleAddClick = (date?: Date) => {
+  const handleAddClick = (date?: Date, startTime?: string, endTime?: string) => {
     setAddFormDate(date);
+    setAddFormStartTime(startTime);
+    setAddFormEndTime(endTime);
     setShowAddForm(true);
   };
 
@@ -296,6 +300,8 @@ export default function SchedulePage() {
         open={showAddForm}
         onOpenChange={setShowAddForm}
         defaultDate={addFormDate}
+        defaultStartTime={addFormStartTime}
+        defaultEndTime={addFormEndTime}
         onSuccess={forceUpdate}
       />
     </div>

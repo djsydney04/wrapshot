@@ -11,6 +11,7 @@ import {
   Users,
   UserCircle,
   Clapperboard,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ import { FileUpload } from "@/components/ui/file-upload";
 import { AddShootingDayForm } from "@/components/forms/add-shooting-day-form";
 import { AddCastForm } from "@/components/forms/add-cast-form";
 import { AddCrewForm } from "@/components/forms/add-crew-form";
+import { ScriptBreakdownStep } from "@/components/projects/script-breakdown-step";
 import { useProjectStore } from "@/lib/stores/project-store";
 import { cn } from "@/lib/utils";
 import type { Project } from "@/lib/actions/projects";
@@ -29,11 +31,12 @@ interface SetupWizardProps {
   onSkip: () => void;
 }
 
-type WizardStep = "welcome" | "script" | "schedule" | "cast" | "crew" | "complete";
+type WizardStep = "welcome" | "script" | "breakdown" | "schedule" | "cast" | "crew" | "complete";
 
 const STEPS: { id: WizardStep; label: string; icon: React.ElementType }[] = [
   { id: "welcome", label: "Welcome", icon: Clapperboard },
   { id: "script", label: "Script", icon: FileText },
+  { id: "breakdown", label: "Breakdown", icon: Sparkles },
   { id: "schedule", label: "Schedule", icon: Calendar },
   { id: "cast", label: "Cast", icon: Users },
   { id: "crew", label: "Crew", icon: UserCircle },
@@ -52,6 +55,8 @@ export function SetupWizard({
   const [showAddCrew, setShowAddCrew] = React.useState(false);
   const [scriptUrl, setScriptUrl] = React.useState<string | null>(null);
   const [scriptName, setScriptName] = React.useState("");
+  const [uploadedScriptId, setUploadedScriptId] = React.useState<string | null>(null);
+  const [scenesImported, setScenesImported] = React.useState(0);
   const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
 
   const { addScript, getShootingDaysForProject, getCastForProject, getCrewForProject } =
@@ -77,8 +82,9 @@ export function SetupWizard({
     }
   };
 
-  const handleUploadScript = () => {
+  const handleUploadScript = async () => {
     if (scriptUrl && scriptName) {
+      // Add to local store for UI
       addScript({
         projectId,
         version: 1,
@@ -87,11 +93,38 @@ export function SetupWizard({
         fileName: scriptName,
         uploadedAt: new Date().toISOString(),
       });
+
+      // Also create in database to get scriptId for breakdown
+      try {
+        const { createScript } = await import("@/lib/actions/scripts");
+        const result = await createScript({
+          projectId,
+          version: "1",
+          color: "WHITE",
+          fileUrl: scriptUrl,
+          isActive: true,
+        });
+        if (result.data) {
+          setUploadedScriptId(result.data.id);
+        }
+      } catch (err) {
+        console.error("Error creating script:", err);
+      }
+
       handleNext();
     } else {
-      // Skip script step
-      handleNext();
+      // Skip script step and breakdown step
+      setCurrentStep("schedule");
     }
+  };
+
+  const handleBreakdownComplete = (count: number) => {
+    setScenesImported(count);
+    handleNext();
+  };
+
+  const handleBreakdownSkip = () => {
+    handleNext();
   };
 
   const renderStepContent = () => {
@@ -131,6 +164,18 @@ export function SetupWizard({
               fileName={scriptName}
             />
           </div>
+        );
+
+      case "breakdown":
+        return (
+          <ScriptBreakdownStep
+            projectId={projectId}
+            scriptId={uploadedScriptId || undefined}
+            scriptUrl={scriptUrl || undefined}
+            scriptName={scriptName || undefined}
+            onComplete={handleBreakdownComplete}
+            onSkip={handleBreakdownSkip}
+          />
         );
 
       case "schedule":

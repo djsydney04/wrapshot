@@ -30,6 +30,8 @@ export interface SceneInput {
   castIds?: string[];
 }
 
+export type BreakdownStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "NEEDS_REVIEW";
+
 export interface Scene {
   id: string;
   projectId: string;
@@ -47,6 +49,16 @@ export interface Scene {
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
+  // Stripeboard fields
+  episode?: string | null;
+  scenePartNumber?: number | null;
+  setName?: string | null;
+  scriptPageStart?: number | null;
+  scriptPageEnd?: number | null;
+  pageEighths?: number | null;
+  sequence?: string | null;
+  estimatedHours?: number | null;
+  breakdownStatus?: BreakdownStatus;
   // Joined data
   location?: { id: string; name: string } | null;
   cast?: { id: string; castMemberId: string; castMember: { id: string; characterName: string; actorName: string | null } }[];
@@ -326,4 +338,146 @@ export async function removeCastFromScene(sceneId: string, castMemberId: string,
   revalidatePath(`/projects/${projectId}`);
 
   return { success: true, error: null };
+}
+
+// Assign scene to a shooting day
+export async function assignSceneToShootingDay(
+  sceneId: string,
+  shootingDayId: string,
+  position: number,
+  projectId: string
+) {
+  const supabase = await createClient();
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return { success: false, error: "Not authenticated" };
+  }
+
+  // First, remove the scene from any existing shooting day
+  await supabase
+    .from("ShootingDayScene")
+    .delete()
+    .eq("sceneId", sceneId);
+
+  // Add to the new shooting day
+  const { error: insertError } = await supabase
+    .from("ShootingDayScene")
+    .insert({
+      shootingDayId,
+      sceneId,
+      sortOrder: position,
+    });
+
+  if (insertError) {
+    console.error("Error assigning scene to shooting day:", insertError);
+    return { success: false, error: insertError.message };
+  }
+
+  // Update scene status to SCHEDULED
+  await supabase
+    .from("Scene")
+    .update({ status: "SCHEDULED", updatedAt: new Date().toISOString() })
+    .eq("id", sceneId);
+
+  revalidatePath(`/projects/${projectId}`);
+
+  return { success: true, error: null };
+}
+
+// Remove scene from a shooting day
+export async function removeSceneFromShootingDay(
+  sceneId: string,
+  shootingDayId: string,
+  projectId: string
+) {
+  const supabase = await createClient();
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return { success: false, error: "Not authenticated" };
+  }
+
+  const { error } = await supabase
+    .from("ShootingDayScene")
+    .delete()
+    .eq("sceneId", sceneId)
+    .eq("shootingDayId", shootingDayId);
+
+  if (error) {
+    console.error("Error removing scene from shooting day:", error);
+    return { success: false, error: error.message };
+  }
+
+  // Update scene status to NOT_SCHEDULED
+  await supabase
+    .from("Scene")
+    .update({ status: "NOT_SCHEDULED", updatedAt: new Date().toISOString() })
+    .eq("id", sceneId);
+
+  revalidatePath(`/projects/${projectId}`);
+
+  return { success: true, error: null };
+}
+
+// Batch import scenes from breakdown
+export async function batchCreateScenes(
+  projectId: string,
+  scenes: Array<{
+    sceneNumber: string;
+    synopsis?: string;
+    intExt?: IntExt;
+    dayNight?: DayNight;
+    setName?: string;
+    pageEighths?: number;
+    scriptPageStart?: number;
+    scriptPageEnd?: number;
+  }>
+) {
+  const supabase = await createClient();
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return { data: null, error: "Not authenticated" };
+  }
+
+  // Get current max sortOrder
+  const { data: existingScenes } = await supabase
+    .from("Scene")
+    .select("sortOrder")
+    .eq("projectId", projectId)
+    .order("sortOrder", { ascending: false })
+    .limit(1);
+
+  let sortOrder = (existingScenes?.[0]?.sortOrder ?? -1) + 1;
+
+  const scenesToInsert = scenes.map((scene) => ({
+    projectId,
+    sceneNumber: scene.sceneNumber,
+    synopsis: scene.synopsis || null,
+    intExt: scene.intExt || "INT",
+    dayNight: scene.dayNight || "DAY",
+    setName: scene.setName || null,
+    pageCount: scene.pageEighths ? scene.pageEighths / 8 : 1,
+    pageEighths: scene.pageEighths || 8,
+    scriptPageStart: scene.scriptPageStart || null,
+    scriptPageEnd: scene.scriptPageEnd || null,
+    status: "NOT_SCHEDULED",
+    breakdownStatus: "PENDING",
+    sortOrder: sortOrder++,
+  }));
+
+  const { data, error } = await supabase
+    .from("Scene")
+    .insert(scenesToInsert)
+    .select();
+
+  if (error) {
+    console.error("Error batch creating scenes:", error);
+    return { data: null, error: error.message };
+  }
+
+  revalidatePath(`/projects/${projectId}`);
+
+  return { data, error: null };
 }

@@ -32,7 +32,8 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "tailwind-merge": "^2.6.0",
-    "stripe": "^17.5.0"
+    "stripe": "^17.5.0",
+    "pdf-parse": "^1.1.1"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
@@ -45,6 +46,7 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "@types/pdf-parse": "^1.1.4"
   }
 }

@@ -36,7 +36,7 @@ interface DraggableWeekCalendarProps {
   cast?: CastMember[];
   locations?: Location[];
   onDayClick?: (date: Date, events: ShootingDay[]) => void;
-  onAddClick?: (date: Date) => void;
+  onAddClick?: (date: Date, startTime?: string, endTime?: string) => void;
   onReschedule?: (shootingDayId: string, newDate: string) => Promise<void>;
   onAddSceneToDay?: (sceneId: string, shootingDayId: string) => Promise<void>;
   onRemoveSceneFromDay?: (sceneId: string, shootingDayId: string) => Promise<void>;
@@ -148,13 +148,17 @@ function DroppableDay({
   isCurrentDay,
   shootingDayId,
   children,
-  onAddClick,
+  onMouseDown,
+  isCreating,
+  createPreview,
 }: {
   date: Date;
   isCurrentDay: boolean;
   shootingDayId?: string;
   children: React.ReactNode;
-  onAddClick?: (date: Date) => void;
+  onMouseDown?: (e: React.MouseEvent, date: Date) => void;
+  isCreating?: boolean;
+  createPreview?: { top: number; height: number; startTime: string; endTime: string } | null;
 }) {
   const dateStr = format(date, "yyyy-MM-dd");
   const dropId = shootingDayId ? `shootingday-${shootingDayId}` : `day-${dateStr}`;
@@ -168,10 +172,11 @@ function DroppableDay({
     <div
       ref={setNodeRef}
       className={cn(
-        "relative border-l border-border h-full",
+        "relative border-l border-border h-full select-none",
         isCurrentDay && "bg-blue-50/30 dark:bg-blue-950/10",
         isOver && "bg-primary/10 ring-2 ring-primary ring-inset"
       )}
+      onMouseDown={(e) => onMouseDown?.(e, date)}
     >
       {/* Hour Lines - includes line at midnight end (24th hour) */}
       {[...HOURS, 24].map((_, i) => (
@@ -182,15 +187,20 @@ function DroppableDay({
         />
       ))}
 
-      {/* Click to add overlay */}
-      <button
-        className="absolute inset-0 hover:bg-muted/20 transition-colors group z-0"
-        onClick={() => onAddClick?.(date)}
-      >
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <Plus className="h-5 w-5 text-muted-foreground" />
+      {/* Creation preview */}
+      {isCreating && createPreview && (
+        <div
+          className="absolute left-1 right-1 bg-blue-500/30 border-2 border-blue-500 border-dashed rounded-lg z-20 pointer-events-none"
+          style={{
+            top: `${createPreview.top}px`,
+            height: `${Math.max(createPreview.height, 20)}px`,
+          }}
+        >
+          <div className="px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-300">
+            {createPreview.startTime} - {createPreview.endTime}
+          </div>
         </div>
-      </button>
+      )}
 
       {children}
     </div>
@@ -279,6 +289,7 @@ function DraggableEvent({
         setNodeRef(node);
         setDropRef(node);
       }}
+      data-shooting-day="true"
       style={{
         ...style,
         position: "absolute",
@@ -371,6 +382,12 @@ export function DraggableWeekCalendar({
   const [showScenesSidebar, setShowScenesSidebar] = React.useState(true);
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
+  // Drag-to-create state
+  const [isCreating, setIsCreating] = React.useState(false);
+  const [createStart, setCreateStart] = React.useState<{ date: Date; y: number } | null>(null);
+  const [createCurrentY, setCreateCurrentY] = React.useState<number | null>(null);
+  const gridRef = React.useRef<HTMLDivElement>(null);
+
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeek, i));
 
   // Get unassigned scenes (not in any shooting day)
@@ -417,6 +434,73 @@ export function DraggableWeekCalendar({
 
     // Default to 10 hours if no wrap time
     return 10 * HOUR_HEIGHT;
+  };
+
+  // Convert Y position to time string (snapped to 15-minute intervals)
+  const yToTime = (y: number): string => {
+    const totalMinutes = (y / HOUR_HEIGHT) * 60;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = Math.round((totalMinutes % 60) / 15) * 15;
+    const adjustedHours = hours + Math.floor(minutes / 60);
+    const adjustedMinutes = minutes % 60;
+    return `${Math.min(23, Math.max(0, adjustedHours)).toString().padStart(2, '0')}:${adjustedMinutes.toString().padStart(2, '0')}`;
+  };
+
+  // Handle mouse down on calendar grid to start creating
+  const handleGridMouseDown = (e: React.MouseEvent, date: Date) => {
+    // Only start if clicking directly on the grid background
+    if ((e.target as HTMLElement).closest('[data-shooting-day]')) {
+      return;
+    }
+
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const y = e.clientY - rect.top + (scrollRef.current?.scrollTop || 0);
+
+    setIsCreating(true);
+    setCreateStart({ date, y });
+    setCreateCurrentY(y);
+  };
+
+  // Handle mouse move during creation
+  const handleGridMouseMove = (e: React.MouseEvent) => {
+    if (!isCreating || !createStart || !gridRef.current) return;
+
+    const rect = gridRef.current.getBoundingClientRect();
+    const y = e.clientY - rect.top + (scrollRef.current?.scrollTop || 0);
+    setCreateCurrentY(Math.max(0, Math.min(y, HOURS.length * HOUR_HEIGHT)));
+  };
+
+  // Handle mouse up to finish creation
+  const handleGridMouseUp = () => {
+    if (!isCreating || !createStart || createCurrentY === null) {
+      setIsCreating(false);
+      setCreateStart(null);
+      setCreateCurrentY(null);
+      return;
+    }
+
+    const startY = Math.min(createStart.y, createCurrentY);
+    const endY = Math.max(createStart.y, createCurrentY);
+
+    // Only create if drag distance is meaningful (at least 15 minutes / quarter hour)
+    if (endY - startY >= HOUR_HEIGHT / 4) {
+      const startTime = yToTime(startY);
+      const endTime = yToTime(endY);
+      onAddClick?.(createStart.date, startTime, endTime);
+    }
+
+    setIsCreating(false);
+    setCreateStart(null);
+    setCreateCurrentY(null);
+  };
+
+  // Handle mouse leave to cancel creation
+  const handleGridMouseLeave = () => {
+    if (isCreating) {
+      setIsCreating(false);
+      setCreateStart(null);
+      setCreateCurrentY(null);
+    }
   };
 
   // Scroll to working hours (6 AM) on mount
@@ -596,8 +680,12 @@ export function DraggableWeekCalendar({
             {/* Time Grid */}
             <div ref={scrollRef} className="flex-1 overflow-auto">
               <div
+                ref={gridRef}
                 className="grid grid-cols-[56px_repeat(7,1fr)] relative"
                 style={{ height: `${(HOURS.length + 1) * HOUR_HEIGHT}px` }}
+                onMouseMove={handleGridMouseMove}
+                onMouseUp={handleGridMouseUp}
+                onMouseLeave={handleGridMouseLeave}
               >
                 {/* Time Labels */}
                 <div className="relative border-r border-border">
@@ -630,12 +718,28 @@ export function DraggableWeekCalendar({
                   const events = getDayEvents(day);
                   const isCurrentDay = isToday(day);
 
+                  // Calculate creation preview for this day
+                  const isCreatingOnThisDay = isCreating && createStart && isSameDay(createStart.date, day) ? true : false;
+                  let createPreview = null;
+                  if (isCreatingOnThisDay && createStart && createCurrentY !== null) {
+                    const startY = Math.min(createStart.y, createCurrentY);
+                    const endY = Math.max(createStart.y, createCurrentY);
+                    createPreview = {
+                      top: startY,
+                      height: endY - startY,
+                      startTime: yToTime(startY),
+                      endTime: yToTime(endY),
+                    };
+                  }
+
                   return (
                     <DroppableDay
                       key={dayIndex}
                       date={day}
                       isCurrentDay={isCurrentDay}
-                      onAddClick={onAddClick}
+                      onMouseDown={handleGridMouseDown}
+                      isCreating={isCreatingOnThisDay}
+                      createPreview={createPreview}
                     >
                       {events.map((event) => {
                         const top = getEventPosition(event.generalCall);
