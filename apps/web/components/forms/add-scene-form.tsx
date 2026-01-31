@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -14,8 +15,13 @@ import {
   DialogBody,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { SceneBreakdownEditor } from "@/components/scenes/scene-breakdown-editor";
 import { createScene, updateScene as updateSceneAction, type Scene, type IntExt, type DayNight } from "@/lib/actions/scenes";
 import { getLocations, type Location } from "@/lib/actions/locations";
+import { getElements, type Element } from "@/lib/actions/elements";
+import { getSceneElements } from "@/lib/actions/elements";
+import { getCastMembers, type CastMember } from "@/lib/actions/cast";
+import type { SceneElementItem } from "@/components/scenes/breakdown-category";
 
 interface AddSceneFormProps {
   projectId: string;
@@ -23,6 +29,7 @@ interface AddSceneFormProps {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   editScene?: Scene | null;
+  showBreakdownTab?: boolean;
 }
 
 const initialFormData = {
@@ -42,21 +49,57 @@ export function AddSceneForm({
   onOpenChange,
   onSuccess,
   editScene,
+  showBreakdownTab = false,
 }: AddSceneFormProps) {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [locations, setLocations] = React.useState<Location[]>([]);
+  const [elements, setElements] = React.useState<Element[]>([]);
+  const [sceneElements, setSceneElements] = React.useState<SceneElementItem[]>([]);
+  const [cast, setCast] = React.useState<CastMember[]>([]);
   const [formData, setFormData] = React.useState(initialFormData);
+  const [activeTab, setActiveTab] = React.useState<string>("basic");
   const isEditing = !!editScene;
 
-  // Load locations when dialog opens
+  // Load data when dialog opens
   React.useEffect(() => {
     if (open) {
+      // Load locations
       getLocations(projectId).then(({ data }) => {
         if (data) setLocations(data);
       });
+
+      // Load elements and cast for breakdown tab
+      if (showBreakdownTab || isEditing) {
+        getElements(projectId).then(({ data }) => {
+          if (data) setElements(data);
+        });
+
+        getCastMembers(projectId).then(({ data }) => {
+          if (data) setCast(data);
+        });
+
+        // Load scene elements if editing
+        if (editScene) {
+          getSceneElements(editScene.id).then(({ data }) => {
+            if (data) {
+              const mapped = data.map((se: { id: string; elementId: string; quantity: number; notes: string | null; element: Element }) => ({
+                id: se.id,
+                elementId: se.elementId,
+                quantity: se.quantity,
+                notes: se.notes,
+                element: se.element,
+              }));
+              setSceneElements(mapped);
+            }
+          });
+        }
+      }
+    } else {
+      // Reset tab when dialog closes
+      setActiveTab("basic");
     }
-  }, [open, projectId]);
+  }, [open, projectId, showBreakdownTab, isEditing, editScene]);
 
   // Reset form when dialog opens/closes or when editing a different scene
   React.useEffect(() => {
@@ -74,6 +117,7 @@ export function AddSceneForm({
       setError(null);
     } else if (open && !editScene) {
       setFormData(initialFormData);
+      setSceneElements([]);
       setError(null);
     }
   }, [open, editScene]);
@@ -113,176 +157,278 @@ export function AddSceneForm({
     }
   };
 
+  const handleBreakdownUpdate = () => {
+    // Refresh scene elements
+    if (editScene) {
+      getSceneElements(editScene.id).then(({ data }) => {
+        if (data) {
+          const mapped = data.map((se: { id: string; elementId: string; quantity: number; notes: string | null; element: Element }) => ({
+            id: se.id,
+            elementId: se.elementId,
+            quantity: se.quantity,
+            notes: se.notes,
+            element: se.element,
+          }));
+          setSceneElements(mapped);
+        }
+      });
+    }
+  };
+
+  const showTabs = isEditing && showBreakdownTab;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent onClose={() => onOpenChange(false)} className="max-w-2xl">
+      <DialogContent onClose={() => onOpenChange(false)} className={showTabs ? "max-w-4xl" : "max-w-2xl"}>
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Scene" : "Add Scene"}</DialogTitle>
           <DialogDescription>
-            {isEditing ? "Update scene details" : "Add a new scene to your project"}
+            {isEditing ? "Update scene details and breakdown" : "Add a new scene to your project"}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
-          <DialogBody className="space-y-4 max-h-[60vh] overflow-y-auto">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  Scene Number *
-                </label>
-                <Input
-                  required
-                  value={formData.sceneNumber}
-                  onChange={(e) =>
-                    setFormData({ ...formData, sceneNumber: e.target.value })
-                  }
-                  placeholder="e.g., 1, 2A, 3B"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  Page Count
-                </label>
-                <Input
-                  type="number"
-                  step="0.125"
-                  min="0.125"
-                  value={formData.pageCount}
-                  onChange={(e) =>
-                    setFormData({ ...formData, pageCount: e.target.value })
-                  }
-                />
-              </div>
-            </div>
+        {showTabs ? (
+          <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue="basic">
+            <TabsList className="w-full">
+              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="breakdown">Breakdown</TabsTrigger>
+            </TabsList>
 
-            <div>
-              <label className="block text-sm font-medium mb-1.5">
-                Synopsis *
-              </label>
-              <Textarea
-                required
-                value={formData.synopsis}
-                onChange={(e) =>
-                  setFormData({ ...formData, synopsis: e.target.value })
-                }
-                placeholder="Brief description of the scene..."
-                rows={3}
+            <TabsContent value="basic">
+              <form onSubmit={handleSubmit}>
+                <DialogBody className="space-y-4 max-h-[60vh] overflow-y-auto">
+                  <BasicInfoFields
+                    formData={formData}
+                    setFormData={setFormData}
+                    locations={locations}
+                    error={error}
+                  />
+                </DialogBody>
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={loading}>
+                    {loading ? "Saving..." : "Save Changes"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="breakdown">
+              <DialogBody className="max-h-[60vh] overflow-y-auto">
+                {editScene && (
+                  <SceneBreakdownEditor
+                    scene={editScene}
+                    projectId={projectId}
+                    cast={cast}
+                    elements={elements}
+                    sceneElements={sceneElements}
+                    locations={locations}
+                    onUpdate={handleBreakdownUpdate}
+                  />
+                )}
+              </DialogBody>
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Close
+                </Button>
+              </DialogFooter>
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <DialogBody className="space-y-4 max-h-[60vh] overflow-y-auto">
+              <BasicInfoFields
+                formData={formData}
+                setFormData={setFormData}
+                locations={locations}
+                error={error}
               />
-            </div>
+            </DialogBody>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  INT/EXT
-                </label>
-                <Select
-                  value={formData.intExt}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      intExt: e.target.value as IntExt,
-                    })
-                  }
-                  options={[
-                    { value: "INT", label: "Interior" },
-                    { value: "EXT", label: "Exterior" },
-                    { value: "BOTH", label: "Both" },
-                  ]}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  Day/Night
-                </label>
-                <Select
-                  value={formData.dayNight}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      dayNight: e.target.value as DayNight,
-                    })
-                  }
-                  options={[
-                    { value: "DAY", label: "Day" },
-                    { value: "NIGHT", label: "Night" },
-                    { value: "DAWN", label: "Dawn" },
-                    { value: "DUSK", label: "Dusk" },
-                    { value: "MORNING", label: "Morning" },
-                    { value: "AFTERNOON", label: "Afternoon" },
-                    { value: "EVENING", label: "Evening" },
-                  ]}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  Est. Minutes
-                </label>
-                <Input
-                  type="number"
-                  min="1"
-                  value={formData.estimatedMinutes}
-                  onChange={(e) =>
-                    setFormData({ ...formData, estimatedMinutes: e.target.value })
-                  }
-                  placeholder="Runtime"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1.5">
-                Location
-              </label>
-              <Select
-                value={formData.locationId}
-                onChange={(e) =>
-                  setFormData({ ...formData, locationId: e.target.value })
-                }
-                options={[
-                  { value: "", label: "Select a location..." },
-                  ...locations.map((loc) => ({
-                    value: loc.id,
-                    label: loc.name,
-                  })),
-                ]}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1.5">
-                Notes
-              </label>
-              <Textarea
-                value={formData.notes}
-                onChange={(e) =>
-                  setFormData({ ...formData, notes: e.target.value })
-                }
-                placeholder="Additional notes about the scene..."
-                rows={2}
-              />
-            </div>
-
-            {error && (
-              <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
-                {error}
-              </div>
-            )}
-          </DialogBody>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? (isEditing ? "Saving..." : "Adding...") : (isEditing ? "Save Changes" : "Add Scene")}
-            </Button>
-          </DialogFooter>
-        </form>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? (isEditing ? "Saving..." : "Adding...") : (isEditing ? "Save Changes" : "Add Scene")}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Extract basic info fields to a separate component for reuse
+interface BasicInfoFieldsProps {
+  formData: typeof initialFormData;
+  setFormData: React.Dispatch<React.SetStateAction<typeof initialFormData>>;
+  locations: Location[];
+  error: string | null;
+}
+
+function BasicInfoFields({ formData, setFormData, locations, error }: BasicInfoFieldsProps) {
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium mb-1.5">
+            Scene Number *
+          </label>
+          <Input
+            required
+            value={formData.sceneNumber}
+            onChange={(e) =>
+              setFormData({ ...formData, sceneNumber: e.target.value })
+            }
+            placeholder="e.g., 1, 2A, 3B"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1.5">
+            Page Count
+          </label>
+          <Input
+            type="number"
+            step="0.125"
+            min="0.125"
+            value={formData.pageCount}
+            onChange={(e) =>
+              setFormData({ ...formData, pageCount: e.target.value })
+            }
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1.5">
+          Synopsis *
+        </label>
+        <Textarea
+          required
+          value={formData.synopsis}
+          onChange={(e) =>
+            setFormData({ ...formData, synopsis: e.target.value })
+          }
+          placeholder="Brief description of the scene..."
+          rows={3}
+        />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div>
+          <label className="block text-sm font-medium mb-1.5">
+            INT/EXT
+          </label>
+          <Select
+            value={formData.intExt}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                intExt: e.target.value as IntExt,
+              })
+            }
+            options={[
+              { value: "INT", label: "Interior" },
+              { value: "EXT", label: "Exterior" },
+              { value: "BOTH", label: "Both" },
+            ]}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1.5">
+            Day/Night
+          </label>
+          <Select
+            value={formData.dayNight}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                dayNight: e.target.value as DayNight,
+              })
+            }
+            options={[
+              { value: "DAY", label: "Day" },
+              { value: "NIGHT", label: "Night" },
+              { value: "DAWN", label: "Dawn" },
+              { value: "DUSK", label: "Dusk" },
+              { value: "MORNING", label: "Morning" },
+              { value: "AFTERNOON", label: "Afternoon" },
+              { value: "EVENING", label: "Evening" },
+            ]}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1.5">
+            Est. Minutes
+          </label>
+          <Input
+            type="number"
+            min="1"
+            value={formData.estimatedMinutes}
+            onChange={(e) =>
+              setFormData({ ...formData, estimatedMinutes: e.target.value })
+            }
+            placeholder="Runtime"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1.5">
+          Location
+        </label>
+        <Select
+          value={formData.locationId}
+          onChange={(e) =>
+            setFormData({ ...formData, locationId: e.target.value })
+          }
+          options={[
+            { value: "", label: "Select a location..." },
+            ...locations.map((loc) => ({
+              value: loc.id,
+              label: loc.name,
+            })),
+          ]}
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1.5">
+          Notes
+        </label>
+        <Textarea
+          value={formData.notes}
+          onChange={(e) =>
+            setFormData({ ...formData, notes: e.target.value })
+          }
+          placeholder="Additional notes about the scene..."
+          rows={2}
+        />
+      </div>
+
+      {error && (
+        <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+    </>
   );
 }

@@ -420,6 +420,102 @@ export async function removeSceneFromShootingDay(
   return { success: true, error: null };
 }
 
+// Update scene breakdown (bulk update cast, elements, etc.)
+export async function updateSceneBreakdown(
+  sceneId: string,
+  projectId: string,
+  updates: {
+    castIds?: string[];
+    elements?: { elementId: string; quantity: number; notes?: string }[];
+    locationId?: string;
+    notes?: string;
+    breakdownStatus?: BreakdownStatus;
+  }
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return { error: "Not authenticated" };
+  }
+
+  // Update scene fields if provided
+  const sceneUpdates: Record<string, unknown> = {
+    updatedAt: new Date().toISOString(),
+  };
+  if (updates.locationId !== undefined) {
+    sceneUpdates.locationId = updates.locationId || null;
+  }
+  if (updates.notes !== undefined) {
+    sceneUpdates.notes = updates.notes || null;
+  }
+  if (updates.breakdownStatus !== undefined) {
+    sceneUpdates.breakdownStatus = updates.breakdownStatus;
+  }
+
+  const { error: sceneError } = await supabase
+    .from("Scene")
+    .update(sceneUpdates)
+    .eq("id", sceneId);
+
+  if (sceneError) {
+    console.error("Error updating scene:", sceneError);
+    return { error: sceneError.message };
+  }
+
+  // Update cast members if provided
+  if (updates.castIds !== undefined) {
+    // Delete existing cast associations
+    await supabase.from("SceneCastMember").delete().eq("sceneId", sceneId);
+
+    // Insert new associations
+    if (updates.castIds.length > 0) {
+      const castInserts = updates.castIds.map((castMemberId) => ({
+        sceneId,
+        castMemberId,
+      }));
+
+      const { error: castError } = await supabase
+        .from("SceneCastMember")
+        .insert(castInserts);
+
+      if (castError) {
+        console.error("Error updating cast:", castError);
+        // Don't fail the whole operation
+      }
+    }
+  }
+
+  // Update elements if provided
+  if (updates.elements !== undefined) {
+    // Delete existing element associations
+    await supabase.from("SceneElement").delete().eq("sceneId", sceneId);
+
+    // Insert new associations
+    if (updates.elements.length > 0) {
+      const elementInserts = updates.elements.map((elem) => ({
+        sceneId,
+        elementId: elem.elementId,
+        quantity: elem.quantity,
+        notes: elem.notes || null,
+      }));
+
+      const { error: elemError } = await supabase
+        .from("SceneElement")
+        .insert(elementInserts);
+
+      if (elemError) {
+        console.error("Error updating elements:", elemError);
+        // Don't fail the whole operation
+      }
+    }
+  }
+
+  revalidatePath(`/projects/${projectId}`);
+
+  return { error: null };
+}
+
 // Batch import scenes from breakdown
 export async function batchCreateScenes(
   projectId: string,

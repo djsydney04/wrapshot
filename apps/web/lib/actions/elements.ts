@@ -20,7 +20,21 @@ export type ElementCategory =
   | "SOUND"
   | "MUSIC"
   | "BACKGROUND"
-  | "OTHER";
+  | "OTHER"
+  | "CAMERA"
+  | "GRIP"
+  | "ELECTRIC"
+  | "SET_DRESSING"
+  | "ADDITIONAL_LABOR"
+  | "ANIMAL_WRANGLER"
+  | "MECHANICAL_EFFECTS"
+  | "VIDEO_PLAYBACK"
+  | "LOCATION_NOTES"
+  | "SAFETY_NOTES"
+  | "SECURITY"
+  | "QUESTIONS"
+  | "COMMENTS"
+  | "MISCELLANEOUS";
 
 export const ELEMENT_CATEGORY_LABELS: Record<ElementCategory, string> = {
   PROP: "Props",
@@ -29,16 +43,30 @@ export const ELEMENT_CATEGORY_LABELS: Record<ElementCategory, string> = {
   ANIMAL: "Animals",
   SPECIAL_EQUIPMENT: "Special Equipment",
   VFX: "Visual Effects",
-  SFX: "Sound Effects",
+  SFX: "Special Effects",
   STUNT: "Stunts",
-  MAKEUP: "Makeup",
+  MAKEUP: "Makeup/Hair",
   HAIR: "Hair",
-  GREENERY: "Greenery/Plants",
+  GREENERY: "Greenery",
   ART_DEPARTMENT: "Art Department",
   SOUND: "Sound",
   MUSIC: "Music",
-  BACKGROUND: "Background/Extras",
+  BACKGROUND: "Background",
   OTHER: "Other",
+  CAMERA: "Camera",
+  GRIP: "Grip",
+  ELECTRIC: "Electric",
+  SET_DRESSING: "Set Dressing",
+  ADDITIONAL_LABOR: "Additional Labor",
+  ANIMAL_WRANGLER: "Animal Wrangler",
+  MECHANICAL_EFFECTS: "Mechanical Effects",
+  VIDEO_PLAYBACK: "Video Playback",
+  LOCATION_NOTES: "Location Notes",
+  SAFETY_NOTES: "Safety Notes",
+  SECURITY: "Security",
+  QUESTIONS: "Questions",
+  COMMENTS: "Comments",
+  MISCELLANEOUS: "Miscellaneous",
 };
 
 export interface ElementInput {
@@ -380,6 +408,42 @@ export async function getElementsWithSceneCounts(projectId: string) {
   }));
 
   return { data: elementsWithCounts as Element[], error: null };
+}
+
+// Quick create element - lightweight creation for inline breakdown editor
+export async function quickCreateElement(
+  projectId: string,
+  category: ElementCategory,
+  name: string,
+  notes?: string
+): Promise<{ data: Element | null; error: string | null }> {
+  const supabase = await createClient();
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return { data: null, error: "Not authenticated" };
+  }
+
+  const { data, error } = await supabase
+    .from("Element")
+    .insert({
+      projectId,
+      category,
+      name,
+      description: null,
+      notes: notes || null,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error quick creating element:", error);
+    return { data: null, error: error.message };
+  }
+
+  revalidatePath(`/projects/${projectId}`);
+
+  return { data: data as Element, error: null };
 }
 
 // Bulk create elements (useful for importing from script breakdown)
