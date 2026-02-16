@@ -9,7 +9,7 @@ import {
   type DepartmentType,
   type GearItem,
   type Script,
-} from "@/lib/mock-data";
+} from "@/lib/types";
 
 interface ProjectStore {
   // Data

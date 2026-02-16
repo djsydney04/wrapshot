@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Film,
-  Calendar,
   Search,
   Settings,
   Plus,
@@ -19,10 +18,12 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
-import { Tooltip } from "@/components/ui/tooltip";
+import { SimpleTooltip } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
 import { useLayoutStore } from "@/lib/stores/layout-store";
 import { useProjectStore } from "@/lib/stores/project-store";
+import { FeedbackButton } from "@/components/feedback/feedback-button";
+import { ShareButton } from "@/components/share/share-button";
 
 interface SidebarProps {
   user?: {
@@ -70,12 +71,6 @@ export function Sidebar({ user }: SidebarProps) {
       tourId: "projects",
     },
     {
-      label: "Schedule",
-      href: "/schedule",
-      icon: Calendar,
-      tourId: "schedule",
-    },
-    {
       label: "Finance",
       href: "/finance",
       icon: DollarSign,
@@ -107,7 +102,7 @@ export function Sidebar({ user }: SidebarProps) {
             </Button>
           </>
         ) : (
-          <Tooltip content="Expand sidebar" side="right">
+          <SimpleTooltip content="Expand sidebar" side="right">
             <Button
               variant="ghost"
               size="icon-sm"
@@ -116,7 +111,7 @@ export function Sidebar({ user }: SidebarProps) {
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-          </Tooltip>
+          </SimpleTooltip>
         )}
       </div>
 
@@ -147,7 +142,7 @@ export function Sidebar({ user }: SidebarProps) {
 
             if (!sidebarOpen) {
               return (
-                <Tooltip key={item.href} content={item.label} side="right">
+                <SimpleTooltip key={item.href} content={item.label} side="right">
                   <Link href={item.href} data-tour={item.tourId}>
                     <Button
                       variant="ghost"
@@ -160,7 +155,7 @@ export function Sidebar({ user }: SidebarProps) {
                       <Icon className="h-4 w-4" />
                     </Button>
                   </Link>
-                </Tooltip>
+                </SimpleTooltip>
               );
             }
 
@@ -228,6 +223,10 @@ export function Sidebar({ user }: SidebarProps) {
       <div className="border-t border-stone-800 p-2 space-y-1">
         {sidebarOpen ? (
           <>
+            {/* Share & Feedback Buttons */}
+            <ShareButton />
+            <FeedbackButton />
+
             {/* Settings Link */}
             <Link href="/settings">
               <Button
@@ -254,7 +253,7 @@ export function Sidebar({ user }: SidebarProps) {
                 </p>
               </div>
               <form action="/auth/signout" method="post">
-                <Tooltip content="Sign out" side="top">
+                <SimpleTooltip content="Sign out" side="top">
                   <Button
                     type="submit"
                     variant="ghost"
@@ -263,13 +262,15 @@ export function Sidebar({ user }: SidebarProps) {
                   >
                     <LogOut className="h-4 w-4" />
                   </Button>
-                </Tooltip>
+                </SimpleTooltip>
               </form>
             </div>
           </>
         ) : (
           <>
-            <Tooltip content="Settings" side="right">
+            <ShareButton variant="sidebar" />
+            <FeedbackButton collapsed />
+            <SimpleTooltip content="Settings" side="right">
               <Link href="/settings">
                 <Button
                   variant="ghost"
@@ -282,12 +283,12 @@ export function Sidebar({ user }: SidebarProps) {
                   <Settings className="h-4 w-4" />
                 </Button>
               </Link>
-            </Tooltip>
-            <Tooltip content="User menu" side="right">
+            </SimpleTooltip>
+            <SimpleTooltip content="User menu" side="right">
               <Button variant="ghost" size="icon" className="w-full text-stone-400 hover:text-white hover:bg-stone-800">
                 <User className="h-4 w-4" />
               </Button>
-            </Tooltip>
+            </SimpleTooltip>
           </>
         )}
       </div>

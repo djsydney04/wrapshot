@@ -30,7 +30,7 @@ import {
 import { SceneOrderEditor } from "./scene-order-editor";
 import { CastCallTimesEditor } from "./cast-call-times-editor";
 import { DepartmentCallTimesEditor } from "./department-call-times-editor";
-import type { ShootingDay, Scene, CastMember, Location } from "@/lib/mock-data";
+import type { ShootingDay, Scene, CastMember, Location } from "@/lib/types";
 
 interface ShootingDayDetailPanelProps {
   shootingDay: ShootingDay | null;

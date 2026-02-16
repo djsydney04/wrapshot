@@ -14,15 +14,16 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
-import type { Scene, CastMember, ShootingDay, GearItem, Script } from "@/lib/mock-data";
-import type { Project } from "@/lib/actions/projects";
-import type { CrewMember } from "@/lib/actions/crew";
+import type { Scene, ShootingDay, GearItem, Script } from "@/lib/types";
+import type { Project } from "@/lib/actions/projects.types";
+import type { CrewMemberWithInviteStatus } from "@/lib/actions/crew";
+import type { CastMemberWithInviteStatus } from "@/lib/actions/cast";
 
 interface OverviewSectionProps {
   project: Project;
   scenes: Scene[];
-  cast: CastMember[];
-  crew: CrewMember[];
+  cast: CastMemberWithInviteStatus[];
+  crew: CrewMemberWithInviteStatus[];
   shootingDays: ShootingDay[];
   gear: GearItem[];
   scripts: Script[];
@@ -183,8 +184,8 @@ export function OverviewSection({
                     className="flex items-center gap-2 px-3 py-2 rounded-full bg-muted/50"
                   >
                     <Avatar
-                      alt={"actorName" in member ? member.actorName : member.name}
-                      src={"profilePhotoUrl" in member ? member.profilePhotoUrl : undefined}
+                      alt={"actorName" in member ? (member.actorName ?? member.characterName) : member.name}
+                      src={"profilePhotoUrl" in member ? (member.profilePhotoUrl ?? undefined) : undefined}
                       size="sm"
                     />
                     <span className="text-sm">

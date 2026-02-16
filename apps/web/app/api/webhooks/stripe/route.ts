@@ -97,6 +97,17 @@ async function handleCheckoutCompleted(supabase: SupabaseClientType, session: St
   const priceId = subscription.items.data[0]?.price.id;
   const plan = getPlanFromPriceId(priceId);
 
+  // Check if this is a new subscription or upgrade
+  const { data: existingSub } = await supabase
+    .from("Subscription")
+    .select("invoiceCount")
+    .eq("userId", userId)
+    .maybeSingle();
+
+  // For new subscriptions, set invoiceCount to 1 (first payment just occurred)
+  // For existing subscriptions (upgrades), keep the existing count
+  const invoiceCount = existingSub?.invoiceCount ?? 1;
+
   // Upsert subscription record
   const { error } = await supabase
     .from("Subscription")
@@ -109,6 +120,7 @@ async function handleCheckoutCompleted(supabase: SupabaseClientType, session: St
       status: mapStripeStatus(subscription.status),
       plan,
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      invoiceCount,
     }, {
       onConflict: "userId",
     });
@@ -185,15 +197,25 @@ async function handleSubscriptionDeleted(supabase: SupabaseClientType, subscript
 async function handlePaymentSucceeded(supabase: SupabaseClientType, invoice: Stripe.Invoice) {
   const customerId = invoice.customer as string;
 
-  // Update subscription period end
+  // Update subscription period end and increment invoice count
   if (invoice.subscription) {
     const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+
+    // First, get the current invoice count
+    const { data: existingSub } = await supabase
+      .from("Subscription")
+      .select("invoiceCount")
+      .eq("stripeCustomerId", customerId)
+      .single();
+
+    const currentInvoiceCount = existingSub?.invoiceCount ?? 0;
 
     const { error } = await supabase
       .from("Subscription")
       .update({
         stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
         status: "ACTIVE",
+        invoiceCount: currentInvoiceCount + 1,
         updatedAt: new Date().toISOString(),
       })
       .eq("stripeCustomerId", customerId);

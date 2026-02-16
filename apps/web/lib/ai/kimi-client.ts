@@ -2,6 +2,7 @@
  * Kimi K2.5 API client for script analysis
  * Uses Fireworks AI as the inference provider
  */
+import { getFireworksApiKey } from "@/lib/ai/config";
 
 interface KimiMessage {
   role: "system" | "user" | "assistant";
@@ -28,9 +29,11 @@ export class KimiClient {
   private model = "accounts/fireworks/models/kimi-k2-5-instruct";
 
   constructor(apiKey?: string) {
-    this.apiKey = apiKey || process.env.FIREWORKS_SECRET_KEY || "";
+    this.apiKey = getFireworksApiKey(apiKey);
     if (!this.apiKey) {
-      throw new Error("FIREWORKS_SECRET_KEY is required for Kimi client");
+      throw new Error(
+        "Fireworks API key missing. Set FIREWORKS_SECRET_KEY (or FIREWORKS_API_KEY) in apps/web/.env.local."
+      );
     }
   }
 
@@ -65,6 +68,71 @@ export class KimiClient {
     }
 
     return content;
+  }
+
+  /**
+   * Streaming completion for real-time UI updates
+   */
+  async *completeStreaming(options: KimiCompletionOptions): AsyncGenerator<string> {
+    const { messages, maxTokens = 4000, temperature = 0.1 } = options;
+
+    const response = await fetch(this.baseUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        messages,
+        max_tokens: maxTokens,
+        temperature,
+        stream: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Kimi API error:", response.status, errorText);
+      throw new Error(`Kimi API error: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("No response body");
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed === "data: [DONE]") continue;
+          if (!trimmed.startsWith("data: ")) continue;
+
+          try {
+            const json = JSON.parse(trimmed.slice(6));
+            const content = json.choices?.[0]?.delta?.content;
+            if (content) {
+              yield content;
+            }
+          } catch {
+            // Skip malformed JSON chunks
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
   }
 
   /**

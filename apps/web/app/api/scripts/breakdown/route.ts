@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { KimiClient, SCENE_EXTRACTION_PROMPT, KimiClient as KC } from "@/lib/ai/kimi-client";
 import { parsePdfScript, normalizeScriptText } from "@/lib/scripts/parser";
+import { getFireworksApiKey } from "@/lib/ai/config";
 
 export interface ExtractedScene {
   scene_number: string;
@@ -40,11 +41,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const fireworksKey = process.env.FIREWORKS_SECRET_KEY;
+    const fireworksKey = getFireworksApiKey();
     if (!fireworksKey) {
-      console.error("FIREWORKS_SECRET_KEY not configured");
+      console.error("Fireworks key not configured");
       return NextResponse.json(
-        { error: "AI breakdown not configured" },
+        { error: "Wrapshot Intelligence breakdown is not configured" },
         { status: 500 }
       );
     }
@@ -129,13 +130,13 @@ export async function POST(request: Request) {
         throw new Error("Invalid breakdown result: missing scenes array");
       }
     } catch (aiError) {
-      console.error("Error in AI breakdown:", aiError);
+      console.error("Error in Wrapshot Intelligence breakdown:", aiError);
       await supabase
         .from("Script")
         .update({ breakdownStatus: "FAILED" })
         .eq("id", scriptId);
       return NextResponse.json(
-        { error: "AI breakdown failed" },
+        { error: "Wrapshot Intelligence breakdown failed" },
         { status: 500 }
       );
     }

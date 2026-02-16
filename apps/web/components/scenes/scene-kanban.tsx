@@ -23,7 +23,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { SceneCard } from "./scene-card";
 import { cn } from "@/lib/utils";
 import type { Scene, SceneStatus } from "@/lib/actions/scenes";
-import type { CastMember } from "@/lib/mock-data";
+import type { CastMember } from "@/lib/types";
 
 const COLUMNS = [
   { id: "NOT_SCHEDULED", label: "Not Scheduled", color: "bg-muted" },

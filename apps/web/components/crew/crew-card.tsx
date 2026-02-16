@@ -1,19 +1,28 @@
 "use client";
 
 import * as React from "react";
-import { Mail, Phone, UserCircle } from "lucide-react";
+import { Mail, Phone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
+import { InviteStatusBadge } from "@/components/ui/invite-status-badge";
 import { cn } from "@/lib/utils";
-import { type CrewMember } from "@/lib/actions/crew";
+import { type CrewMemberWithInviteStatus } from "@/lib/actions/crew";
 
 interface CrewCardProps {
-  member: CrewMember;
+  member: CrewMemberWithInviteStatus;
   onClick?: () => void;
   compact?: boolean;
+  onSendInvite?: () => void;
+  onResendInvite?: () => void;
 }
 
-export function CrewCard({ member, onClick, compact = false }: CrewCardProps) {
+export function CrewCard({
+  member,
+  onClick,
+  compact = false,
+  onSendInvite,
+  onResendInvite,
+}: CrewCardProps) {
   if (compact) {
     return (
       <button
@@ -29,9 +38,20 @@ export function CrewCard({ member, onClick, compact = false }: CrewCardProps) {
           <p className="text-sm font-medium truncate">{member.name}</p>
           <p className="text-xs text-muted-foreground truncate">{member.role}</p>
         </div>
-        {member.isHead && (
-          <Badge variant="default" className="text-[10px] flex-shrink-0">HEAD</Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {member.inviteStatus && (
+            <InviteStatusBadge
+              status={member.inviteStatus}
+              email={member.email}
+              onSendInvite={onSendInvite}
+              onResendInvite={onResendInvite}
+              compact
+            />
+          )}
+          {member.isHead && (
+            <Badge variant="default" className="text-[10px] flex-shrink-0">HEAD</Badge>
+          )}
+        </div>
       </button>
     );
   }
@@ -57,7 +77,18 @@ export function CrewCard({ member, onClick, compact = false }: CrewCardProps) {
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <p className="font-medium">{member.name}</p>
+        <div className="flex items-center gap-2">
+          <p className="font-medium">{member.name}</p>
+          {member.inviteStatus && (
+            <InviteStatusBadge
+              status={member.inviteStatus}
+              email={member.email}
+              onSendInvite={onSendInvite}
+              onResendInvite={onResendInvite}
+              compact
+            />
+          )}
+        </div>
         <p className="text-sm text-muted-foreground">{member.role}</p>
 
         {/* Contact Links */}

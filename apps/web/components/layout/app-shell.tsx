@@ -1,9 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "@/lib/utils";
-import { Sidebar } from "./sidebar";
-import { useLayoutStore } from "@/lib/stores/layout-store";
+import { TimedSurvey } from "@/components/feedback/timed-survey";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -14,35 +12,13 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, user }: AppShellProps) {
-  const [mounted, setMounted] = React.useState(false);
-  const sidebarOpen = useLayoutStore((state) => state.sidebarOpen);
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Render a loading state during SSR to avoid hydration mismatch
-  if (!mounted) {
-    return (
-      <div className="flex h-screen overflow-hidden bg-background">
-        <div className="w-[240px] border-r border-stone-800 bg-stone-900" />
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar user={user} />
-      <main
-        className={cn(
-          "flex-1 overflow-auto transition-all duration-200"
-        )}
-      >
+    <div className="h-screen overflow-hidden bg-background">
+      <main className="h-full overflow-auto">
         {children}
       </main>
+      {/* Timed feedback survey - shows after 5 minutes */}
+      <TimedSurvey />
     </div>
   );
 }

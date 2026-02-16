@@ -6,44 +6,92 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
+import { InviteStatusBadge, type InviteStatus } from "@/components/ui/invite-status-badge";
 import { AddCastForm } from "@/components/forms/add-cast-form";
 import { useProjectStore } from "@/lib/stores/project-store";
-import type { CastMember } from "@/lib/mock-data";
+import {
+  inviteCastMember,
+  resendCastCrewInvite,
+} from "@/lib/actions/cast-crew-invites";
+import type { CastMemberWithInviteStatus } from "@/lib/actions/cast";
 
 interface CastSectionProps {
   projectId: string;
-  cast: CastMember[];
+  cast: CastMemberWithInviteStatus[];
 }
 
 export function CastSection({ projectId, cast }: CastSectionProps) {
   const [showAddCast, setShowAddCast] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [localCast, setLocalCast] = React.useState(cast);
   const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
 
   const { deleteCastMember } = useProjectStore();
 
+  // Sync with props
+  React.useEffect(() => {
+    setLocalCast(cast);
+  }, [cast]);
+
   const filteredCast = React.useMemo(() => {
-    if (!searchQuery) return cast;
+    if (!searchQuery) return localCast;
     const query = searchQuery.toLowerCase();
-    return cast.filter(
+    return localCast.filter(
       (c) =>
         c.characterName.toLowerCase().includes(query) ||
-        c.actorName.toLowerCase().includes(query)
+        (c.actorName && c.actorName.toLowerCase().includes(query))
     );
-  }, [cast, searchQuery]);
+  }, [localCast, searchQuery]);
 
   const sortedCast = React.useMemo(() => {
-    return [...filteredCast].sort((a, b) => a.castNumber - b.castNumber);
+    return [...filteredCast].sort((a, b) => (a.castNumber || 0) - (b.castNumber || 0));
   }, [filteredCast]);
 
   const handleDelete = (id: string) => {
     if (confirm("Are you sure you want to remove this cast member?")) {
       deleteCastMember(id);
+      setLocalCast((prev) => prev.filter((c) => c.id !== id));
       forceUpdate();
     }
   };
 
-  const statusVariant = (status: CastMember["status"]) => {
+  const handleSendInvite = async (memberId: string) => {
+    try {
+      const result = await inviteCastMember(memberId, projectId);
+      if (result.success) {
+        // Update local state to reflect the new status
+        setLocalCast((prev) =>
+          prev.map((c) =>
+            c.id === memberId
+              ? { ...c, inviteStatus: "invite_sent" as InviteStatus }
+              : c
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Failed to send invite:", error);
+    }
+  };
+
+  const handleResendInvite = async (inviteId: string) => {
+    try {
+      const result = await resendCastCrewInvite(inviteId, projectId);
+      if (result.success) {
+        // Update local state
+        setLocalCast((prev) =>
+          prev.map((c) =>
+            c.inviteId === inviteId
+              ? { ...c, inviteStatus: "invite_sent" as InviteStatus }
+              : c
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Failed to resend invite:", error);
+    }
+  };
+
+  const statusVariant = (status: string) => {
     switch (status) {
       case "WORKING":
         return "production";
@@ -87,6 +135,7 @@ export function CastSection({ projectId, cast }: CastSectionProps) {
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Character</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Actor</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Account</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Contact</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground w-10"></th>
               </tr>
@@ -105,11 +154,27 @@ export function CastSection({ projectId, cast }: CastSectionProps) {
                       <span className="font-medium">{member.characterName}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{member.actorName}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{member.actorName || "—"}</td>
                   <td className="px-4 py-3">
-                    <Badge variant={statusVariant(member.status)}>
-                      {member.status}
+                    <Badge variant={statusVariant(member.workStatus)}>
+                      {member.workStatus}
                     </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <InviteStatusBadge
+                      status={member.inviteStatus}
+                      email={member.email}
+                      onSendInvite={
+                        member.inviteStatus === "no_account" && member.email
+                          ? () => handleSendInvite(member.id)
+                          : undefined
+                      }
+                      onResendInvite={
+                        member.inviteStatus === "invite_expired" && member.inviteId
+                          ? () => handleResendInvite(member.inviteId!)
+                          : undefined
+                      }
+                    />
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">

@@ -27,6 +27,15 @@ export function TourProvider({ children }: TourProviderProps) {
 
   const [targetRect, setTargetRect] = React.useState<DOMRect | null>(null);
 
+  const handleComplete = React.useCallback(async () => {
+    completeTour();
+    try {
+      await completeTourAction();
+    } catch (error) {
+      console.error("Failed to save tour completion:", error);
+    }
+  }, [completeTour]);
+
   // Check for tour query param
   React.useEffect(() => {
     if (searchParams.get("tour") === "1" || searchParams.get("startTour") === "true") {
@@ -85,7 +94,7 @@ export function TourProvider({ children }: TourProviderProps) {
       window.removeEventListener("scroll", findTarget, true);
       window.removeEventListener("resize", findTarget);
     };
-  }, [isActive, currentStepIndex]);
+  }, [isActive, currentStepIndex, handleComplete]);
 
   const handleNext = () => {
     if (currentStepIndex < TOUR_STEPS.length - 1) {
@@ -101,15 +110,6 @@ export function TourProvider({ children }: TourProviderProps) {
 
   const handleSkip = async () => {
     skipTour();
-    try {
-      await completeTourAction();
-    } catch (error) {
-      console.error("Failed to save tour completion:", error);
-    }
-  };
-
-  const handleComplete = async () => {
-    completeTour();
     try {
       await completeTourAction();
     } catch (error) {

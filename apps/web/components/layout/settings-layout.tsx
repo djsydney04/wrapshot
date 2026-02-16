@@ -11,8 +11,11 @@ import {
   CreditCard,
   Users,
   ChevronRight,
+  MessageSquarePlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FeedbackButton } from "@/components/feedback/feedback-button";
+import { ShareButton } from "@/components/share/share-button";
 
 const settingsNav = [
   { label: "Profile", href: "/settings", icon: User, description: "Your personal info" },
@@ -86,6 +89,13 @@ export function SettingsLayout({
                     </Link>
                   );
                 })}
+
+                {/* Divider */}
+                <div className="my-4 border-t border-border" />
+
+                {/* Share & Feedback */}
+                <ShareButton variant="default" />
+                <FeedbackButton variant="default" />
               </div>
             </nav>
 

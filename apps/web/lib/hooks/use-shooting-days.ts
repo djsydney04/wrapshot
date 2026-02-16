@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { ShootingDay } from "@/lib/mock-data";
+import type { ShootingDay } from "@/lib/types";
 
 interface UseShootingDaysOptions {
   projectId?: string;
@@ -19,14 +19,16 @@ interface SupabaseShootingDayRow {
   generalCall: string | null;
   estimatedWrap: string | null;
   notes: string | null;
-  scenes?: { sceneId: string }[] | null;
+  scenes?: { sceneId: string; sortOrder: number | null }[] | null;
 }
 
 // Transform database row to match the mock data format
 function transformToShootingDay(row: SupabaseShootingDayRow): ShootingDay {
   // Handle the scenes relation which could be null or an array
   const sceneIds = Array.isArray(row.scenes)
-    ? row.scenes.map((s) => s.sceneId)
+    ? [...row.scenes]
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+        .map((s) => s.sceneId)
     : [];
 
   return {
@@ -76,6 +78,7 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
           notes,
           scenes:ShootingDayScene(
             sceneId,
+            sortOrder,
             scene:Scene(
               id,
               sceneNumber,
@@ -130,6 +133,17 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
           fetchShootingDays();
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "ShootingDayScene",
+        },
+        () => {
+          fetchShootingDays();
+        }
+      )
       .subscribe();
 
     return () => {
@@ -173,6 +187,7 @@ export function useAllShootingDays() {
           notes,
           scenes:ShootingDayScene(
             sceneId,
+            sortOrder,
             scene:Scene(
               id,
               sceneNumber,
@@ -216,6 +231,17 @@ export function useAllShootingDays() {
           event: "*",
           schema: "public",
           table: "ShootingDay",
+        },
+        () => {
+          fetchAllShootingDays();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "ShootingDayScene",
         },
         () => {
           fetchAllShootingDays();

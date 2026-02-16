@@ -133,11 +133,14 @@ export function ImageUpload({
     <div className={cn("relative", className)}>
       {value ? (
         <div className={cn("relative rounded-lg overflow-hidden border border-border", aspectClasses[aspectRatio])}>
-          <img
-            src={value}
-            alt="Uploaded"
-            className="w-full h-full object-cover"
-          />
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={value}
+              alt="Uploaded"
+              className="w-full h-full object-cover"
+            />
+          </>
           {!disabled && (
             <Button
               type="button"
@@ -296,11 +299,14 @@ export function MultiImageUpload({
               key={url}
               className="relative aspect-square rounded-lg overflow-hidden border border-border group"
             >
-              <img
-                src={url}
-                alt={`Image ${index + 1}`}
-                className="w-full h-full object-cover"
-              />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={url}
+                  alt={`Image ${index + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              </>
               {!disabled && (
                 <Button
                   type="button"

@@ -67,13 +67,17 @@ export function AddLineItemForm({
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [formData, setFormData] = React.useState<FormData>(initialFormData);
+  const [amountInput, setAmountInput] = React.useState("");
+  const lastEditedRef = React.useRef<"amount" | "fields" | null>(null);
 
   const isEditMode = !!editLineItem;
 
   // Reset form when dialog opens or editLineItem changes
   React.useEffect(() => {
     if (open) {
+      lastEditedRef.current = null;
       if (editLineItem) {
+        const estimatedTotal = editLineItem.estimatedTotal ?? 0;
         setFormData({
           accountCode: editLineItem.accountCode,
           description: editLineItem.description,
@@ -83,8 +87,10 @@ export function AddLineItemForm({
           fringePercent: editLineItem.fringePercent.toString(),
           notes: editLineItem.notes || "",
         });
+        setAmountInput(estimatedTotal ? estimatedTotal.toString() : "");
       } else {
         setFormData(initialFormData);
+        setAmountInput("");
       }
       setError(null);
     }
@@ -99,6 +105,32 @@ export function AddLineItemForm({
     const fringeAmount = subtotal * (fringePercent / 100);
     return subtotal + fringeAmount;
   }, [formData.quantity, formData.rate, formData.fringePercent]);
+
+  React.useEffect(() => {
+    if (lastEditedRef.current === "amount") return;
+    if (!open) return;
+    const total = Number.isFinite(previewTotal) ? previewTotal : 0;
+    setAmountInput(total ? total.toString() : "");
+  }, [previewTotal, open]);
+
+  const handleAmountChange = (value: string) => {
+    lastEditedRef.current = "amount";
+    setAmountInput(value);
+    const parsed = parseFloat(value);
+    const amount = Number.isFinite(parsed) ? parsed : 0;
+    setFormData((prev) => ({
+      ...prev,
+      units: "FLAT",
+      quantity: "1",
+      rate: amount.toString(),
+      fringePercent: "0",
+    }));
+  };
+
+  const handleFieldChange = (field: keyof FormData, value: string) => {
+    lastEditedRef.current = "fields";
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -183,7 +215,7 @@ export function AddLineItemForm({
                 <Input
                   required
                   value={formData.accountCode}
-                  onChange={(e) => setFormData({ ...formData, accountCode: e.target.value })}
+                  onChange={(e) => handleFieldChange("accountCode", e.target.value)}
                   placeholder="2310"
                 />
               </div>
@@ -192,10 +224,32 @@ export function AddLineItemForm({
                 <Input
                   required
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) => handleFieldChange("description", e.target.value)}
                   placeholder="e.g., Camera Operator"
                 />
               </div>
+            </div>
+
+            {/* Amount */}
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Amount (total)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  $
+                </span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={amountInput}
+                  onChange={(e) => handleAmountChange(e.target.value)}
+                  className="pl-7"
+                  placeholder="0.00"
+                />
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Quick entry. Sets units to Flat, quantity 1, fringe 0.
+              </p>
             </div>
 
             {/* Units */}
@@ -204,7 +258,7 @@ export function AddLineItemForm({
               <Select
                 value={formData.units}
                 onChange={(e) =>
-                  setFormData({ ...formData, units: e.target.value as LineItemUnits })
+                  handleFieldChange("units", e.target.value as LineItemUnits)
                 }
                 options={unitsOptions}
               />
@@ -219,7 +273,7 @@ export function AddLineItemForm({
                   step="0.01"
                   min="0"
                   value={formData.quantity}
-                  onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                  onChange={(e) => handleFieldChange("quantity", e.target.value)}
                   placeholder="1"
                 />
               </div>
@@ -231,13 +285,13 @@ export function AddLineItemForm({
                   </span>
                   <Input
                     type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.rate}
-                    onChange={(e) => setFormData({ ...formData, rate: e.target.value })}
-                    className="pl-7"
-                    placeholder="0.00"
-                  />
+                  step="0.01"
+                  min="0"
+                  value={formData.rate}
+                  onChange={(e) => handleFieldChange("rate", e.target.value)}
+                  className="pl-7"
+                  placeholder="0.00"
+                />
                 </div>
               </div>
             </div>
@@ -254,7 +308,7 @@ export function AddLineItemForm({
                   min="0"
                   max="100"
                   value={formData.fringePercent}
-                  onChange={(e) => setFormData({ ...formData, fringePercent: e.target.value })}
+                  onChange={(e) => handleFieldChange("fringePercent", e.target.value)}
                   className="pr-8"
                   placeholder="0"
                 />
@@ -286,7 +340,7 @@ export function AddLineItemForm({
               </label>
               <Textarea
                 value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                onChange={(e) => handleFieldChange("notes", e.target.value)}
                 placeholder="Any additional details..."
                 rows={2}
               />

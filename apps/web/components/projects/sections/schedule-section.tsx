@@ -42,8 +42,12 @@ import {
   updateCastCallTimes,
   updateDepartmentCallTimes,
 } from "@/lib/actions/shooting-days";
+import {
+  assignSceneToShootingDay,
+  removeSceneFromShootingDay,
+} from "@/lib/actions/scenes";
 import { cn } from "@/lib/utils";
-import type { ShootingDay, Scene, Location, CastMember } from "@/lib/mock-data";
+import type { ShootingDay, Scene, Location, CastMember } from "@/lib/types";
 
 type ViewMode = "week" | "month" | "list";
 
@@ -58,11 +62,11 @@ interface ScheduleSectionProps {
 
 export function ScheduleSection({
   projectId,
-  shootingDays,
+  shootingDays: initialShootingDays,
   scenes,
   locations = [],
   cast = [],
-  useMockData = true,
+  useMockData = false,
 }: ScheduleSectionProps) {
   const [showAddDay, setShowAddDay] = React.useState(false);
   const [selectedDate, setSelectedDate] = React.useState<Date | null>(null);
@@ -71,21 +75,42 @@ export function ScheduleSection({
   const [viewMode, setViewMode] = React.useState<ViewMode>("month");
   const [currentDate, setCurrentDate] = React.useState(new Date());
   const [deleting, setDeleting] = React.useState(false);
-  const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
+  const [defaultStartTime, setDefaultStartTime] = React.useState<string | undefined>();
+  const [defaultEndTime, setDefaultEndTime] = React.useState<string | undefined>();
+
+  // Local state for optimistic updates
+  const [localShootingDays, setLocalShootingDays] = React.useState(initialShootingDays);
+
+  // Sync local state with props when props change (e.g., after server revalidation)
+  React.useEffect(() => {
+    setLocalShootingDays(initialShootingDays);
+  }, [initialShootingDays]);
 
   const {
     deleteShootingDay: deleteFromStore,
     updateShootingDay: updateInStore,
+    updateScene: updateSceneInStore,
   } = useProjectStore();
 
   const sortedDays = React.useMemo(() => {
-    return [...shootingDays].sort(
+    return [...localShootingDays].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
-  }, [shootingDays]);
+  }, [localShootingDays]);
 
   // Handler for rescheduling shooting days via drag and drop
   const handleReschedule = async (shootingDayId: string, newDate: string) => {
+    // Find the original shooting day for potential rollback
+    const originalDay = localShootingDays.find((d) => d.id === shootingDayId);
+    if (!originalDay) return;
+
+    const originalDate = originalDay.date;
+
+    // Optimistic update - immediately update local state
+    setLocalShootingDays((prev) =>
+      prev.map((d) => (d.id === shootingDayId ? { ...d, date: newDate } : d))
+    );
+
     try {
       if (useMockData) {
         updateInStore(shootingDayId, { date: newDate });
@@ -93,12 +118,19 @@ export function ScheduleSection({
         const result = await rescheduleShootingDay(shootingDayId, newDate);
         if (result.error) {
           console.error("Failed to reschedule:", result.error);
+          // Rollback on error
+          setLocalShootingDays((prev) =>
+            prev.map((d) => (d.id === shootingDayId ? { ...d, date: originalDate } : d))
+          );
           return;
         }
       }
-      forceUpdate();
     } catch (error) {
       console.error("Error rescheduling shooting day:", error);
+      // Rollback on error
+      setLocalShootingDays((prev) =>
+        prev.map((d) => (d.id === shootingDayId ? { ...d, date: originalDate } : d))
+      );
     }
   };
 
@@ -114,9 +146,10 @@ export function ScheduleSection({
           return;
         }
       }
+      // Optimistically remove from local state
+      setLocalShootingDays((prev) => prev.filter((d) => d.id !== id));
       setSelectedDay(null);
       setShowDetailPanel(false);
-      forceUpdate();
     } finally {
       setDeleting(false);
     }
@@ -133,11 +166,14 @@ export function ScheduleSection({
           return;
         }
       }
+      // Optimistically update local state
+      setLocalShootingDays((prev) =>
+        prev.map((d) => (d.id === id ? { ...d, ...updates } : d))
+      );
       // Update selected day with new values
       if (selectedDay && selectedDay.id === id) {
         setSelectedDay({ ...selectedDay, ...updates });
       }
-      forceUpdate();
     } catch (error) {
       console.error("Error updating shooting day:", error);
     }
@@ -154,11 +190,14 @@ export function ScheduleSection({
           return;
         }
       }
+      // Optimistically update local state
+      setLocalShootingDays((prev) =>
+        prev.map((d) => (d.id === shootingDayId ? { ...d, scenes: sceneIds } : d))
+      );
       // Update selected day with new scene order
       if (selectedDay && selectedDay.id === shootingDayId) {
         setSelectedDay({ ...selectedDay, scenes: sceneIds });
       }
-      forceUpdate();
     } catch (error) {
       console.error("Error updating scene order:", error);
     }
@@ -166,7 +205,7 @@ export function ScheduleSection({
 
   const handleAddSceneToDay = async (sceneId: string, shootingDayId: string) => {
     try {
-      const shootingDay = shootingDays.find((d) => d.id === shootingDayId);
+      const shootingDay = localShootingDays.find((d) => d.id === shootingDayId);
       if (!shootingDay) return;
 
       // Add scene to the shooting day's scenes list
@@ -174,20 +213,58 @@ export function ScheduleSection({
 
       if (useMockData) {
         updateInStore(shootingDayId, { scenes: newSceneIds });
+        updateSceneInStore(sceneId, { status: "SCHEDULED" });
       } else {
-        const result = await updateSceneOrder(shootingDayId, newSceneIds);
+        const result = await assignSceneToShootingDay(
+          sceneId,
+          shootingDayId,
+          newSceneIds.length - 1,
+          projectId
+        );
         if (result.error) {
           console.error("Failed to add scene to day:", result.error);
           return;
         }
       }
+      // Optimistically update local state
+      setLocalShootingDays((prev) =>
+        prev.map((d) => (d.id === shootingDayId ? { ...d, scenes: newSceneIds } : d))
+      );
       // Update selected day with new scene order
       if (selectedDay && selectedDay.id === shootingDayId) {
         setSelectedDay({ ...selectedDay, scenes: newSceneIds });
       }
-      forceUpdate();
     } catch (error) {
       console.error("Error adding scene to day:", error);
+    }
+  };
+
+  const handleRemoveSceneFromDay = async (sceneId: string, shootingDayId: string) => {
+    try {
+      const shootingDay = localShootingDays.find((d) => d.id === shootingDayId);
+      if (!shootingDay) return;
+
+      const newSceneIds = shootingDay.scenes.filter((id) => id !== sceneId);
+
+      if (useMockData) {
+        updateInStore(shootingDayId, { scenes: newSceneIds });
+        updateSceneInStore(sceneId, { status: "NOT_SCHEDULED" });
+      } else {
+        const result = await removeSceneFromShootingDay(sceneId, shootingDayId, projectId);
+        if (result.error) {
+          console.error("Failed to remove scene from day:", result.error);
+          return;
+        }
+      }
+      // Optimistically update local state
+      setLocalShootingDays((prev) =>
+        prev.map((d) => (d.id === shootingDayId ? { ...d, scenes: newSceneIds } : d))
+      );
+      if (selectedDay && selectedDay.id === shootingDayId) {
+        setSelectedDay({ ...selectedDay, scenes: newSceneIds });
+      }
+    } catch (error) {
+      console.error("Error removing scene from day:", error);
     }
   };
 
@@ -213,7 +290,6 @@ export function ScheduleSection({
           return;
         }
       }
-      forceUpdate();
     } catch (error) {
       console.error("Error updating cast call times:", error);
     }
@@ -235,7 +311,6 @@ export function ScheduleSection({
           return;
         }
       }
-      forceUpdate();
     } catch (error) {
       console.error("Error updating department call times:", error);
     }
@@ -247,7 +322,7 @@ export function ScheduleSection({
       setSelectedDay(events[0]);
       setShowDetailPanel(true);
     } else {
-      const dayEvents = shootingDays.filter((day) =>
+      const dayEvents = localShootingDays.filter((day) =>
         isSameDay(new Date(day.date), date)
       );
       if (dayEvents.length > 0) {
@@ -261,8 +336,10 @@ export function ScheduleSection({
     }
   };
 
-  const handleAddClick = (date: Date) => {
+  const handleAddClick = (date: Date, startTime?: string, endTime?: string) => {
     setSelectedDate(date);
+    setDefaultStartTime(startTime);
+    setDefaultEndTime(endTime);
     setShowAddDay(true);
   };
 
@@ -274,7 +351,7 @@ export function ScheduleSection({
   };
 
   const getDayEvents = (date: Date) => {
-    return shootingDays.filter((day) => isSameDay(new Date(day.date), date));
+    return localShootingDays.filter((day) => isSameDay(new Date(day.date), date));
   };
 
   const getStatusBadge = (status: ShootingDay["status"]) => {
@@ -317,8 +394,8 @@ export function ScheduleSection({
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">
-              {shootingDays.length} day{shootingDays.length !== 1 ? "s" : ""} ·{" "}
-              {shootingDays.filter((d) => d.status === "COMPLETED").length} wrapped
+              {localShootingDays.length} day{localShootingDays.length !== 1 ? "s" : ""} ·{" "}
+              {localShootingDays.filter((d) => d.status === "COMPLETED").length} wrapped
             </span>
           </div>
 
@@ -373,7 +450,7 @@ export function ScheduleSection({
         {/* Draggable Week Calendar */}
         {viewMode === "week" && (
           <DraggableWeekCalendar
-            shootingDays={shootingDays}
+            shootingDays={localShootingDays}
             scenes={scenes}
             cast={cast}
             locations={locations}
@@ -381,6 +458,8 @@ export function ScheduleSection({
             onAddClick={handleAddClick}
             onReschedule={handleReschedule}
             onAddSceneToDay={handleAddSceneToDay}
+            onRemoveSceneFromDay={handleRemoveSceneFromDay}
+            onUpdateSceneOrder={handleUpdateSceneOrder}
             selectedDate={selectedDate || undefined}
           />
         )}
@@ -388,7 +467,7 @@ export function ScheduleSection({
         {/* Draggable Month Calendar */}
         {viewMode === "month" && (
           <DraggableCalendar
-            shootingDays={shootingDays}
+            shootingDays={localShootingDays}
             scenes={scenes}
             cast={cast}
             locations={locations}
@@ -532,9 +611,17 @@ export function ScheduleSection({
       <AddShootingDayForm
         projectId={projectId}
         open={showAddDay}
-        onOpenChange={setShowAddDay}
-        onSuccess={forceUpdate}
+        onOpenChange={(open) => {
+          setShowAddDay(open);
+          if (!open) {
+            // Reset times when form closes
+            setDefaultStartTime(undefined);
+            setDefaultEndTime(undefined);
+          }
+        }}
         defaultDate={selectedDate || undefined}
+        defaultStartTime={defaultStartTime}
+        defaultEndTime={defaultEndTime}
         useMockData={useMockData}
       />
     </div>

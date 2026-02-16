@@ -4,6 +4,7 @@ import * as React from "react";
 import {
   DndContext,
   DragEndEvent,
+  DragOverEvent,
   DragOverlay,
   DragStartEvent,
   PointerSensor,
@@ -14,6 +15,13 @@ import {
   rectIntersection,
 } from "@dnd-kit/core";
 import {
+  SortableContext,
+  arrayMove,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   addDays,
   addWeeks,
   subWeeks,
@@ -23,12 +31,12 @@ import {
   isToday,
   parseISO,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, Plus, GripVertical, FileText, PanelRightOpen, PanelRightClose, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, GripVertical, FileText, PanelRightOpen, PanelRightClose, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ShootingDayCard } from "./shooting-day-card";
-import type { ShootingDay, Scene, CastMember, Location } from "@/lib/mock-data";
+import type { ShootingDay, Scene, CastMember, Location } from "@/lib/types";
 
 interface DraggableWeekCalendarProps {
   shootingDays: ShootingDay[];
@@ -40,12 +48,18 @@ interface DraggableWeekCalendarProps {
   onReschedule?: (shootingDayId: string, newDate: string) => Promise<void>;
   onAddSceneToDay?: (sceneId: string, shootingDayId: string) => Promise<void>;
   onRemoveSceneFromDay?: (sceneId: string, shootingDayId: string) => Promise<void>;
+  onUpdateSceneOrder?: (shootingDayId: string, sceneIds: string[]) => Promise<void>;
   selectedDate?: Date;
   className?: string;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // Full 24 hours (midnight to midnight)
 const HOUR_HEIGHT = 52; // pixels per hour
+const SCENE_PREFIX = "scene-";
+const UNSCHEDULED_CONTAINER_ID = "unscheduled-scenes";
+
+const toSceneItemId = (id: string) => `${SCENE_PREFIX}${id}`;
+const fromSceneItemId = (id: string) => id.replace(SCENE_PREFIX, "");
 
 // Draggable scene card for the sidebar
 function DraggableSceneItem({
@@ -55,30 +69,39 @@ function DraggableSceneItem({
   scene: Scene;
   isDragging?: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: `scene-${scene.id}`,
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({
+    id: toSceneItemId(scene.id),
     data: { scene, type: "scene" },
   });
 
-  const style = transform
-    ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-        zIndex: 100,
-      }
-    : undefined;
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: 100,
+  };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
       className={cn(
         "flex items-start gap-2 p-2 rounded-lg border border-border bg-card cursor-grab active:cursor-grabbing transition-all hover:bg-muted/50",
         isDragging && "opacity-50 shadow-lg ring-2 ring-primary"
       )}
     >
-      <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+      <span
+        {...attributes}
+        {...listeners}
+        className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5 cursor-grab active:cursor-grabbing"
+      >
+        <GripVertical className="h-4 w-4" />
+      </span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 mb-0.5">
           <span className="flex h-5 w-5 items-center justify-center rounded bg-muted text-[10px] font-semibold">
@@ -207,30 +230,47 @@ function DroppableDay({
   );
 }
 
-// Mini scene block inside a shooting day
-function MiniSceneBlock({
+function SortableMiniSceneBlock({
   scene,
-  index,
   totalScenes,
   shootingDayHeight,
 }: {
   scene: Scene;
-  index: number;
   totalScenes: number;
   shootingDayHeight: number;
 }) {
-  const blockHeight = Math.max(
-    20,
-    (shootingDayHeight - 50) / Math.max(totalScenes, 1)
-  );
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: toSceneItemId(scene.id),
+    data: { scene, type: "scene" },
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   return (
     <div
-      className="mx-1 px-1.5 py-0.5 rounded text-[9px] bg-white/20 truncate flex items-center gap-1"
-      style={{ height: `${Math.min(blockHeight, 24)}px` }}
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "mx-1 px-1.5 py-0.5 rounded text-[9px] bg-white/20 truncate flex items-center gap-1 cursor-grab active:cursor-grabbing",
+        isDragging && "opacity-60"
+      )}
+      {...attributes}
+      {...listeners}
     >
       <span className="font-semibold">{scene.sceneNumber}</span>
-      <span className="opacity-70 truncate">{scene.synopsis?.slice(0, 20)}</span>
+      <span className="opacity-70 truncate">
+        {scene.synopsis?.slice(0, 20)}
+      </span>
     </div>
   );
 }
@@ -262,8 +302,8 @@ function DraggableEvent({
     });
 
   const { isOver, setNodeRef: setDropRef } = useDroppable({
-    id: `shootingday-drop-${shootingDay.id}`,
-    data: { shootingDayId: shootingDay.id, type: "shootingday-drop" },
+    id: `scenes-${shootingDay.id}`,
+    data: { shootingDayId: shootingDay.id, type: "scene-container" },
   });
 
   const style = transform
@@ -272,8 +312,9 @@ function DraggableEvent({
       }
     : undefined;
 
-  // Get scenes for this shooting day
-  const dayScenes = scenes.filter((s) => shootingDay.scenes.includes(s.id));
+  const dayScenes = scenes;
+  const maxVisible = Math.floor((height - 50) / 24);
+  const visibleScenes = dayScenes.slice(0, maxVisible);
 
   const STATUS_COLORS: Record<ShootingDay["status"], string> = {
     COMPLETED: "bg-emerald-500",
@@ -307,11 +348,11 @@ function DraggableEvent({
         isOver && "ring-2 ring-yellow-400"
       )}
       {...attributes}
-      {...listeners}
     >
       {/* Header with drag indicator */}
       <div
         className="flex items-center justify-between px-2 py-1 border-b border-white/20"
+        {...listeners}
         onClick={(e) => {
           e.stopPropagation();
           onClick?.();
@@ -336,23 +377,27 @@ function DraggableEvent({
           }}
         >
           {dayScenes.length > 0 ? (
-            dayScenes.slice(0, Math.floor((height - 50) / 24)).map((scene, i) => (
-              <MiniSceneBlock
-                key={scene.id}
-                scene={scene}
-                index={i}
-                totalScenes={dayScenes.length}
-                shootingDayHeight={height}
-              />
-            ))
+            <SortableContext
+              items={visibleScenes.map((scene) => toSceneItemId(scene.id))}
+              strategy={verticalListSortingStrategy}
+            >
+              {visibleScenes.map((scene) => (
+                <SortableMiniSceneBlock
+                  key={scene.id}
+                  scene={scene}
+                  totalScenes={dayScenes.length}
+                  shootingDayHeight={height}
+                />
+              ))}
+            </SortableContext>
           ) : (
             <div className="px-2 py-1 text-[10px] opacity-60 italic">
               Drop scenes here
             </div>
           )}
-          {dayScenes.length > Math.floor((height - 50) / 24) && (
+          {dayScenes.length > maxVisible && (
             <div className="px-2 text-[9px] opacity-60">
-              +{dayScenes.length - Math.floor((height - 50) / 24)} more
+              +{dayScenes.length - maxVisible} more
             </div>
           )}
         </div>
@@ -371,6 +416,7 @@ export function DraggableWeekCalendar({
   onReschedule,
   onAddSceneToDay,
   onRemoveSceneFromDay,
+  onUpdateSceneOrder,
   selectedDate,
   className,
 }: DraggableWeekCalendarProps) {
@@ -381,6 +427,11 @@ export function DraggableWeekCalendar({
   const [activeType, setActiveType] = React.useState<"scene" | "shootingday" | null>(null);
   const [showScenesSidebar, setShowScenesSidebar] = React.useState(true);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const [itemsByContainer, setItemsByContainer] = React.useState<Record<string, string[]>>({});
+  const { setNodeRef: setUnscheduledRef, isOver: isUnscheduledOver } = useDroppable({
+    id: UNSCHEDULED_CONTAINER_ID,
+    data: { type: "scene-container" },
+  });
 
   // Drag-to-create state
   const [isCreating, setIsCreating] = React.useState(false);
@@ -390,9 +441,48 @@ export function DraggableWeekCalendar({
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeek, i));
 
-  // Get unassigned scenes (not in any shooting day)
-  const assignedSceneIds = new Set(shootingDays.flatMap((d) => d.scenes));
-  const unassignedScenes = scenes.filter((s) => !assignedSceneIds.has(s.id));
+  const sceneById = React.useMemo(() => {
+    return new Map(scenes.map((scene) => [scene.id, scene]));
+  }, [scenes]);
+
+  const buildItemsByContainer = React.useCallback(() => {
+    const next: Record<string, string[]> = {};
+    const assigned = new Set<string>();
+
+    shootingDays.forEach((day) => {
+      const ids = (day.scenes || []).filter((id) => sceneById.has(id));
+      next[`scenes-${day.id}`] = ids.map(toSceneItemId);
+      ids.forEach((id) => assigned.add(id));
+    });
+
+    const unscheduled = scenes
+      .filter((scene) => !assigned.has(scene.id))
+      .sort((a, b) => {
+        const aNum = parseInt(a.sceneNumber);
+        const bNum = parseInt(b.sceneNumber);
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+          return aNum - bNum;
+        }
+        return a.sceneNumber.localeCompare(b.sceneNumber, undefined, { numeric: true });
+      })
+      .map((scene) => toSceneItemId(scene.id));
+
+    next[UNSCHEDULED_CONTAINER_ID] = unscheduled;
+    return next;
+  }, [sceneById, scenes, shootingDays]);
+
+  React.useEffect(() => {
+    if (activeId) return;
+    setItemsByContainer(buildItemsByContainer());
+  }, [activeId, buildItemsByContainer]);
+
+  const resolveScenes = React.useCallback(
+    (sceneItemIds: string[]) =>
+      sceneItemIds
+        .map((id) => sceneById.get(fromSceneItemId(id)))
+        .filter(Boolean) as Scene[],
+    [sceneById]
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -514,11 +604,56 @@ export function DraggableWeekCalendar({
     const id = event.active.id as string;
     setActiveId(id);
 
-    if (id.startsWith("scene-")) {
+    if (id.startsWith(SCENE_PREFIX)) {
       setActiveType("scene");
     } else {
       setActiveType("shootingday");
     }
+  };
+
+  const findContainer = React.useCallback(
+    (id: string) => {
+      if (id in itemsByContainer) return id;
+      return Object.keys(itemsByContainer).find((containerId) =>
+        itemsByContainer[containerId].includes(id)
+      );
+    },
+    [itemsByContainer]
+  );
+
+  const handleDragOver = (event: DragOverEvent) => {
+    if (activeType !== "scene") return;
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeIdStr = active.id as string;
+    const overIdStr = over.id as string;
+
+    const activeContainer = findContainer(activeIdStr);
+    const overContainer = findContainer(overIdStr);
+
+    if (!activeContainer || !overContainer || activeContainer === overContainer) {
+      return;
+    }
+
+    setItemsByContainer((prev) => {
+      const activeItems = prev[activeContainer].filter((id) => id !== activeIdStr);
+      const overItems = prev[overContainer];
+      const overIndex = overItems.indexOf(overIdStr);
+      const newIndex = overIndex >= 0 ? overIndex : overItems.length;
+
+      const nextOverItems = [
+        ...overItems.slice(0, newIndex),
+        activeIdStr,
+        ...overItems.slice(newIndex),
+      ];
+
+      return {
+        ...prev,
+        [activeContainer]: activeItems,
+        [overContainer]: nextOverItems,
+      };
+    });
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -530,17 +665,83 @@ export function DraggableWeekCalendar({
 
     const activeIdStr = active.id as string;
     const overIdStr = over.id as string;
-    const overData = over.data.current;
-
     // Handle scene drop
-    if (activeIdStr.startsWith("scene-")) {
-      const sceneId = activeIdStr.replace("scene-", "");
-
-      // Dropped on a shooting day
-      if (overIdStr.startsWith("shootingday-drop-") || overData?.type === "shootingday-drop") {
-        const targetShootingDayId = overIdStr.replace("shootingday-drop-", "");
-        await onAddSceneToDay?.(sceneId, targetShootingDayId);
+    if (activeIdStr.startsWith(SCENE_PREFIX)) {
+      const activeContainer = findContainer(activeIdStr);
+      const overContainer = findContainer(overIdStr);
+      if (!activeContainer || !overContainer) {
+        setItemsByContainer(buildItemsByContainer());
+        return;
       }
+
+      const sceneId = fromSceneItemId(activeIdStr);
+
+      if (activeContainer === overContainer) {
+        const items = itemsByContainer[activeContainer] || [];
+        const oldIndex = items.indexOf(activeIdStr);
+        const overIndex = items.indexOf(overIdStr);
+        const newIndex = overIndex >= 0 ? overIndex : items.length - 1;
+
+        if (oldIndex !== newIndex) {
+          const nextItems = arrayMove(items, oldIndex, newIndex);
+          setItemsByContainer((prev) => ({ ...prev, [activeContainer]: nextItems }));
+
+          if (activeContainer !== UNSCHEDULED_CONTAINER_ID) {
+            const shootingDayId = activeContainer.replace("scenes-", "");
+            await onUpdateSceneOrder?.(
+              shootingDayId,
+              nextItems.map((id) => fromSceneItemId(id))
+            );
+          }
+        }
+
+        return;
+      }
+
+      const sourceDayId =
+        activeContainer !== UNSCHEDULED_CONTAINER_ID
+          ? activeContainer.replace("scenes-", "")
+          : null;
+      const targetDayId =
+        overContainer !== UNSCHEDULED_CONTAINER_ID
+          ? overContainer.replace("scenes-", "")
+          : null;
+
+      let targetItems = itemsByContainer[overContainer] || [];
+      if (!targetItems.includes(activeIdStr)) {
+        targetItems = [...targetItems, activeIdStr];
+      }
+
+      const sourceItems =
+        itemsByContainer[activeContainer]?.filter((id) => id !== activeIdStr) || [];
+
+      setItemsByContainer((prev) => ({
+        ...prev,
+        [activeContainer]: sourceItems,
+        [overContainer]: targetItems,
+      }));
+
+      if (targetDayId) {
+        await onAddSceneToDay?.(sceneId, targetDayId);
+        await onUpdateSceneOrder?.(
+          targetDayId,
+          targetItems.map((id) => fromSceneItemId(id))
+        );
+        if (sourceDayId && sourceDayId !== targetDayId) {
+          await onUpdateSceneOrder?.(
+            sourceDayId,
+            sourceItems.map((id) => fromSceneItemId(id))
+          );
+        }
+      } else if (sourceDayId) {
+        await onRemoveSceneFromDay?.(sceneId, sourceDayId);
+        await onUpdateSceneOrder?.(
+          sourceDayId,
+          sourceItems.map((id) => fromSceneItemId(id))
+        );
+      }
+
+      return;
     }
     // Handle shooting day reschedule
     else {
@@ -560,6 +761,7 @@ export function DraggableWeekCalendar({
   const handleDragCancel = () => {
     setActiveId(null);
     setActiveType(null);
+    setItemsByContainer(buildItemsByContainer());
   };
 
   const activeShootingDay = activeType === "shootingday" && activeId
@@ -567,7 +769,7 @@ export function DraggableWeekCalendar({
     : null;
 
   const activeScene = activeType === "scene" && activeId
-    ? scenes.find((s) => s.id === activeId.replace("scene-", ""))
+    ? scenes.find((s) => s.id === fromSceneItemId(activeId))
     : null;
 
   return (
@@ -575,6 +777,7 @@ export function DraggableWeekCalendar({
       sensors={sensors}
       collisionDetection={rectIntersection}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
@@ -744,12 +947,14 @@ export function DraggableWeekCalendar({
                       {events.map((event) => {
                         const top = getEventPosition(event.generalCall);
                         const height = getEventDuration(event);
+                        const dayScenes =
+                          itemsByContainer[`scenes-${event.id}`] || [];
 
                         return (
                           <DraggableEvent
                             key={event.id}
                             shootingDay={event}
-                            scenes={scenes}
+                            scenes={resolveScenes(dayScenes)}
                             cast={cast}
                             locations={locations}
                             top={top}
@@ -768,32 +973,45 @@ export function DraggableWeekCalendar({
 
         {/* Scenes Sidebar */}
         {showScenesSidebar && (
-          <div className="w-64 flex-shrink-0 border border-border rounded-lg flex flex-col bg-card">
+          <div
+            ref={setUnscheduledRef}
+            className={cn(
+              "w-64 flex-shrink-0 border border-border rounded-lg flex flex-col bg-card",
+              isUnscheduledOver && "ring-2 ring-primary bg-primary/5"
+            )}
+          >
             <div className="px-3 py-2 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium text-sm">Unassigned Scenes</span>
               </div>
               <span className="text-xs text-muted-foreground">
-                {unassignedScenes.length}
+                {itemsByContainer[UNSCHEDULED_CONTAINER_ID]?.length || 0}
               </span>
             </div>
-            <div className="flex-1 overflow-auto p-2 space-y-2">
-              {unassignedScenes.length > 0 ? (
-                unassignedScenes.map((scene) => (
-                  <DraggableSceneItem
-                    key={scene.id}
-                    scene={scene}
-                    isDragging={activeId === `scene-${scene.id}`}
-                  />
-                ))
-              ) : (
-                <div className="text-center py-8 text-sm text-muted-foreground">
-                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  <p>All scenes assigned</p>
-                </div>
-              )}
-            </div>
+            <SortableContext
+              items={itemsByContainer[UNSCHEDULED_CONTAINER_ID] || []}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="flex-1 overflow-auto p-2 space-y-2">
+                {itemsByContainer[UNSCHEDULED_CONTAINER_ID]?.length ? (
+                  resolveScenes(itemsByContainer[UNSCHEDULED_CONTAINER_ID] || []).map(
+                    (scene) => (
+                      <DraggableSceneItem
+                        key={scene.id}
+                        scene={scene}
+                        isDragging={activeId === toSceneItemId(scene.id)}
+                      />
+                    )
+                  )
+                ) : (
+                  <div className="text-center py-8 text-sm text-muted-foreground">
+                    <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                    <p>All scenes assigned</p>
+                  </div>
+                )}
+              </div>
+            </SortableContext>
             <div className="px-3 py-2 border-t border-border">
               <p className="text-[10px] text-muted-foreground text-center">
                 Drag scenes onto shooting days

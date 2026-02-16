@@ -238,6 +238,87 @@ export async function getCrewMemberByUserId(projectId: string, linkedUserId: str
   return { data: data as CrewMember | null, error: null };
 }
 
+export type CrewMemberInviteStatus = "linked" | "invite_sent" | "invite_expired" | "no_account";
+
+export interface CrewMemberWithInviteStatus extends CrewMember {
+  inviteStatus: CrewMemberInviteStatus;
+  inviteId?: string;
+  inviteExpiresAt?: string;
+}
+
+// Get all crew members with their invite status
+export async function getCrewMembersWithInviteStatus(
+  projectId: string
+): Promise<{ data: CrewMemberWithInviteStatus[] | null; error: string | null }> {
+  const supabase = await createClient();
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return { data: null, error: "Not authenticated" };
+  }
+
+  // Get crew members
+  const { data: crewMembers, error: crewError } = await supabase
+    .from("CrewMember")
+    .select("*")
+    .eq("projectId", projectId)
+    .order("department", { ascending: true })
+    .order("isHead", { ascending: false })
+    .order("name", { ascending: true });
+
+  if (crewError) {
+    console.error("Error fetching crew members:", crewError);
+    return { data: null, error: crewError.message };
+  }
+
+  if (!crewMembers || crewMembers.length === 0) {
+    return { data: [], error: null };
+  }
+
+  // Get all pending/active crew invites for this project
+  const { data: invites } = await supabase
+    .from("CastCrewInvite")
+    .select("id, email, targetId, expiresAt, acceptedAt")
+    .eq("projectId", projectId)
+    .eq("inviteType", "CREW")
+    .is("acceptedAt", null);
+
+  // Create a map of targetId -> invite
+  const inviteMap = new Map(
+    invites?.map((inv) => [inv.targetId, inv]) || []
+  );
+
+  // Determine invite status for each crew member
+  const result: CrewMemberWithInviteStatus[] = crewMembers.map((member) => {
+    const invite = inviteMap.get(member.id);
+
+    let inviteStatus: CrewMemberInviteStatus;
+
+    if (member.userId) {
+      inviteStatus = "linked";
+    } else if (invite) {
+      if (new Date(invite.expiresAt) < new Date()) {
+        inviteStatus = "invite_expired";
+      } else {
+        inviteStatus = "invite_sent";
+      }
+    } else if (member.email) {
+      inviteStatus = "no_account";
+    } else {
+      inviteStatus = "no_account";
+    }
+
+    return {
+      ...(member as CrewMember),
+      inviteStatus,
+      inviteId: invite?.id,
+      inviteExpiresAt: invite?.expiresAt,
+    };
+  });
+
+  return { data: result, error: null };
+}
+
 // Get crew members grouped by department
 export async function getCrewMembersByDepartment(projectId: string) {
   const { data, error } = await getCrewMembers(projectId);

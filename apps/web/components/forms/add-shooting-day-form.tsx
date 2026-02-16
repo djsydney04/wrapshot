@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { format } from "date-fns";
+import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -17,7 +18,8 @@ import {
 } from "@/components/ui/dialog";
 import { useProjectStore } from "@/lib/stores/project-store";
 import { createShootingDay, updateShootingDay } from "@/lib/actions/shooting-days";
-import type { ShootingDay } from "@/lib/mock-data";
+import type { ShootingDay } from "@/lib/types";
+import { trackShootingDayCreated } from "@/lib/analytics/posthog";
 
 interface AddShootingDayFormProps {
   projectId: string;
@@ -40,7 +42,7 @@ export function AddShootingDayForm({
   defaultStartTime,
   defaultEndTime,
   onSuccess,
-  useMockData = true,
+  useMockData = false,
   editingDay,
 }: AddShootingDayFormProps) {
   const {
@@ -81,21 +83,55 @@ export function AddShootingDayForm({
 
   const [formData, setFormData] = React.useState(getInitialFormData);
 
-  // Reset form when editingDay changes
+  // Reset form when dialog opens or when editing day/default values change
   React.useEffect(() => {
-    setFormData(getInitialFormData());
-    setError(null);
-  }, [editingDay, defaultDate, defaultStartTime, defaultEndTime]);
-
-  // Update date when defaultDate changes (for add mode only)
-  React.useEffect(() => {
-    if (defaultDate && !isEditMode) {
-      setFormData((prev) => ({
-        ...prev,
-        date: format(defaultDate, "yyyy-MM-dd"),
-      }));
+    if (open) {
+      setFormData({
+        date: editingDay
+          ? editingDay.date
+          : defaultDate
+          ? format(defaultDate, "yyyy-MM-dd")
+          : "",
+        unit: (editingDay?.unit || "MAIN") as "MAIN" | "SECOND",
+        status: (editingDay?.status || "TENTATIVE") as
+          | "TENTATIVE"
+          | "SCHEDULED"
+          | "CONFIRMED"
+          | "COMPLETED"
+          | "CANCELLED",
+        generalCall: editingDay?.generalCall || defaultStartTime || "07:00",
+        wrapTime: editingDay?.wrapTime || editingDay?.expectedWrap || defaultEndTime || "19:00",
+        crewCall: editingDay?.crewCall || "06:30",
+        talentCall: editingDay?.talentCall || "08:00",
+        lunchTime: editingDay?.lunchTime || "12:30",
+        notes: editingDay?.notes || "",
+        selectedScenes: editingDay?.scenes || ([] as string[]),
+      });
+      setError(null);
     }
-  }, [defaultDate, isEditMode]);
+  }, [open, editingDay, defaultDate, defaultStartTime, defaultEndTime]);
+
+  // Check if a shooting day already exists for the given date and unit
+  const checkForExistingDay = React.useCallback((date: string, unit: string): ShootingDay | undefined => {
+    return existingDays.find(
+      (day) => day.date === date && day.unit === unit && (!isEditMode || day.id !== editingDay?.id)
+    );
+  }, [existingDays, isEditMode, editingDay?.id]);
+
+  // Live conflict detection for the current date/unit selection
+  const conflictingDay = React.useMemo(() => {
+    if (!formData.date) return null;
+    return checkForExistingDay(formData.date, formData.unit);
+  }, [formData.date, formData.unit, checkForExistingDay]);
+
+  // Check what units are available for the selected date
+  const availableUnits = React.useMemo(() => {
+    if (!formData.date) return { MAIN: true, SECOND: true };
+    return {
+      MAIN: !checkForExistingDay(formData.date, "MAIN"),
+      SECOND: !checkForExistingDay(formData.date, "SECOND"),
+    };
+  }, [formData.date, checkForExistingDay]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,6 +139,17 @@ export function AddShootingDayForm({
     setError(null);
 
     try {
+      // Check for duplicate shooting day on the same date with the same unit
+      const existingDay = checkForExistingDay(formData.date, formData.unit);
+      if (existingDay) {
+        const unitLabel = formData.unit === "MAIN" ? "Main Unit" : "Second Unit";
+        const otherUnit = formData.unit === "MAIN" ? "Second Unit" : "Main Unit";
+        throw new Error(
+          `A shooting day for ${unitLabel} already exists on this date (Day ${existingDay.dayNumber}). ` +
+          `Try selecting "${otherUnit}" instead, or choose a different date.`
+        );
+      }
+
       if (isEditMode && editingDay) {
         // Update existing shooting day
         if (useMockData) {
@@ -130,6 +177,13 @@ export function AddShootingDayForm({
           });
 
           if (result.error) {
+            // Handle duplicate key error from database
+            if (result.error.includes("duplicate key") || result.error.includes("unique constraint")) {
+              throw new Error(
+                `A shooting day already exists for this date and unit. ` +
+                `Try selecting a different unit or date.`
+              );
+            }
             throw new Error(result.error);
           }
         }
@@ -166,7 +220,19 @@ export function AddShootingDayForm({
           });
 
           if (result.error) {
+            // Handle duplicate key error from database
+            if (result.error.includes("duplicate key") || result.error.includes("unique constraint")) {
+              throw new Error(
+                `A shooting day already exists for this date and unit. ` +
+                `Try selecting a different unit or date.`
+              );
+            }
             throw new Error(result.error);
+          }
+
+          // Track shooting day creation
+          if (result.data) {
+            trackShootingDayCreated(projectId, result.data.id);
           }
         }
       }
@@ -248,22 +314,24 @@ export function AddShootingDayForm({
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
-          <DialogBody className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  Date *
-                </label>
-                <Input
-                  type="date"
-                  required
-                  value={formData.date}
-                  onChange={(e) =>
-                    setFormData({ ...formData, date: e.target.value })
-                  }
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
+          <DialogBody className="space-y-5">
+            {/* Date, Unit, Status Row */}
+            <div className="space-y-3">
+              <div className="grid gap-3 grid-cols-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.date}
+                    onChange={(e) =>
+                      setFormData({ ...formData, date: e.target.value })
+                    }
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [color-scheme:light] dark:[color-scheme:dark]"
+                  />
+                </div>
                 <div>
                   <label className="block text-sm font-medium mb-1.5">Unit</label>
                   <Select
@@ -275,8 +343,8 @@ export function AddShootingDayForm({
                       })
                     }
                     options={[
-                      { value: "MAIN", label: "Main" },
-                      { value: "SECOND", label: "Second" },
+                      { value: "MAIN", label: `Main${!availableUnits.MAIN ? " (taken)" : ""}` },
+                      { value: "SECOND", label: `Second${!availableUnits.SECOND ? " (taken)" : ""}` },
                     ]}
                   />
                 </div>
@@ -306,6 +374,25 @@ export function AddShootingDayForm({
                   />
                 </div>
               </div>
+
+              {/* Conflict Warning */}
+              {conflictingDay && (
+                <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2">
+                  <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                  <div className="text-sm text-amber-800 dark:text-amber-200">
+                    <span className="font-medium">Day {conflictingDay.dayNumber}</span> already exists for {formData.unit === "MAIN" ? "Main Unit" : "Second Unit"} on this date.
+                    {(formData.unit === "MAIN" ? availableUnits.SECOND : availableUnits.MAIN) && (
+                      <button
+                        type="button"
+                        className="ml-1 underline hover:no-underline"
+                        onClick={() => setFormData({ ...formData, unit: formData.unit === "MAIN" ? "SECOND" : "MAIN" })}
+                      >
+                        Switch to {formData.unit === "MAIN" ? "Second" : "Main"} Unit
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Call Times Section */}

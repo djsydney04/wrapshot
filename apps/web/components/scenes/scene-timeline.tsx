@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Scene } from "@/lib/actions/scenes";
-import type { CastMember, ShootingDay } from "@/lib/mock-data";
+import type { CastMember, ShootingDay } from "@/lib/types";
 
 interface SceneTimelineProps {
   scenes: Scene[];

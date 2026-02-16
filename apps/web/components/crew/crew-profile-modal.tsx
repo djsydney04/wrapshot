@@ -15,7 +15,7 @@ import {
   DialogBody,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { DEPARTMENT_LABELS } from "@/lib/mock-data";
+import { DEPARTMENT_LABELS } from "@/lib/types";
 import { type CrewMember, type CrewMemberInput } from "@/lib/actions/crew";
 
 interface CrewProfileModalProps {

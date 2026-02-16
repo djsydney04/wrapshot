@@ -14,7 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { deleteProject, type Project } from "@/lib/actions/projects";
+import { deleteProject } from "@/lib/actions/projects";
+import type { Project } from "@/lib/actions/projects.types";
 
 interface SettingsSectionProps {
   projectId: string;

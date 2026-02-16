@@ -26,7 +26,7 @@ This guide documents the FinanceOps feature implementation for Wrapshoot. The fe
 - `get_budget_health()` - Calculate budget status
 - `get_burn_rate()` - Calculate daily spending rate
 
-### 2. TypeScript Types (`lib/mock-data.ts`)
+### 2. TypeScript Types (`lib/types.ts`)
 
 **Interfaces Added:**
 - `Budget`, `BudgetCategory`, `BudgetLineItem`

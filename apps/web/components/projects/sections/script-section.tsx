@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, FileText, Download, Eye, Trash2, Upload } from "lucide-react";
+import { Plus, FileText, Download, Eye, Trash2, Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/ui/file-upload";
@@ -16,7 +16,9 @@ import {
 } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/select";
 import { useProjectStore } from "@/lib/stores/project-store";
-import { SCRIPT_COLORS, type Script } from "@/lib/mock-data";
+import { SCRIPT_COLORS, type Script } from "@/lib/types";
+import { ScriptChangeBanner } from "@/components/ai/script-change-banner";
+import { ScriptDiffModal } from "@/components/ai/script-diff-modal";
 
 interface ScriptSectionProps {
   projectId: string;
@@ -33,6 +35,16 @@ export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
   const [loading, setLoading] = React.useState(false);
   const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
 
+  // Script change detection state
+  const [scriptChanges, setScriptChanges] = React.useState<{
+    changes: any[];
+    summary: any;
+    previousVersion: number;
+    newVersion: number;
+  } | null>(null);
+  const [showDiffModal, setShowDiffModal] = React.useState(false);
+  const [analyzingChanges, setAnalyzingChanges] = React.useState(false);
+
   const { addScript, deleteScript } = useProjectStore();
 
   const sortedScripts = React.useMemo(() => {
@@ -41,10 +53,12 @@ export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
 
   const nextVersion = scripts.length > 0 ? Math.max(...scripts.map((s) => s.version)) + 1 : 1;
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!uploadData.fileUrl || !uploadData.fileName) return;
 
     setLoading(true);
+
+    // Add the new script
     addScript({
       projectId,
       version: nextVersion,
@@ -53,6 +67,44 @@ export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
       fileName: uploadData.fileName,
       uploadedAt: new Date().toISOString(),
     });
+
+    // If there's a previous version, trigger change detection
+    if (sortedScripts.length > 0) {
+      const previousScript = sortedScripts[0];
+      setAnalyzingChanges(true);
+
+      try {
+        // Fetch script contents (in a real app, you'd parse the PDFs)
+        // For now, we'll simulate with a placeholder
+        const response = await fetch("/api/ai/script-diff", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId,
+            previousScript: `Previous script version ${previousScript.version}`, // Placeholder
+            newScript: `New script version ${nextVersion}`, // Placeholder
+            previousVersion: previousScript.version,
+            newVersion: nextVersion,
+          }),
+        });
+
+        if (response.ok) {
+          const { data } = await response.json();
+          if (data.changes && data.changes.length > 0) {
+            setScriptChanges({
+              changes: data.changes,
+              summary: data.summary,
+              previousVersion: previousScript.version,
+              newVersion: nextVersion,
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Failed to analyze script changes:", error);
+      } finally {
+        setAnalyzingChanges(false);
+      }
+    }
 
     setLoading(false);
     setShowUpload(false);
@@ -74,6 +126,25 @@ export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
 
   return (
     <div className="space-y-4">
+      {/* Script Change Detection Banner */}
+      {scriptChanges && (
+        <ScriptChangeBanner
+          changes={scriptChanges.changes}
+          previousVersion={scriptChanges.previousVersion}
+          newVersion={scriptChanges.newVersion}
+          onReview={() => setShowDiffModal(true)}
+          onDismiss={() => setScriptChanges(null)}
+        />
+      )}
+
+      {/* Analyzing changes indicator */}
+      {analyzingChanges && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg px-4 py-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Analyzing script changes...
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
@@ -243,6 +314,23 @@ export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Script Diff Modal */}
+      {scriptChanges && (
+        <ScriptDiffModal
+          open={showDiffModal}
+          onClose={() => setShowDiffModal(false)}
+          changes={scriptChanges.changes}
+          summary={scriptChanges.summary}
+          previousVersion={scriptChanges.previousVersion}
+          newVersion={scriptChanges.newVersion}
+          onApplyChanges={(selectedActions) => {
+            console.log("Applying actions:", selectedActions);
+            // In a real implementation, this would update the breakdowns
+            setScriptChanges(null);
+          }}
+        />
+      )}
     </div>
   );
 }

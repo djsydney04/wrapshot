@@ -6,7 +6,7 @@ import { MoreHorizontal, Film, Users, MapPin, Calendar, Plus } from "lucide-reac
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { Project } from "@/lib/actions/projects";
+import type { Project } from "@/lib/actions/projects.types";
 
 interface ProjectCardProps {
   project: Project;

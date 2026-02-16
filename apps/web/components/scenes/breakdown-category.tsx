@@ -9,11 +9,20 @@ import {
   Search,
   Loader2,
   Package,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { ElementCategory, Element } from "@/lib/actions/elements";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import type { Element } from "@/lib/actions/elements";
+import type { ElementCategory } from "@/lib/constants/elements";
+import type { ElementSuggestion } from "@/lib/stores/ai-store";
 
 export interface SceneElementItem {
   id: string;
@@ -35,6 +44,10 @@ interface BreakdownCategoryProps {
   onCreateNew: (name: string, notes?: string) => Promise<Element | null>;
   onUpdateQuantity?: (elementId: string, quantity: number) => void;
   defaultExpanded?: boolean;
+  // AI suggestion props
+  suggestions?: ElementSuggestion[];
+  onAcceptSuggestion?: (suggestion: ElementSuggestion) => Promise<void>;
+  onDismissSuggestion?: (suggestionId: string) => void;
 }
 
 export function BreakdownCategory({
@@ -49,13 +62,52 @@ export function BreakdownCategory({
   onCreateNew,
   onUpdateQuantity,
   defaultExpanded = false,
+  suggestions = [],
+  onAcceptSuggestion,
+  onDismissSuggestion,
 }: BreakdownCategoryProps) {
-  const [isExpanded, setIsExpanded] = React.useState(defaultExpanded || items.length > 0);
+  const [isExpanded, setIsExpanded] = React.useState(defaultExpanded || items.length > 0 || suggestions.length > 0);
   const [isAdding, setIsAdding] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [isCreating, setIsCreating] = React.useState(false);
+  const [acceptingIds, setAcceptingIds] = React.useState<Set<string>>(new Set());
+  const [dismissingIds, setDismissingIds] = React.useState<Set<string>>(new Set());
   const inputRef = React.useRef<HTMLInputElement>(null);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Filter suggestions to only pending ones not in dismissing state
+  const pendingSuggestions = suggestions.filter(
+    (s) => s.status === "pending" && !dismissingIds.has(s.id)
+  );
+
+  // Handle accepting a suggestion
+  const handleAcceptSuggestion = async (suggestion: ElementSuggestion) => {
+    if (!onAcceptSuggestion) return;
+
+    setAcceptingIds((prev) => new Set(prev).add(suggestion.id));
+    try {
+      await onAcceptSuggestion(suggestion);
+    } finally {
+      setAcceptingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(suggestion.id);
+        return next;
+      });
+    }
+  };
+
+  // Handle dismissing a suggestion with animation
+  const handleDismissSuggestion = (suggestionId: string) => {
+    setDismissingIds((prev) => new Set(prev).add(suggestionId));
+    setTimeout(() => {
+      onDismissSuggestion?.(suggestionId);
+      setDismissingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(suggestionId);
+        return next;
+      });
+    }, 150);
+  };
 
   // Filter available elements (not already in scene and matching search)
   const filteredElements = React.useMemo(() => {
@@ -159,18 +211,91 @@ export function BreakdownCategory({
           {icon}
           {label}
         </span>
-        {items.length > 0 && (
-          <span className="ml-auto text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-            {items.length}
-          </span>
-        )}
+        <span className="ml-auto flex items-center gap-1.5">
+          {pendingSuggestions.length > 0 && (
+            <span className="text-xs text-primary bg-primary/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+              <Sparkles className="h-3 w-3" />
+              {pendingSuggestions.length}
+            </span>
+          )}
+          {items.length > 0 && (
+            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+              {items.length}
+            </span>
+          )}
+        </span>
       </button>
 
       {/* Content */}
       {isExpanded && (
-        <div className="px-3 py-2 space-y-2 bg-background">
-          {/* Existing items */}
-          {items.map((item) => (
+        <TooltipProvider delayDuration={300}>
+          <div className="px-3 py-2 space-y-2 bg-background">
+            {/* AI Suggested items (ghost items) */}
+            {pendingSuggestions.length > 0 && (
+              <div className="space-y-1 pb-2 mb-2 border-b border-dashed border-primary/20">
+                {pendingSuggestions.map((suggestion) => (
+                  <div
+                    key={suggestion.id}
+                    className={cn(
+                      "flex items-center gap-2 text-sm group",
+                      "bg-primary/5 rounded-md px-2 py-1.5",
+                      "border border-dashed border-primary/30",
+                      "transition-all duration-150",
+                      dismissingIds.has(suggestion.id) && "opacity-0 scale-95 h-0 py-0 overflow-hidden"
+                    )}
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="flex-1 truncate text-muted-foreground">
+                          {suggestion.name}
+                          <span className="ml-1.5 text-xs text-primary/60">(AI)</span>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <p className="font-medium mb-1">{suggestion.name}</p>
+                        <p className="text-xs text-muted-foreground">{suggestion.reason}</p>
+                        {suggestion.sourceText && (
+                          <p className="text-xs italic border-l-2 border-primary/30 pl-2 mt-2">
+                            &ldquo;{suggestion.sourceText}&rdquo;
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Confidence: {Math.round(suggestion.confidence * 100)}%
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={() => handleAcceptSuggestion(suggestion)}
+                        disabled={acceptingIds.has(suggestion.id)}
+                        className="p-0.5 hover:bg-primary/20 rounded text-primary"
+                        aria-label="Accept suggestion"
+                      >
+                        {acceptingIds.has(suggestion.id) ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Plus className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDismissSuggestion(suggestion.id)}
+                        disabled={acceptingIds.has(suggestion.id)}
+                        className="p-0.5 hover:bg-destructive/10 rounded text-muted-foreground hover:text-destructive"
+                        aria-label="Dismiss suggestion"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Existing items */}
+            {items.map((item) => (
             <div
               key={item.id}
               className="flex items-center gap-2 text-sm group"
@@ -264,7 +389,8 @@ export function BreakdownCategory({
               </button>
             )}
           </div>
-        </div>
+          </div>
+        </TooltipProvider>
       )}
     </div>
   );

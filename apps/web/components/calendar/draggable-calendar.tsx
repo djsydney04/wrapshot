@@ -29,7 +29,7 @@ import { ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ShootingDayCard } from "./shooting-day-card";
-import type { ShootingDay, Scene, CastMember, Location } from "@/lib/mock-data";
+import type { ShootingDay, Scene, CastMember, Location } from "@/lib/types";
 
 interface DraggableCalendarProps {
   shootingDays: ShootingDay[];

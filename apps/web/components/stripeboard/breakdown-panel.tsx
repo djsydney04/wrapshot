@@ -8,14 +8,7 @@ import {
   Users,
   MapPin,
   FileText,
-  Shirt,
-  Car,
-  Sparkles,
-  Camera,
-  Lightbulb,
-  Mic,
-  Trees,
-  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,45 +16,90 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Scene } from "@/lib/actions/scenes";
-import type { CastMember } from "@/lib/mock-data";
+import { SmartSynopsisField } from "@/components/ai/smart-synopsis-field";
+import { TimeEstimationWidget } from "@/components/ai/time-estimation-widget";
+import { SceneBreakdownEditor } from "@/components/scenes/scene-breakdown-editor";
+import { getElements, getSceneElements, type Element } from "@/lib/actions/elements";
+import { getLocations, type Location } from "@/lib/actions/locations";
+import { getCastMembers, type CastMember, type CastMemberWithInviteStatus } from "@/lib/actions/cast";
+import type { SceneElementItem } from "@/components/scenes/breakdown-category";
 
 interface BreakdownPanelProps {
   scene: Scene;
-  cast: CastMember[];
+  projectId: string;
+  cast: CastMemberWithInviteStatus[];
   onUpdate: (updates: Partial<Scene>) => void;
   onClose: () => void;
 }
 
-// Industry-standard breakdown categories with colors
-const ELEMENT_CATEGORIES = [
-  { key: "CAST", label: "Cast", icon: Users, color: "bg-red-100 text-red-700" },
-  { key: "BACKGROUND", label: "Background", icon: Users, color: "bg-orange-100 text-orange-700" },
-  { key: "PROP", label: "Props", icon: FileText, color: "bg-purple-100 text-purple-700" },
-  { key: "WARDROBE", label: "Wardrobe", icon: Shirt, color: "bg-blue-100 text-blue-700" },
-  { key: "VEHICLE", label: "Vehicles", icon: Car, color: "bg-yellow-100 text-yellow-700" },
-  { key: "VFX", label: "VFX", icon: Sparkles, color: "bg-pink-100 text-pink-700" },
-  { key: "SFX", label: "SFX", icon: Sparkles, color: "bg-indigo-100 text-indigo-700" },
-  { key: "CAMERA", label: "Camera", icon: Camera, color: "bg-cyan-100 text-cyan-700" },
-  { key: "ELECTRIC", label: "Lighting", icon: Lightbulb, color: "bg-amber-100 text-amber-700" },
-  { key: "SOUND", label: "Sound", icon: Mic, color: "bg-green-100 text-green-700" },
-  { key: "GREENERY", label: "Greenery", icon: Trees, color: "bg-emerald-100 text-emerald-700" },
-  { key: "SAFETY_NOTES", label: "Safety", icon: AlertTriangle, color: "bg-red-100 text-red-700" },
-] as const;
-
 export function BreakdownPanel({
   scene,
-  cast,
+  projectId,
+  cast: _cast,
   onUpdate,
   onClose,
 }: BreakdownPanelProps) {
   const [editedScene, setEditedScene] = React.useState(scene);
   const [isDirty, setIsDirty] = React.useState(false);
+  const [loadingBreakdownData, setLoadingBreakdownData] = React.useState(true);
+  const [elements, setElements] = React.useState<Element[]>([]);
+  const [sceneElements, setSceneElements] = React.useState<SceneElementItem[]>([]);
+  const [locations, setLocations] = React.useState<Location[]>([]);
+  const [castMembers, setCastMembers] = React.useState<CastMember[]>([]);
 
   // Reset when scene changes
   React.useEffect(() => {
     setEditedScene(scene);
     setIsDirty(false);
   }, [scene]);
+
+  const fetchBreakdownData = React.useCallback(async () => {
+    setLoadingBreakdownData(true);
+    try {
+      const [elementsResult, sceneElementsResult, locationsResult, castResult] = await Promise.all([
+        getElements(projectId),
+        getSceneElements(scene.id),
+        getLocations(projectId),
+        getCastMembers(projectId),
+      ]);
+
+      if (elementsResult.data) {
+        setElements(elementsResult.data);
+      }
+      if (locationsResult.data) {
+        setLocations(locationsResult.data);
+      }
+      if (castResult.data) {
+        setCastMembers(castResult.data);
+      }
+      if (sceneElementsResult.data) {
+        const mapped = sceneElementsResult.data.map(
+          (item: {
+            id: string;
+            elementId: string;
+            quantity: number;
+            notes: string | null;
+            element: Element;
+          }) => ({
+            id: item.id,
+            elementId: item.elementId,
+            quantity: item.quantity,
+            notes: item.notes,
+            element: item.element,
+          })
+        );
+        setSceneElements(mapped);
+      } else {
+        setSceneElements([]);
+      }
+    } finally {
+      setLoadingBreakdownData(false);
+    }
+  }, [projectId, scene.id]);
+
+  React.useEffect(() => {
+    fetchBreakdownData();
+  }, [fetchBreakdownData]);
 
   const handleChange = (key: keyof Scene, value: unknown) => {
     setEditedScene((prev) => ({ ...prev, [key]: value }));
@@ -77,7 +115,7 @@ export function BreakdownPanel({
   const sceneCast = scene.cast?.map((sc) => ({
     id: sc.castMemberId,
     characterName: sc.castMember?.characterName || "Unknown",
-    actorName: sc.castMember?.actorName || null,
+    actorName: sc.castMember?.actorName || undefined,
   })) || [];
 
   const stripColor = getStripColor(scene.intExt, scene.dayNight);
@@ -153,18 +191,35 @@ export function BreakdownPanel({
           </div>
         </div>
 
-        {/* Synopsis */}
-        <div>
-          <label className="text-xs font-medium text-muted-foreground mb-1 block">
-            Synopsis
-          </label>
-          <Textarea
-            value={editedScene.synopsis || ""}
-            onChange={(e) => handleChange("synopsis", e.target.value)}
-            placeholder="Scene description..."
-            className="text-sm min-h-[60px] resize-none"
-          />
-        </div>
+        {/* AI Time Estimation Widget */}
+        <TimeEstimationWidget
+          sceneId={scene.id}
+          projectId={projectId}
+          sceneNumber={scene.sceneNumber}
+          location={editedScene.setName || scene.location?.name}
+          intExt={scene.intExt}
+          dayNight={scene.dayNight}
+          pageCount={scene.pageCount}
+          pageEighths={editedScene.pageEighths || Math.round(scene.pageCount * 8)}
+          cast={sceneCast}
+          elements={scene.elements?.map((e: string) => ({ category: "UNKNOWN", name: e })) || []}
+          synopsis={editedScene.synopsis || undefined}
+          scriptText={scene.scriptText || undefined}
+          currentEstimate={editedScene.estimatedHours || undefined}
+          onEstimateChange={(hours) => handleChange("estimatedHours", hours)}
+        />
+
+        {/* Synopsis with AI generation */}
+        <SmartSynopsisField
+          sceneId={scene.id}
+          projectId={projectId}
+          sceneNumber={scene.sceneNumber}
+          location={editedScene.setName || scene.location?.name}
+          dayNight={scene.dayNight}
+          scriptText={scene.scriptText || undefined}
+          initialSynopsis={editedScene.synopsis || ""}
+          onChange={(synopsis) => handleChange("synopsis", synopsis)}
+        />
 
         {/* Cast */}
         <div>
@@ -225,29 +280,27 @@ export function BreakdownPanel({
           </div>
         </div>
 
-        {/* Element Categories (placeholder for future expansion) */}
+        {/* Element Breakdown */}
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-2 block">
             Elements
           </label>
-          <div className="grid grid-cols-2 gap-1.5">
-            {ELEMENT_CATEGORIES.slice(0, 8).map((cat) => {
-              const Icon = cat.icon;
-              return (
-                <button
-                  key={cat.key}
-                  className={cn(
-                    "flex items-center gap-1.5 px-2 py-1.5 rounded text-xs",
-                    cat.color,
-                    "opacity-50 hover:opacity-100 transition-opacity"
-                  )}
-                >
-                  <Icon className="h-3 w-3" />
-                  {cat.label}
-                </button>
-              );
-            })}
-          </div>
+          {loadingBreakdownData ? (
+            <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground flex items-center gap-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Loading scene breakdown tools...
+            </div>
+          ) : (
+            <SceneBreakdownEditor
+              scene={editedScene}
+              projectId={projectId}
+              cast={castMembers}
+              elements={elements}
+              sceneElements={sceneElements}
+              locations={locations}
+              onUpdate={fetchBreakdownData}
+            />
+          )}
         </div>
       </div>
 

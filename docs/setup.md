@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Node.js 18+
-- pnpm (install with `npm install -g pnpm`)
+- npm 10.x (included with Node.js 18+)
 - A Supabase account ([supabase.com](https://supabase.com))
 
 ## Step-by-Step Setup
@@ -42,7 +42,7 @@ anon/public key: eyJxxx...
 
 ### 3. Configure Environment Variables
 
-In the `/Users/djsydney/Downloads/ProdAI` directory:
+In the project root directory:
 
 1. Open `.env` file
 2. Fill in your Supabase credentials:
@@ -63,8 +63,7 @@ DIRECT_URL="postgresql://postgres:password@db.xxxxx.supabase.co:5432/postgres"
 ### 4. Install Dependencies
 
 ```bash
-cd /Users/djsydney/Downloads/ProdAI
-pnpm install
+npm install
 ```
 
 This will install all packages for the monorepo.
@@ -72,13 +71,13 @@ This will install all packages for the monorepo.
 ### 5. Generate Prisma Client
 
 ```bash
-pnpm db:generate
+npm run db:generate
 ```
 
 ### 6. Push Database Schema to Supabase
 
 ```bash
-pnpm db:push
+npm run db:push
 ```
 
 This creates all the tables in your Supabase database.
@@ -86,7 +85,7 @@ This creates all the tables in your Supabase database.
 ### 7. Seed the Database with Sample Data
 
 ```bash
-pnpm db:seed
+npm run db:seed
 ```
 
 This creates:
@@ -101,7 +100,7 @@ This creates:
 ### 8. Start the Development Server
 
 ```bash
-pnpm dev
+npm run dev
 ```
 
 The app will be available at [http://localhost:3000](http://localhost:3000)
@@ -128,7 +127,7 @@ The app will be available at [http://localhost:3000](http://localhost:3000)
 
 **Error**: "Prisma schema not found"
 - Make sure you're in the project root directory
-- Run `pnpm db:generate` from `/Users/djsydney/Downloads/ProdAI`
+- Run `npm run db:generate` from the project root directory
 
 ### Email Confirmation Not Arriving
 
@@ -144,38 +143,38 @@ The app will be available at [http://localhost:3000](http://localhost:3000)
 lsof -ti:3000 | xargs kill -9
 
 # Or run on a different port
-pnpm dev -- -p 3001
+npm run dev -- -p 3001
 ```
 
 ## Next Steps
 
 After setup, you can:
 
-1. **View Prisma Studio**: `pnpm db:studio`
+1. **View Prisma Studio**: `npm run db:studio`
    - Visual database editor at http://localhost:5555
 
 2. **Explore Sample Data**: The seed created a full sample project
 
-3. **Start Building**: Follow the implementation plan in `/Users/djsydney/.claude/plans/glowing-sparking-stardust.md`
+3. **Start Building**: Follow the implementation plan referenced in your internal planning docs
 
 ## Useful Commands
 
 ```bash
 # Development
-pnpm dev                 # Start dev server
-pnpm build              # Build for production
-pnpm lint               # Run linter
+npm run dev             # Start dev server
+npm run build           # Build for production
+npm run lint            # Run linter
 
 # Database
-pnpm db:generate        # Generate Prisma client
-pnpm db:push            # Push schema changes
-pnpm db:migrate         # Create migration
-pnpm db:seed            # Seed database
-pnpm db:studio          # Open Prisma Studio
+npm run db:generate     # Generate Prisma client
+npm run db:push         # Push schema changes
+npm run db:migrate      # Create migration
+npm run db:seed         # Seed database
+npm run db:studio       # Open Prisma Studio
 
 # Clean install
 rm -rf node_modules */node_modules */*/node_modules
-pnpm install
+npm install
 ```
 
 ## Project Structure

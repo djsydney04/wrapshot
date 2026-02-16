@@ -9,6 +9,7 @@ export interface CreateBudgetCategoryInput {
   code: string;
   name: string;
   parentCategoryId?: string | null;
+  allocatedBudget?: number;
   sortOrder?: number;
 }
 
@@ -16,6 +17,7 @@ export interface UpdateBudgetCategoryInput {
   code?: string;
   name?: string;
   parentCategoryId?: string | null;
+  allocatedBudget?: number;
 }
 
 // Create a new budget category
@@ -67,6 +69,7 @@ export async function createBudgetCategory(
       code: data.code,
       name: data.name,
       parentCategoryId: data.parentCategoryId || null,
+      allocatedBudget: data.allocatedBudget ?? 0,
       sortOrder,
       subtotalEstimated: 0,
       subtotalActual: 0,
@@ -128,6 +131,7 @@ export async function updateBudgetCategory(
   if (data.code !== undefined) updateData.code = data.code;
   if (data.name !== undefined) updateData.name = data.name;
   if (data.parentCategoryId !== undefined) updateData.parentCategoryId = data.parentCategoryId;
+  if (data.allocatedBudget !== undefined) updateData.allocatedBudget = data.allocatedBudget;
 
   const { data: category, error } = await supabase
     .from("BudgetCategory")

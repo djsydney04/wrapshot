@@ -226,6 +226,61 @@ export async function searchUsersForInvite(
   return results.slice(0, 10);
 }
 
+// Combined search: search users AND check if email exists on platform
+// Returns search results plus whether the query (if an email) matches an existing user
+export async function searchUsersAndCheckEmail(
+  query: string,
+  projectId: string
+): Promise<{
+  users: UserSearchResult[];
+  emailExists: boolean;
+  existingUser?: UserSearchResult;
+}> {
+  const currentUserId = await getCurrentUserId();
+
+  if (!currentUserId) {
+    throw new Error("Not authenticated");
+  }
+
+  if (!query || query.trim().length < 2) {
+    return { users: [], emailExists: false };
+  }
+
+  // Search for users
+  const users = await searchUsersForInvite(query, projectId);
+
+  // Check if the query is an email and if that email exists on the platform
+  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(query.trim());
+
+  if (!isEmail) {
+    return { users, emailExists: false };
+  }
+
+  const normalizedEmail = query.trim().toLowerCase();
+
+  // Check if any of the search results match the email
+  const matchInResults = users.find(
+    (u) => u.email.toLowerCase() === normalizedEmail
+  );
+
+  if (matchInResults) {
+    return { users, emailExists: true, existingUser: matchInResults };
+  }
+
+  // Email wasn't in search results, check if user exists but is already a member
+  const userCheck = await checkUserExistsByEmail(normalizedEmail);
+
+  if (userCheck.exists && userCheck.profile) {
+    return {
+      users,
+      emailExists: true,
+      existingUser: userCheck.profile,
+    };
+  }
+
+  return { users, emailExists: false };
+}
+
 // Check if a user exists by email in the auth system
 export async function checkUserExistsByEmail(
   email: string

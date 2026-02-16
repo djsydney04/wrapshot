@@ -98,10 +98,10 @@ export function ScriptBreakdownStep({
   if (!scriptId || !scriptUrl) {
     return (
       <div className="py-4">
-        <h2 className="text-xl font-semibold mb-2">AI Script Breakdown</h2>
+        <h2 className="text-xl font-semibold mb-2">Wrapshot Intelligence Script Breakdown</h2>
         <p className="text-muted-foreground mb-6">
           No script has been uploaded yet. You can upload a script in the previous
-          step to use AI-powered scene extraction.
+          step to use Wrapshot Intelligence-powered scene extraction.
         </p>
         <Button variant="outline" onClick={onSkip} className="w-full">
           Skip This Step
@@ -114,10 +114,11 @@ export function ScriptBreakdownStep({
   if (state === "idle") {
     return (
       <div className="py-4">
-        <h2 className="text-xl font-semibold mb-2">AI Script Breakdown</h2>
+        <h2 className="text-xl font-semibold mb-2">Wrapshot Intelligence Script Breakdown</h2>
         <p className="text-muted-foreground mb-6">
           We can automatically extract scenes, characters, and production elements
-          from your script using AI. This will save hours of manual breakdown work.
+          from your script using Wrapshot Intelligence. This will save hours of manual breakdown
+          work.
         </p>
 
         <div className="rounded-lg border border-border p-4 mb-6">
@@ -127,7 +128,9 @@ export function ScriptBreakdownStep({
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sm truncate">{scriptName || "Uploaded Script"}</p>
-              <p className="text-xs text-muted-foreground">Ready for AI analysis</p>
+              <p className="text-xs text-muted-foreground">
+                Ready for Wrapshot Intelligence analysis
+              </p>
             </div>
           </div>
         </div>
@@ -135,7 +138,7 @@ export function ScriptBreakdownStep({
         <div className="space-y-2">
           <Button onClick={handleAnalyze} className="w-full">
             <Sparkles className="h-4 w-4 mr-2" />
-            Analyze Script with AI
+            Analyze Script with Wrapshot Intelligence
           </Button>
           <Button variant="ghost" onClick={onSkip} className="w-full text-muted-foreground">
             Skip and add scenes manually
@@ -154,8 +157,8 @@ export function ScriptBreakdownStep({
         </div>
         <h2 className="text-xl font-semibold mb-2">Analyzing Script...</h2>
         <p className="text-muted-foreground max-w-md mx-auto">
-          Our AI is reading through your script to identify scenes, characters,
-          and production elements. This may take a minute.
+          Wrapshot Intelligence is reading through your script to identify scenes,
+          characters, and production elements. This may take a minute.
         </p>
       </div>
     );

@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import { useDroppable } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { FileText, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { SceneStrip } from "./scene-strip";
+import { SortableSceneStrip } from "./scene-strip";
 import { cn } from "@/lib/utils";
 import type { Scene } from "@/lib/actions/scenes";
 
@@ -12,12 +13,14 @@ interface UnscheduledPoolProps {
   scenes: Scene[];
   onSceneClick?: (sceneId: string) => void;
   selectedSceneId?: string | null;
+  activeId?: string | null;
 }
 
 export function UnscheduledPool({
   scenes,
   onSceneClick,
   selectedSceneId,
+  activeId,
 }: UnscheduledPoolProps) {
   const [search, setSearch] = React.useState("");
 
@@ -25,6 +28,9 @@ export function UnscheduledPool({
     id: "unscheduled-pool",
     data: { type: "unscheduled-pool" },
   });
+
+  // Dim when dragging but not over this container
+  const isDimmed = activeId && !isOver;
 
   // Filter scenes by search
   const filteredScenes = React.useMemo(() => {
@@ -54,6 +60,11 @@ export function UnscheduledPool({
     });
   }, [filteredScenes]);
 
+  const sortableIds = React.useMemo(
+    () => sortedScenes.map((scene) => scene.id),
+    [sortedScenes]
+  );
+
   const totalPages = scenes.reduce(
     (sum, s) => sum + (s.pageEighths ? s.pageEighths / 8 : s.pageCount),
     0
@@ -63,8 +74,9 @@ export function UnscheduledPool({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex flex-col h-full border border-border rounded-lg bg-card",
-        isOver && "ring-2 ring-primary bg-primary/5"
+        "flex flex-col h-full border border-border rounded-lg bg-card transition-all duration-200",
+        isOver && "ring-2 ring-primary bg-primary/5 scale-[1.01]",
+        isDimmed && "opacity-60"
       )}
     >
       {/* Header */}
@@ -90,33 +102,35 @@ export function UnscheduledPool({
       </div>
 
       {/* Scenes List */}
-      <div className="flex-1 overflow-auto p-2 space-y-1.5">
-        {sortedScenes.length > 0 ? (
-          sortedScenes.map((scene) => (
-            <SceneStrip
-              key={scene.id}
-              scene={scene}
-              onClick={() => onSceneClick?.(scene.id)}
-              isSelected={selectedSceneId === scene.id}
-              layout="strip"
-            />
-          ))
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center py-8">
-            {search ? (
-              <>
-                <Search className="h-8 w-8 text-muted-foreground/30 mb-2" />
-                <p className="text-xs text-muted-foreground">No scenes match</p>
-              </>
-            ) : (
-              <>
-                <FileText className="h-8 w-8 text-muted-foreground/30 mb-2" />
-                <p className="text-xs text-muted-foreground">All scenes scheduled!</p>
-              </>
-            )}
-          </div>
-        )}
-      </div>
+      <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+        <div className="flex-1 overflow-auto p-2 space-y-1.5">
+          {sortedScenes.length > 0 ? (
+            sortedScenes.map((scene) => (
+              <SortableSceneStrip
+                key={scene.id}
+                scene={scene}
+                onClick={() => onSceneClick?.(scene.id)}
+                isSelected={selectedSceneId === scene.id}
+                layout="strip"
+              />
+            ))
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center py-8">
+              {search ? (
+                <>
+                  <Search className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                  <p className="text-xs text-muted-foreground">No scenes match</p>
+                </>
+              ) : (
+                <>
+                  <FileText className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                  <p className="text-xs text-muted-foreground">All scenes scheduled!</p>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </SortableContext>
 
       {/* Footer */}
       <div className="px-3 py-2 border-t border-border">

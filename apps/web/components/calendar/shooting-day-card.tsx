@@ -4,7 +4,7 @@ import * as React from "react";
 import { Clock, MapPin, FileText, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
-import type { ShootingDay, Scene, CastMember, Location } from "@/lib/mock-data";
+import type { ShootingDay, Scene, CastMember, Location } from "@/lib/types";
 
 interface ShootingDayCardProps {
   shootingDay: ShootingDay;

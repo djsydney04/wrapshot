@@ -30,6 +30,7 @@ import {
   MoreHorizontal,
   Loader2,
   Save,
+  Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -42,15 +43,17 @@ import {
 } from "@/lib/actions/scenes";
 import {
   type Element,
-  type ElementCategory,
-  ELEMENT_CATEGORY_LABELS,
   quickCreateElement,
   assignElementToScene,
   removeElementFromScene,
 } from "@/lib/actions/elements";
+import type { ElementCategory } from "@/lib/constants/elements";
+import { ELEMENT_CATEGORY_LABELS } from "@/lib/constants/elements";
 import { addCastToScene, removeCastFromScene } from "@/lib/actions/scenes";
 import type { CastMember } from "@/lib/actions/cast";
 import type { Location } from "@/lib/actions/locations";
+import { useElementSuggestions } from "@/lib/hooks/use-element-suggestions";
+import { useAIStore, type ElementSuggestion } from "@/lib/stores/ai-store";
 
 // Category configuration with icons and colors
 const BREAKDOWN_CATEGORIES: {
@@ -61,6 +64,7 @@ const BREAKDOWN_CATEGORIES: {
   column: "left" | "right";
 }[] = [
   // Left column
+  { category: "NAME", label: "Names", icon: <Tag className="h-4 w-4" />, color: "bg-fuchsia-500/10 text-fuchsia-700", column: "left" },
   { category: "BACKGROUND", label: "Background", icon: <Users className="h-4 w-4" />, color: "bg-amber-500/10 text-amber-700", column: "left" },
   { category: "PROP", label: "Props", icon: <Package className="h-4 w-4" />, color: "bg-blue-500/10 text-blue-700", column: "left" },
   { category: "VEHICLE", label: "Vehicles", icon: <Car className="h-4 w-4" />, color: "bg-slate-500/10 text-slate-700", column: "left" },
@@ -119,6 +123,32 @@ export function SceneBreakdownEditor({
   const [mentions, setMentions] = React.useState<Mention[]>([]);
   const [saving, setSaving] = React.useState(false);
   const [hasChanges, setHasChanges] = React.useState(false);
+
+  // AI element suggestions
+  const {
+    getSuggestionsForCategory,
+    acceptSuggestion,
+    dismissSuggestion,
+  } = useElementSuggestions({
+    sceneId: scene.id,
+    projectId,
+    scriptText: scene.scriptText || scene.synopsis || "",
+    existingElements: sceneElements.map((se) => ({
+      category: se.element.category,
+      name: se.element.name,
+    })),
+    autoFetch: true,
+  });
+
+  // Handle accepting an AI suggestion
+  const handleAcceptSuggestion = async (suggestion: ElementSuggestion) => {
+    // Create the element if it doesn't exist
+    const newElement = await handleCreateElement(suggestion.category, suggestion.name);
+    if (newElement) {
+      await handleAddElement(suggestion.category, newElement.id, 1);
+      acceptSuggestion(suggestion.id);
+    }
+  };
 
   // Track changes
   React.useEffect(() => {
@@ -305,19 +335,19 @@ export function SceneBreakdownEditor({
   const rightCategories = BREAKDOWN_CATEGORIES.filter((c) => c.column === "right");
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Cast Section */}
       <div className="border border-border rounded-lg overflow-hidden">
-        <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 text-blue-700 font-medium text-sm">
+        <div className="flex items-center gap-2 px-4 py-3 bg-blue-500/10 text-blue-700 font-medium text-sm border-b border-blue-200">
           <User className="h-4 w-4" />
-          Cast
+          <span>Cast Members</span>
           {sceneCast.length > 0 && (
-            <span className="ml-auto text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+            <span className="ml-auto text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
               {sceneCast.length}
             </span>
           )}
         </div>
-        <div className="px-3 py-2 space-y-2 bg-background">
+        <div className="p-4 space-y-3 bg-background">
           {/* Selected cast */}
           {sceneCast.map((castId) => {
             const member = cast.find((c) => c.id === castId);
@@ -355,9 +385,9 @@ export function SceneBreakdownEditor({
       </div>
 
       {/* Two-column grid for categories */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         {/* Left column */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           {leftCategories.map((cat) => (
             <BreakdownCategory
               key={cat.category}
@@ -370,12 +400,15 @@ export function SceneBreakdownEditor({
               onAdd={(elementId, quantity) => handleAddElement(cat.category, elementId, quantity)}
               onRemove={handleRemoveElement}
               onCreateNew={(name) => handleCreateElement(cat.category, name)}
+              suggestions={getSuggestionsForCategory(cat.category)}
+              onAcceptSuggestion={handleAcceptSuggestion}
+              onDismissSuggestion={dismissSuggestion}
             />
           ))}
         </div>
 
         {/* Right column */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           {rightCategories.map((cat) => (
             <BreakdownCategory
               key={cat.category}
@@ -388,6 +421,9 @@ export function SceneBreakdownEditor({
               onAdd={(elementId, quantity) => handleAddElement(cat.category, elementId, quantity)}
               onRemove={handleRemoveElement}
               onCreateNew={(name) => handleCreateElement(cat.category, name)}
+              suggestions={getSuggestionsForCategory(cat.category)}
+              onAcceptSuggestion={handleAcceptSuggestion}
+              onDismissSuggestion={dismissSuggestion}
             />
           ))}
         </div>
@@ -395,11 +431,11 @@ export function SceneBreakdownEditor({
 
       {/* Notes section with @-mentions */}
       <div className="border border-border rounded-lg overflow-hidden">
-        <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 font-medium text-sm">
+        <div className="flex items-center gap-2 px-4 py-3 bg-muted/50 font-medium text-sm border-b border-border">
           <MessageSquare className="h-4 w-4" />
-          Notes
+          <span>Notes</span>
         </div>
-        <div className="p-3 bg-background">
+        <div className="p-4 bg-background">
           <MentionInput
             value={notes}
             mentions={mentions}

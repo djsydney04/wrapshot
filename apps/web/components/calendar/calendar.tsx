@@ -17,7 +17,7 @@ import {
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import type { ShootingDay } from "@/lib/mock-data";
+import type { ShootingDay } from "@/lib/types";
 
 interface CalendarProps {
   shootingDays: ShootingDay[];

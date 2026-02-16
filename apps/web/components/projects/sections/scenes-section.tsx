@@ -15,7 +15,7 @@ import {
   type Scene,
   type SceneStatus
 } from "@/lib/actions/scenes";
-import type { CastMember, ShootingDay } from "@/lib/mock-data";
+import type { CastMember, ShootingDay } from "@/lib/types";
 
 type ViewMode = "grid" | "list" | "kanban" | "timeline";
 

@@ -22,7 +22,7 @@ import { AddCrewForm } from "@/components/forms/add-crew-form";
 import { ScriptBreakdownStep } from "@/components/projects/script-breakdown-step";
 import { useProjectStore } from "@/lib/stores/project-store";
 import { cn } from "@/lib/utils";
-import type { Project } from "@/lib/actions/projects";
+import type { Project } from "@/lib/actions/projects.types";
 
 interface SetupWizardProps {
   projectId: string;

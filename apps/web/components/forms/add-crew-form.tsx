@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { ImageUpload } from "@/components/ui/image-upload";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -18,9 +16,8 @@ import {
 } from "@/components/ui/dialog";
 import { createCrewMember, type DepartmentType } from "@/lib/actions/crew";
 import { inviteCrewMember } from "@/lib/actions/cast-crew-invites";
-import { CastCrewUserPicker } from "@/components/ui/cast-crew-user-picker";
-import { type UserSelection } from "@/components/ui/user-search-combobox";
-import { DEPARTMENT_LABELS } from "@/lib/mock-data";
+import { SmartUserInput, type SmartUserSelection } from "@/components/ui/smart-user-input";
+import { DEPARTMENT_LABELS } from "@/lib/types";
 
 interface AddCrewFormProps {
   projectId: string;
@@ -53,26 +50,22 @@ export function AddCrewForm({
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [formData, setFormData] = React.useState(initialFormData);
-  const [selectedUser, setSelectedUser] = React.useState<UserSelection | null>(null);
-  const [sendInvite, setSendInvite] = React.useState(false);
+  const [userSelection, setUserSelection] = React.useState<SmartUserSelection>(null);
 
   // Reset form when dialog opens
   React.useEffect(() => {
     if (open) {
       setFormData(initialFormData);
       setError(null);
-      setSelectedUser(null);
-      setSendInvite(false);
+      setUserSelection(null);
     }
   }, [open]);
 
-  const handleUserSelect = React.useCallback((selection: UserSelection | null) => {
-    setSelectedUser(selection);
-    // Reset send invite when user selection changes
-    setSendInvite(false);
+  const handleSelectionChange = React.useCallback((selection: SmartUserSelection) => {
+    setUserSelection(selection);
   }, []);
 
-  const handleManualEntry = React.useCallback((name: string, email: string) => {
+  const handleValueChange = React.useCallback((name: string, email: string) => {
     setFormData((prev) => ({
       ...prev,
       name: name,
@@ -88,8 +81,8 @@ export function AddCrewForm({
     try {
       // Determine userId if an existing user was selected
       const userId =
-        selectedUser?.type === "existing_user"
-          ? selectedUser.user.userId
+        userSelection?.type === "existing_user"
+          ? userSelection.user.userId
           : undefined;
 
       // Create the crew member using server action
@@ -107,9 +100,8 @@ export function AddCrewForm({
 
       if (createError) throw new Error(createError);
 
-      // If sendInvite is checked and we have an email (but not linked to existing user)
-      // send the invite
-      if (crewMember && formData.email && sendInvite && !userId) {
+      // Auto-send invite if a new email was selected (not linked to existing user)
+      if (crewMember && userSelection?.type === "new_invite" && formData.email) {
         try {
           await inviteCrewMember(crewMember.id, projectId);
         } catch (inviteError) {
@@ -126,14 +118,6 @@ export function AddCrewForm({
       setLoading(false);
     }
   };
-
-  // Show invite checkbox if email is provided and user is not already linked
-  const showInviteOption =
-    formData.email &&
-    (!selectedUser || selectedUser.type === "new_email");
-
-  // Show linked user indicator
-  const isUserLinked = selectedUser?.type === "existing_user";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -170,13 +154,12 @@ export function AddCrewForm({
               <label className="block text-sm font-medium mb-3">
                 Crew Member Details
               </label>
-              <CastCrewUserPicker
+              <SmartUserInput
                 projectId={projectId}
-                onUserSelect={handleUserSelect}
-                onManualEntry={handleManualEntry}
+                onSelectionChange={handleSelectionChange}
+                onValueChange={handleValueChange}
                 nameLabel="Name"
-                namePlaceholder="e.g., John Smith"
-                emailPlaceholder="email@example.com (optional)"
+                placeholder="Search by name or enter email..."
                 disabled={loading}
               />
             </div>
@@ -239,40 +222,6 @@ export function AddCrewForm({
                 placeholder="+1 555 123 4567"
               />
             </div>
-
-            {showInviteOption && (
-              <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3">
-                <Checkbox
-                  id="send-crew-invite"
-                  checked={sendInvite}
-                  onCheckedChange={(checked) => setSendInvite(checked === true)}
-                />
-                <div className="space-y-1">
-                  <Label htmlFor="send-crew-invite" className="cursor-pointer">
-                    Send platform invite
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    They&apos;ll receive an email to create an account and link to
-                    this crew role.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {isUserLinked && (
-              <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm">
-                <div className="h-2 w-2 rounded-full bg-green-500" />
-                <span>
-                  This crew member will be linked to{" "}
-                  <strong>
-                    {selectedUser.user.displayName ||
-                      `${selectedUser.user.firstName || ""} ${selectedUser.user.lastName || ""}`.trim() ||
-                      selectedUser.user.email}
-                  </strong>
-                  &apos;s account
-                </span>
-              </div>
-            )}
 
             {error && (
               <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">

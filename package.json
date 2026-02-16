@@ -12,6 +12,11 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "test": "npx vitest run",
+    "test:unit": "npx vitest run tests/unit",
+    "test:integration": "npx vitest run tests/integration",
+    "test:watch": "npx vitest",
+    "test:e2e": "playwright test",
     "db:generate": "npm run db:generate --workspace=@repo/database",
     "db:push": "npm run db:push --workspace=@repo/database",
     "db:migrate": "npm run db:migrate --workspace=@repo/database",
@@ -19,12 +24,21 @@
     "db:studio": "npm run db:studio --workspace=@repo/database"
   },
   "devDependencies": {
+    "@playwright/test": "^1.51.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "jsdom": "^25.0.1",
     "prettier": "^3.2.5",
     "supabase": "^2.72.8",
     "turbo": "^2.7.4",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.9"
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "framer-motion": "^12.30.0"
   }
 }

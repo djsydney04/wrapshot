@@ -235,6 +235,7 @@ export interface BudgetCategory {
   code: string; // e.g., "2000", "2300"
   name: string; // e.g., "Production", "Camera"
   parentCategoryId?: string;
+  allocatedBudget: number;
 
   // Subtotals (calculated from line items)
   subtotalEstimated: number;

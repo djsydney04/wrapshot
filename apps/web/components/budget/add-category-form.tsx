@@ -26,18 +26,21 @@ interface AddCategoryFormProps {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   editCategory?: BudgetCategory | null;
+  defaultParentCategoryId?: string | null;
 }
 
 interface FormData {
   code: string;
   name: string;
   parentCategoryId: string;
+  allocatedBudget: string;
 }
 
 const initialFormData: FormData = {
   code: "",
   name: "",
   parentCategoryId: "",
+  allocatedBudget: "",
 };
 
 export function AddCategoryForm({
@@ -47,6 +50,7 @@ export function AddCategoryForm({
   onOpenChange,
   onSuccess,
   editCategory,
+  defaultParentCategoryId,
 }: AddCategoryFormProps) {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -62,13 +66,17 @@ export function AddCategoryForm({
           code: editCategory.code,
           name: editCategory.name,
           parentCategoryId: editCategory.parentCategoryId || "",
+          allocatedBudget: editCategory.allocatedBudget?.toString() ?? "",
         });
       } else {
-        setFormData(initialFormData);
+        setFormData({
+          ...initialFormData,
+          parentCategoryId: defaultParentCategoryId || "",
+        });
       }
       setError(null);
     }
-  }, [open, editCategory]);
+  }, [open, editCategory, defaultParentCategoryId]);
 
   // Filter out current category and its children for parent options
   const parentOptions = React.useMemo(() => {
@@ -104,12 +112,18 @@ export function AddCategoryForm({
           code: formData.code,
           name: formData.name,
           parentCategoryId: formData.parentCategoryId || null,
+          allocatedBudget: formData.allocatedBudget
+            ? parseFloat(formData.allocatedBudget) || 0
+            : 0,
         });
       } else {
         await createBudgetCategory(budgetId, {
           code: formData.code,
           name: formData.name,
           parentCategoryId: formData.parentCategoryId || null,
+          allocatedBudget: formData.allocatedBudget
+            ? parseFloat(formData.allocatedBudget) || 0
+            : 0,
         });
       }
 
@@ -147,6 +161,30 @@ export function AddCategoryForm({
               />
               <p className="mt-1 text-xs text-muted-foreground">
                 A unique code for this category (e.g., department number)
+              </p>
+            </div>
+
+            {/* Allocated Budget */}
+            <div>
+              <label className="block text-sm font-medium mb-1.5">
+                Allocated Budget <span className="text-muted-foreground">(optional)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  $
+                </span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.allocatedBudget}
+                  onChange={(e) => setFormData({ ...formData, allocatedBudget: e.target.value })}
+                  className="pl-7"
+                  placeholder="0.00"
+                />
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Set a cap for this department to track variance
               </p>
             </div>
 

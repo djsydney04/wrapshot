@@ -80,7 +80,7 @@ export async function createBudget(data: CreateBudgetData): Promise<Budget> {
     throw new Error(`Failed to create budget: ${error.message}`);
   }
 
-  // If a template was specified, copy its categories
+  // If a template was specified, copy its categories and line items
   if (data.templateId) {
     const { data: template } = await supabase
       .from("BudgetTemplate")
@@ -89,18 +89,116 @@ export async function createBudget(data: CreateBudgetData): Promise<Budget> {
       .single();
 
     if (template?.templateData) {
-      // Create categories from template
-      const templateData = template.templateData as { categories?: Array<{ code: string; name: string }> };
-      if (templateData.categories) {
-        const categories = templateData.categories.map((cat, index) => ({
+      const templateData = template.templateData as {
+        categories?: Array<{
+          code: string;
+          name: string;
+          subcategories?: Array<{ code: string; name: string }>;
+        }>;
+        lineItems?: Array<{
+          accountCode: string;
+          category: string;
+          description: string;
+          units: "DAYS" | "WEEKS" | "FLAT" | "HOURS" | "EACH";
+          quantity: number;
+          rate: number;
+          fringePercent: number;
+        }>;
+      };
+
+      const categoryIdByCode = new Map<string, string>();
+
+      if (templateData.categories && templateData.categories.length > 0) {
+        const topCategories = templateData.categories.map((cat, index) => ({
           budgetId: budget.id,
           code: cat.code,
           name: cat.name,
-          sortOrder: index,
-          subtotal: 0,
+          parentCategoryId: null,
+          sortOrder: index * 1000,
+          allocatedBudget: 0,
+          subtotalEstimated: 0,
+          subtotalActual: 0,
         }));
 
-        await supabase.from("BudgetCategory").insert(categories);
+        const { data: insertedTop, error: topError } = await supabase
+          .from("BudgetCategory")
+          .insert(topCategories)
+          .select("id, code");
+
+        if (topError) {
+          console.error("Error inserting template categories:", topError);
+        } else {
+          for (const cat of insertedTop || []) {
+            categoryIdByCode.set(cat.code, cat.id);
+          }
+        }
+
+        const subcategoryRows = templateData.categories.flatMap((cat, parentIndex) => {
+          const parentId = categoryIdByCode.get(cat.code);
+          if (!parentId || !cat.subcategories || cat.subcategories.length === 0) return [];
+          return cat.subcategories.map((subcat, subIndex) => ({
+            budgetId: budget.id,
+            code: subcat.code,
+            name: subcat.name,
+            parentCategoryId: parentId,
+            sortOrder: parentIndex * 1000 + subIndex + 1,
+            allocatedBudget: 0,
+            subtotalEstimated: 0,
+            subtotalActual: 0,
+          }));
+        });
+
+        if (subcategoryRows.length > 0) {
+          const { data: insertedSubs, error: subError } = await supabase
+            .from("BudgetCategory")
+            .insert(subcategoryRows)
+            .select("id, code");
+
+          if (subError) {
+            console.error("Error inserting template subcategories:", subError);
+          } else {
+            for (const sub of insertedSubs || []) {
+              categoryIdByCode.set(sub.code, sub.id);
+            }
+          }
+        }
+      }
+
+      if (templateData.lineItems && templateData.lineItems.length > 0 && categoryIdByCode.size > 0) {
+        const lineItemsByCategory: Record<string, number> = {};
+
+        const lineItems = templateData.lineItems
+          .map((item) => {
+            const categoryId = categoryIdByCode.get(item.category);
+            if (!categoryId) return null;
+            const sortOrder = lineItemsByCategory[categoryId] ?? 0;
+            lineItemsByCategory[categoryId] = sortOrder + 1;
+
+            return {
+              categoryId,
+              accountCode: item.accountCode,
+              description: item.description,
+              units: item.units,
+              quantity: item.quantity,
+              rate: item.rate,
+              fringePercent: item.fringePercent ?? 0,
+              actualCost: 0,
+              committedCost: 0,
+              notes: null,
+              sortOrder,
+            };
+          })
+          .filter(Boolean);
+
+        if (lineItems.length > 0) {
+          const { error: lineItemError } = await supabase
+            .from("BudgetLineItem")
+            .insert(lineItems);
+
+          if (lineItemError) {
+            console.error("Error inserting template line items:", lineItemError);
+          }
+        }
       }
     }
   } else {
@@ -115,7 +213,10 @@ export async function createBudget(data: CreateBudgetData): Promise<Budget> {
     const categories = defaultCategories.map((cat) => ({
       budgetId: budget.id,
       ...cat,
-      subtotal: 0,
+      parentCategoryId: null,
+      allocatedBudget: 0,
+      subtotalEstimated: 0,
+      subtotalActual: 0,
     }));
 
     await supabase.from("BudgetCategory").insert(categories);
@@ -288,6 +389,7 @@ export interface BudgetCategory {
   code: string;
   name: string;
   parentCategoryId: string | null;
+  allocatedBudget: number;
   subtotalEstimated: number;
   subtotalActual: number;
   sortOrder: number;

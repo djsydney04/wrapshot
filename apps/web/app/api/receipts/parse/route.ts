@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getFireworksApiKey } from "@/lib/ai/config";
 
 export interface ParsedReceiptData {
   vendor: string | null;
@@ -34,9 +35,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const fireworksKey = process.env.FIREWORKS_SECRET_KEY;
+    const fireworksKey = getFireworksApiKey();
     if (!fireworksKey) {
-      console.error("FIREWORKS_SECRET_KEY not configured");
+      console.error("Fireworks key not configured");
       return NextResponse.json(
         { error: "Receipt parsing not configured" },
         { status: 500 }
@@ -125,7 +126,7 @@ Return ONLY the JSON object, no other text.`;
     if (!content) {
       console.error("No content in Fireworks response:", data);
       return NextResponse.json(
-        { error: "No response from AI" },
+        { error: "No response from Wrapshot Intelligence" },
         { status: 500 }
       );
     }
@@ -140,7 +141,7 @@ Return ONLY the JSON object, no other text.`;
       }
       parsedData = JSON.parse(jsonMatch[0]);
     } catch (parseError) {
-      console.error("Failed to parse AI response:", content, parseError);
+      console.error("Failed to parse Wrapshot Intelligence response:", content, parseError);
       // Return partial data with low confidence
       parsedData = {
         vendor: null,

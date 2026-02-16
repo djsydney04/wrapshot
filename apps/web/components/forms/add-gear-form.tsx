@@ -16,7 +16,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useProjectStore } from "@/lib/stores/project-store";
-import { DEPARTMENT_LABELS, GEAR_CATEGORIES, type GearItem, type DepartmentType, type Scene } from "@/lib/mock-data";
+import { DEPARTMENT_LABELS, GEAR_CATEGORIES, type GearItem, type DepartmentType, type Scene } from "@/lib/types";
 
 interface AddGearFormProps {
   projectId: string;

@@ -41,6 +41,45 @@ CREATE TABLE IF NOT EXISTS "SceneImage" (
 CREATE INDEX IF NOT EXISTS "SceneImage_sceneId_idx" ON "SceneImage"("sceneId");
 
 -- Extend ElementCategory enum with new breakdown categories
+-- Ensure the enum exists for fresh databases
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ElementCategory') THEN
+    CREATE TYPE "ElementCategory" AS ENUM (
+      'PROP',
+      'WARDROBE',
+      'VEHICLE',
+      'ANIMAL',
+      'SPECIAL_EQUIPMENT',
+      'VFX',
+      'SFX',
+      'STUNT',
+      'MAKEUP',
+      'HAIR',
+      'GREENERY',
+      'ART_DEPARTMENT',
+      'SOUND',
+      'MUSIC',
+      'BACKGROUND',
+      'OTHER',
+      'CAMERA',
+      'GRIP',
+      'ELECTRIC',
+      'SET_DRESSING',
+      'ADDITIONAL_LABOR',
+      'ANIMAL_WRANGLER',
+      'MECHANICAL_EFFECTS',
+      'VIDEO_PLAYBACK',
+      'LOCATION_NOTES',
+      'SAFETY_NOTES',
+      'SECURITY',
+      'QUESTIONS',
+      'COMMENTS',
+      'MISCELLANEOUS'
+    );
+  END IF;
+END $$;
+
 -- Note: PostgreSQL doesn't allow direct enum modification, so we need to add new values
 ALTER TYPE "ElementCategory" ADD VALUE IF NOT EXISTS 'CAMERA';
 ALTER TYPE "ElementCategory" ADD VALUE IF NOT EXISTS 'GRIP';

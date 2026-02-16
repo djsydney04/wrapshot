@@ -1,12 +1,8 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { CommandPalette } from "@/components/command-palette";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
+import { PostHogProvider } from "@/components/providers/posthog-provider";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: {
@@ -53,9 +49,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} font-sans antialiased`}>
-        {children}
-        <CommandPalette />
+      <body className="font-sans antialiased">
+        <PostHogProvider>
+          {children}
+          <CommandPalette />
+          <Toaster position="bottom-right" richColors />
+        </PostHogProvider>
       </body>
     </html>
   );

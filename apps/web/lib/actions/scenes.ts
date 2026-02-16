@@ -59,6 +59,8 @@ export interface Scene {
   sequence?: string | null;
   estimatedHours?: number | null;
   breakdownStatus?: BreakdownStatus;
+  scriptText?: string | null;
+  elements?: string[];
   // Joined data
   location?: { id: string; name: string } | null;
   cast?: { id: string; castMemberId: string; castMember: { id: string; characterName: string; actorName: string | null } }[];

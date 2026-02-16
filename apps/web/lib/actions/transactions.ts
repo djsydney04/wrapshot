@@ -61,6 +61,11 @@ export interface UpdateTransactionInput {
   notes?: string | null;
 }
 
+export interface ReceiptStatusRow {
+  budgetId: string;
+  receiptStatus: ReceiptStatus;
+}
+
 // Get all transactions for a budget
 export async function getTransactions(budgetId: string): Promise<Transaction[]> {
   const supabase = await createClient();
@@ -82,6 +87,30 @@ export async function getTransactions(budgetId: string): Promise<Transaction[]> 
   }
 
   return data || [];
+}
+
+// Get receipt statuses for a list of budgets (for dashboard rollups)
+export async function getReceiptStatusesForBudgets(budgetIds: string[]): Promise<ReceiptStatusRow[]> {
+  const supabase = await createClient();
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    throw new Error("Not authenticated");
+  }
+
+  if (budgetIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("Transaction")
+    .select("budgetId, receiptStatus")
+    .in("budgetId", budgetIds);
+
+  if (error) {
+    console.error("Error fetching receipt statuses:", error);
+    return [];
+  }
+
+  return (data || []) as ReceiptStatusRow[];
 }
 
 // Get a single transaction with joined data

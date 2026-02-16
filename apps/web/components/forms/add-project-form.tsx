@@ -17,7 +17,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useProjectStore } from "@/lib/stores/project-store";
-import type { Project } from "@/lib/mock-data";
+import type { Project } from "@/lib/types";
+import { trackProjectCreated } from "@/lib/analytics/posthog";
 
 interface AddProjectFormProps {
   open: boolean;
@@ -80,6 +81,7 @@ export function AddProjectForm({ open, onOpenChange }: AddProjectFormProps) {
 
     // Navigate to the new project
     if (newProject) {
+      trackProjectCreated(newProject.id, newProject.name);
       router.push(`/projects/${newProject.id}`);
     }
   };

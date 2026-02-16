@@ -45,7 +45,7 @@ AI-powered film production scheduling and management platform designed to help m
 
 ## Quick Start
 
-See [SETUP.md](./SETUP.md) for detailed setup instructions.
+See [docs/setup.md](./docs/setup.md) for detailed setup instructions.
 
 ### Prerequisites
 
@@ -59,7 +59,7 @@ See [SETUP.md](./SETUP.md) for detailed setup instructions.
 # 1. Install dependencies
 npm install
 
-# 2. Set up environment variables (see SETUP.md)
+# 2. Set up environment variables (see docs/setup.md)
 cp .env.example .env.local
 # Fill in your Supabase credentials
 
@@ -79,6 +79,18 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000) and sign up for an account.
 
 ---
+
+## Documentation
+
+- docs/README.md
+- docs/codebase.md
+- docs/architecture.md
+- docs/load-map.md
+- docs/usage.md
+- docs/api.md
+- docs/setup.md
+- docs/implementation-guides/finance.md
+- docs/finance-flow.md
 
 ## Project Structure
 

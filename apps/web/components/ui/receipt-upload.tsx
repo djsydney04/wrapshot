@@ -257,7 +257,7 @@ export function ReceiptUpload({
           {isParsing && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Analyzing receipt with AI...</span>
+              <span>Analyzing receipt with Wrapshot Intelligence...</span>
             </div>
           )}
         </div>
@@ -300,7 +300,7 @@ export function ReceiptUpload({
                 {onParsedData && (
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <Sparkles className="h-3 w-3" />
-                    AI will auto-extract details
+                    Wrapshot Intelligence will auto-extract details
                   </p>
                 )}
               </>

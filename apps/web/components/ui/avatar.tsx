@@ -49,12 +49,15 @@ function Avatar({
       {...props}
     >
       {src && !hasError ? (
-        <img
-          src={src}
-          alt={alt || "Avatar"}
-          className="aspect-square h-full w-full object-cover"
-          onError={() => setHasError(true)}
-        />
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt={alt || "Avatar"}
+            className="aspect-square h-full w-full object-cover"
+            onError={() => setHasError(true)}
+          />
+        </>
       ) : (
         <span className="font-medium text-muted-foreground">{initials}</span>
       )}

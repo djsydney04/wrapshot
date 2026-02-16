@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import type { ShootingDay } from "@/lib/mock-data";
+import type { ShootingDay } from "@/lib/types";
 
 interface DepartmentCallTimesEditorProps {
   shootingDay: ShootingDay;

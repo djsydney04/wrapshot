@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { useDraggable } from "@dnd-kit/core";
-import { GripVertical, Trash2, Clock, Users, MapPin } from "lucide-react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical, Trash2, Clock, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,10 @@ interface SceneStripProps {
   isSelected?: boolean;
   isDragging?: boolean;
   layout?: "strip" | "list";
+  className?: string;
+  style?: React.CSSProperties;
+  dragHandleProps?: React.HTMLAttributes<HTMLSpanElement>;
+  sortableProps?: React.HTMLAttributes<HTMLDivElement>;
 }
 
 // Industry standard strip colors based on INT/EXT and DAY/NIGHT
@@ -45,47 +50,49 @@ function getStripColor(intExt: string, dayNight: string) {
   return "bg-white border-gray-300 text-gray-900";
 }
 
-export function SceneStrip({
-  scene,
-  onClick,
-  onDelete,
-  isSelected = false,
-  isDragging = false,
-  layout = "strip",
-}: SceneStripProps) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: `scene-${scene.id}`,
-    data: { scene, type: "scene" },
-  });
-
-  const style = transform
-    ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-        zIndex: 100,
-      }
-    : undefined;
+export const SceneStrip = React.forwardRef<HTMLDivElement, SceneStripProps>(
+  (
+    {
+      scene,
+      onClick,
+      onDelete,
+      isSelected = false,
+      isDragging = false,
+      layout = "strip",
+      className,
+      style,
+      dragHandleProps,
+      sortableProps,
+    },
+    ref
+  ) => {
 
   const stripColor = getStripColor(scene.intExt, scene.dayNight);
 
   const castCount = scene.cast?.length || 0;
   const locationName = scene.location?.name || scene.setName || "No location";
 
-  if (layout === "list") {
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        className={cn(
-          "flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all cursor-pointer",
-          stripColor,
-          isSelected && "ring-2 ring-primary ring-offset-2",
-          isDragging && "opacity-50 shadow-lg"
-        )}
-        onClick={onClick}
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0 cursor-grab active:cursor-grabbing" />
+    if (layout === "list") {
+      return (
+        <div
+          ref={ref}
+          style={style}
+          {...sortableProps}
+          className={cn(
+            "flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all cursor-pointer",
+            stripColor,
+            isSelected && "ring-2 ring-primary ring-offset-2",
+            isDragging && "opacity-50 shadow-lg",
+            className
+          )}
+          onClick={onClick}
+        >
+          <span
+            {...dragHandleProps}
+            className="h-4 w-4 text-muted-foreground flex-shrink-0 cursor-grab active:cursor-grabbing"
+          >
+            <GripVertical className="h-4 w-4" />
+          </span>
 
         {/* Scene Number */}
         <span className="font-mono font-bold text-lg w-12 text-center">
@@ -151,39 +158,44 @@ export function SceneStrip({
         </Badge>
 
         {/* Delete */}
-        {onDelete && (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            className="text-red-500 hover:text-red-600 hover:bg-red-50"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        )}
-      </div>
-    );
-  }
+          {onDelete && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="text-red-500 hover:text-red-600 hover:bg-red-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+      );
+    }
 
   // Strip layout (compact, for stripeboard)
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "flex items-center gap-2 px-2 py-1.5 rounded border-2 transition-all cursor-pointer",
-        stripColor,
-        isSelected && "ring-2 ring-primary ring-offset-1",
-        isDragging && "opacity-50 shadow-lg"
-      )}
-      onClick={onClick}
-      {...attributes}
-      {...listeners}
-    >
-      <GripVertical className="h-3 w-3 text-muted-foreground flex-shrink-0 cursor-grab active:cursor-grabbing" />
+    return (
+      <div
+        ref={ref}
+        style={style}
+        {...sortableProps}
+        className={cn(
+          "flex items-center gap-2 px-2 py-1.5 rounded border-2 transition-all cursor-pointer",
+          stripColor,
+          isSelected && "ring-2 ring-primary ring-offset-1",
+          isDragging && "opacity-50 shadow-lg",
+          className
+        )}
+        onClick={onClick}
+      >
+        <span
+          {...dragHandleProps}
+          className="h-3 w-3 text-muted-foreground flex-shrink-0 cursor-grab active:cursor-grabbing"
+        >
+          <GripVertical className="h-3 w-3" />
+        </span>
 
       {/* Scene Number */}
       <span className="font-mono font-bold text-xs w-8 text-center">
@@ -215,6 +227,36 @@ export function SceneStrip({
       <span className="text-[10px] text-muted-foreground">
         {scene.pageEighths ? `${scene.pageEighths}/8` : `${scene.pageCount}pg`}
       </span>
-    </div>
+      </div>
+    );
+  }
+);
+
+SceneStrip.displayName = "SceneStrip";
+
+export function SortableSceneStrip(
+  props: Omit<SceneStripProps, "dragHandleProps" | "isDragging"> & {
+    disabled?: boolean;
+  }
+) {
+  const { scene, disabled, ...rest } = props;
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: scene.id, disabled });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <SceneStrip
+      ref={setNodeRef}
+      scene={scene}
+      isDragging={isDragging}
+      style={style}
+      sortableProps={{ ...attributes, ...listeners }}
+      dragHandleProps={{ ...attributes, ...listeners }}
+      {...rest}
+    />
   );
 }

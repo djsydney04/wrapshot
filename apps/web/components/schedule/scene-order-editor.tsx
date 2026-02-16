@@ -24,7 +24,7 @@ import { GripVertical, Clock, FileText, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import type { ShootingDay, Scene } from "@/lib/mock-data";
+import type { ShootingDay, Scene } from "@/lib/types";
 
 interface SceneOrderEditorProps {
   shootingDay: ShootingDay;

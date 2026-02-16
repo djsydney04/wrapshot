@@ -2,18 +2,20 @@
 
 import * as React from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { Calendar, Clock, MapPin } from "lucide-react";
+import { Calendar, Clock, MapPin, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { SceneStrip } from "./scene-strip";
+import { SortableSceneStrip } from "./scene-strip";
 import { cn } from "@/lib/utils";
 import type { Scene } from "@/lib/actions/scenes";
-import type { ShootingDay } from "@/lib/mock-data";
+import type { ShootingDay } from "@/lib/types";
 
 interface ShootDayContainerProps {
   shootingDay: ShootingDay;
   scenes: Scene[];
   onSceneClick?: (sceneId: string) => void;
   selectedSceneId?: string | null;
+  activeId?: string | null;
+  isSaving?: boolean;
 }
 
 const STATUS_COLORS: Record<ShootingDay["status"], string> = {
@@ -29,11 +31,16 @@ export function ShootDayContainer({
   scenes,
   onSceneClick,
   selectedSceneId,
+  activeId,
+  isSaving,
 }: ShootDayContainerProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: `day-${shootingDay.id}`,
     data: { shootingDayId: shootingDay.id, type: "shooting-day" },
   });
+
+  // Dim non-target containers when dragging
+  const isDimmed = activeId && !isOver;
 
   const totalPages = scenes.reduce(
     (sum, s) => sum + (s.pageEighths ? s.pageEighths / 8 : s.pageCount),
@@ -50,8 +57,9 @@ export function ShootDayContainer({
     <div
       ref={setNodeRef}
       className={cn(
-        "rounded-lg border border-border overflow-hidden transition-all",
-        isOver && "ring-2 ring-primary bg-primary/5"
+        "rounded-lg border border-border overflow-hidden transition-all duration-200",
+        isOver && "ring-2 ring-primary bg-primary/5 scale-[1.01]",
+        isDimmed && "opacity-60"
       )}
     >
       {/* Day Header */}
@@ -80,7 +88,8 @@ export function ShootDayContainer({
             {shootingDay.generalCall}
             {shootingDay.wrapTime && ` - ${shootingDay.wrapTime}`}
           </span>
-          <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-medium">
+          <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-medium flex items-center gap-1">
+            {isSaving && <Loader2 className="h-3 w-3 animate-spin" />}
             {scenes.length} scenes · {totalPages.toFixed(1)} pages
           </span>
         </div>
@@ -90,7 +99,7 @@ export function ShootDayContainer({
       <div className="p-2 space-y-1.5 min-h-[60px] bg-muted/30">
         {scenes.length > 0 ? (
           scenes.map((scene) => (
-            <SceneStrip
+            <SortableSceneStrip
               key={scene.id}
               scene={scene}
               onClick={() => onSceneClick?.(scene.id)}

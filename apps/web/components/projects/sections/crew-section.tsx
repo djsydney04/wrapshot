@@ -8,21 +8,30 @@ import { Badge } from "@/components/ui/badge";
 import { CrewCard } from "@/components/crew/crew-card";
 import { CrewProfileModal } from "@/components/crew/crew-profile-modal";
 import { AddCrewForm } from "@/components/forms/add-crew-form";
-import { DEPARTMENT_LABELS, type DepartmentType } from "@/lib/mock-data";
-import { deleteCrewMember, updateCrewMember, type CrewMember, type CrewMemberInput } from "@/lib/actions/crew";
-import { cn } from "@/lib/utils";
+import { DEPARTMENT_LABELS, type DepartmentType } from "@/lib/types";
+import {
+  deleteCrewMember,
+  updateCrewMember,
+  type CrewMemberWithInviteStatus,
+  type CrewMemberInput,
+} from "@/lib/actions/crew";
+import {
+  inviteCrewMember,
+  resendCastCrewInvite,
+} from "@/lib/actions/cast-crew-invites";
+import type { InviteStatus } from "@/components/ui/invite-status-badge";
 
 interface CrewSectionProps {
   projectId: string;
-  crew: CrewMember[];
+  crew: CrewMemberWithInviteStatus[];
 }
 
 export function CrewSection({ projectId, crew }: CrewSectionProps) {
   const [showAddCrew, setShowAddCrew] = React.useState(false);
-  const [selectedMember, setSelectedMember] = React.useState<CrewMember | null>(null);
+  const [selectedMember, setSelectedMember] = React.useState<CrewMemberWithInviteStatus | null>(null);
   const [collapsedDepts, setCollapsedDepts] = React.useState<Set<DepartmentType>>(new Set());
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [localCrew, setLocalCrew] = React.useState<CrewMember[]>(crew);
+  const [localCrew, setLocalCrew] = React.useState<CrewMemberWithInviteStatus[]>(crew);
 
   // Sync local state with props when crew changes
   React.useEffect(() => {
@@ -43,7 +52,7 @@ export function CrewSection({ projectId, crew }: CrewSectionProps) {
 
   // Group crew by department
   const crewByDepartment = React.useMemo(() => {
-    const grouped: Partial<Record<DepartmentType, CrewMember[]>> = {};
+    const grouped: Partial<Record<DepartmentType, CrewMemberWithInviteStatus[]>> = {};
     filteredCrew.forEach((member) => {
       if (!grouped[member.department]) {
         grouped[member.department] = [];
@@ -95,6 +104,40 @@ export function CrewSection({ projectId, crew }: CrewSectionProps) {
       }
     } else {
       console.error("Failed to update crew member:", error);
+    }
+  };
+
+  const handleSendInvite = async (memberId: string) => {
+    try {
+      const result = await inviteCrewMember(memberId, projectId);
+      if (result.success) {
+        setLocalCrew((prev) =>
+          prev.map((c) =>
+            c.id === memberId
+              ? { ...c, inviteStatus: "invite_sent" as InviteStatus }
+              : c
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Failed to send invite:", error);
+    }
+  };
+
+  const handleResendInvite = async (inviteId: string) => {
+    try {
+      const result = await resendCastCrewInvite(inviteId, projectId);
+      if (result.success) {
+        setLocalCrew((prev) =>
+          prev.map((c) =>
+            c.inviteId === inviteId
+              ? { ...c, inviteStatus: "invite_sent" as InviteStatus }
+              : c
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Failed to resend invite:", error);
     }
   };
 
@@ -166,6 +209,16 @@ export function CrewSection({ projectId, crew }: CrewSectionProps) {
                       <CrewCard
                         member={member}
                         onClick={() => setSelectedMember(member)}
+                        onSendInvite={
+                          member.inviteStatus === "no_account" && member.email
+                            ? () => handleSendInvite(member.id)
+                            : undefined
+                        }
+                        onResendInvite={
+                          member.inviteStatus === "invite_expired" && member.inviteId
+                            ? () => handleResendInvite(member.inviteId!)
+                            : undefined
+                        }
                       />
                     </div>
                   ))}

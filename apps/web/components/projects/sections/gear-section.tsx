@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { AddGearForm } from "@/components/forms/add-gear-form";
-import { DEPARTMENT_LABELS, GEAR_CATEGORIES, type GearItem, type DepartmentType, type Scene } from "@/lib/mock-data";
+import { DEPARTMENT_LABELS, GEAR_CATEGORIES, type GearItem, type DepartmentType, type Scene } from "@/lib/types";
 import { useProjectStore } from "@/lib/stores/project-store";
 import { cn } from "@/lib/utils";
 
@@ -196,11 +196,14 @@ export function GearSection({
                         {/* Icon */}
                         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted flex-shrink-0">
                           {item.photoUrl ? (
-                            <img
-                              src={item.photoUrl}
-                              alt={item.name}
-                              className="h-full w-full object-cover rounded-lg"
-                            />
+                            <>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={item.photoUrl}
+                                alt={item.name}
+                                className="h-full w-full object-cover rounded-lg"
+                              />
+                            </>
                           ) : (
                             <Icon className="h-5 w-5 text-muted-foreground" />
                           )}

@@ -19,7 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { SortableSceneCard } from "./scene-card";
 import type { Scene } from "@/lib/actions/scenes";
-import type { CastMember } from "@/lib/mock-data";
+import type { CastMember } from "@/lib/types";
 
 interface SceneGridProps {
   scenes: Scene[];

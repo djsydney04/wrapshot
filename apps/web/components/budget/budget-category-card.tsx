@@ -7,7 +7,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, ChevronDown, ChevronRight, Plus, Edit2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { deleteBudgetCategory } from "@/lib/actions/budget-categories";
+import { deleteBudgetCategory, updateBudgetCategory } from "@/lib/actions/budget-categories";
 import type { BudgetCategory, BudgetLineItem } from "@/lib/actions/budgets";
 import {
   SortableBudgetLineItemRow,
@@ -89,6 +89,10 @@ export function BudgetCategoryCard({
   dragHandleProps,
 }: InternalCardProps) {
   const [showActions, setShowActions] = React.useState(false);
+  const [allocationValue, setAllocationValue] = React.useState<string>(
+    category.allocatedBudget?.toString() ?? ""
+  );
+  const allocationSaveRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Sort line items by sortOrder
   const sortedLineItems = React.useMemo(() => {
@@ -102,6 +106,18 @@ export function BudgetCategoryCard({
     return { subtotalEstimated: estimated, subtotalActual: actual };
   }, [lineItems]);
 
+  React.useEffect(() => {
+    setAllocationValue(category.allocatedBudget?.toString() ?? "");
+  }, [category.allocatedBudget]);
+
+  React.useEffect(() => {
+    return () => {
+      if (allocationSaveRef.current) {
+        clearTimeout(allocationSaveRef.current);
+      }
+    };
+  }, []);
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -109,6 +125,29 @@ export function BudgetCategoryCard({
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
+  };
+
+  const allocatedBudget = category.allocatedBudget || 0;
+  const actualVariance = allocatedBudget - subtotalActual;
+
+  const handleAllocationChange = (value: string) => {
+    setAllocationValue(value);
+    if (!canEdit) return;
+
+    if (allocationSaveRef.current) {
+      clearTimeout(allocationSaveRef.current);
+    }
+
+    allocationSaveRef.current = setTimeout(async () => {
+      const parsed = parseFloat(value);
+      const allocatedBudgetValue = Number.isFinite(parsed) ? parsed : 0;
+      try {
+        await updateBudgetCategory(category.id, { allocatedBudget: allocatedBudgetValue });
+        onRefresh();
+      } catch (error) {
+        console.error("Error updating allocation:", error);
+      }
+    }, 400);
   };
 
   const handleDelete = async () => {
@@ -174,12 +213,28 @@ export function BudgetCategoryCard({
         {/* Subtotals */}
         <div className="flex items-center gap-4 text-sm">
           <div className="text-right">
-            <span className="text-muted-foreground text-xs mr-1">Est:</span>
+            <span className="text-muted-foreground text-xs mr-1">Alloc:</span>
+            {canEdit ? (
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={allocationValue}
+                onChange={(e) => handleAllocationChange(e.target.value)}
+                className="w-24 rounded border border-transparent bg-transparent text-right text-sm font-medium text-foreground placeholder:text-muted-foreground hover:border-input focus:border-input focus:outline-none"
+                placeholder="0.00"
+              />
+            ) : (
+              <span className="font-medium">{formatCurrency(allocatedBudget)}</span>
+            )}
+          </div>
+          <div className="text-right">
+            <span className="text-muted-foreground text-xs mr-1">Planned:</span>
             <span className="font-medium">{formatCurrency(subtotalEstimated)}</span>
           </div>
           {subtotalActual > 0 && (
             <div className="text-right">
-              <span className="text-muted-foreground text-xs mr-1">Act:</span>
+              <span className="text-muted-foreground text-xs mr-1">Actual:</span>
               <span
                 className={cn(
                   "font-medium",
@@ -189,6 +244,19 @@ export function BudgetCategoryCard({
                 )}
               >
                 {formatCurrency(subtotalActual)}
+              </span>
+            </div>
+          )}
+          {allocatedBudget > 0 && (
+            <div className="text-right">
+              <span className="text-muted-foreground text-xs mr-1">Var:</span>
+              <span
+                className={cn(
+                  "font-medium",
+                  actualVariance < 0 ? "text-red-600" : "text-emerald-600"
+                )}
+              >
+                {formatCurrency(actualVariance)}
               </span>
             </div>
           )}

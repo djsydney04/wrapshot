@@ -1,11 +1,29 @@
 "use client";
 
 import * as React from "react";
-import { useParams } from "next/navigation";
-import { Film, MoreHorizontal, Loader2 } from "lucide-react";
-import { Header } from "@/components/layout/header";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import {
+  Film,
+  Loader2,
+  ChevronLeft,
+  Settings,
+  LogOut,
+  ChevronDown,
+  User,
+  CreditCard,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/components/providers/auth-provider";
 import { ProjectSidebar, type ProjectSection } from "@/components/projects/project-sidebar";
 import { OverviewSection } from "@/components/projects/sections/overview-section";
 import { StripeboardSection } from "@/components/projects/sections/stripeboard-section";
@@ -19,10 +37,14 @@ import { BudgetSection } from "@/components/projects/sections/budget-section";
 import { SettingsSection } from "@/components/projects/sections/settings-section";
 import { SetupWizard } from "@/components/projects/setup-wizard";
 import { useProjectStore } from "@/lib/stores/project-store";
-import { getProject, type Project } from "@/lib/actions/projects";
+import { getProject } from "@/lib/actions/projects";
+import type { Project } from "@/lib/actions/projects.types";
 import { getScenes, type Scene as DBScene } from "@/lib/actions/scenes";
 import { getBudgetsForProject, type Budget } from "@/lib/actions/budgets";
-import { getCrewMembers, type CrewMember } from "@/lib/actions/crew";
+import { getCrewMembersWithInviteStatus, type CrewMemberWithInviteStatus } from "@/lib/actions/crew";
+import { getCastMembersWithInviteStatus, type CastMemberWithInviteStatus } from "@/lib/actions/cast";
+import { useShootingDays } from "@/lib/hooks/use-shooting-days";
+import { trackProjectViewed } from "@/lib/analytics/posthog";
 
 const statusVariant: Record<Project["status"], "development" | "pre-production" | "production" | "post-production" | "completed" | "on-hold"> = {
   DEVELOPMENT: "development",
@@ -44,9 +66,11 @@ const statusLabel: Record<Project["status"], string> = {
 
 export default function ProjectDetailPage() {
   const params = useParams();
+  const router = useRouter();
+  const { user } = useAuth();
   const projectId = params.projectId as string;
 
-  const [activeSection, setActiveSection] = React.useState<ProjectSection>("overview");
+  const [activeSection, setActiveSection] = React.useState<ProjectSection>("scenes");
   const [showWizard, setShowWizard] = React.useState(false);
   const [wizardDismissed, setWizardDismissed] = React.useState(false);
   const [project, setProject] = React.useState<Project | null>(null);
@@ -55,32 +79,39 @@ export default function ProjectDetailPage() {
   // Database-backed data
   const [dbScenes, setDbScenes] = React.useState<DBScene[]>([]);
   const [budgets, setBudgets] = React.useState<Budget[]>([]);
-  const [crew, setCrew] = React.useState<CrewMember[]>([]);
+  const [crew, setCrew] = React.useState<CrewMemberWithInviteStatus[]>([]);
+  const [cast, setCast] = React.useState<CastMemberWithInviteStatus[]>([]);
 
   // Still using store for other data (not yet migrated to DB)
   const {
     getScenesForProject,
-    getCastForProject,
     getLocationsForProject,
     getShootingDaysForProject,
     getGearForProject,
     getScriptsForProject,
   } = useProjectStore();
 
-  // Fetch project, scenes, budgets, and crew from database
+  // Fetch project, scenes, budgets, cast, and crew from database
   React.useEffect(() => {
     async function loadProject() {
       try {
-        const [projectData, scenesResult, budgetsData, crewResult] = await Promise.all([
+        const [projectData, scenesResult, budgetsData, castResult, crewResult] = await Promise.all([
           getProject(projectId),
           getScenes(projectId),
           getBudgetsForProject(projectId),
-          getCrewMembers(projectId),
+          getCastMembersWithInviteStatus(projectId),
+          getCrewMembersWithInviteStatus(projectId),
         ]);
         setProject(projectData);
         if (scenesResult.data) setDbScenes(scenesResult.data);
         setBudgets(budgetsData);
+        if (castResult.data) setCast(castResult.data);
         if (crewResult.data) setCrew(crewResult.data);
+
+        // Track project view
+        if (projectData) {
+          trackProjectViewed(projectData.id, projectData.name);
+        }
       } catch (err) {
         console.error("Error loading project:", err);
       } finally {
@@ -92,38 +123,46 @@ export default function ProjectDetailPage() {
 
   // Store data (for sections not yet migrated to use DB types)
   const storeScenes = getScenesForProject(projectId);
-  const cast = getCastForProject(projectId);
+  const storeCast = useProjectStore((s) => s.getCastForProject(projectId));
   const locations = getLocationsForProject(projectId);
-  const shootingDays = getShootingDaysForProject(projectId);
+  const storeShootingDays = getShootingDaysForProject(projectId);
+  const { shootingDays: dbShootingDays } = useShootingDays({ projectId });
   const gear = getGearForProject(projectId);
   const scripts = getScriptsForProject(projectId);
 
   // Use DB scenes for the scenes section, store scenes for others (until migrated)
   const scenes = dbScenes.length > 0 ? dbScenes : storeScenes;
+  const shootingDays = dbShootingDays.length > 0 ? dbShootingDays : storeShootingDays;
 
-  // Check if project is new (show wizard)
+  // Check if project is new (show wizard only for first project ever)
   React.useEffect(() => {
     const totalScenes = dbScenes.length + storeScenes.length;
-    const isNewProject = totalScenes === 0 && cast.length === 0 && shootingDays.length === 0 && !wizardDismissed;
-    // Check localStorage for wizard dismissal
+    const totalCast = cast.length + storeCast.length;
+    const isNewProject = totalScenes === 0 && totalCast === 0 && shootingDays.length === 0 && !wizardDismissed;
+
+    // Check localStorage for wizard dismissal (per-project and global)
     const dismissed = localStorage.getItem(`wizard-dismissed-${projectId}`);
-    if (dismissed) {
+    const hasSeenWizardBefore = localStorage.getItem("wizard-seen-first-project");
+
+    if (dismissed || hasSeenWizardBefore) {
       setWizardDismissed(true);
     } else if (isNewProject) {
       setShowWizard(true);
     }
-  }, [projectId, dbScenes.length, storeScenes.length, cast.length, shootingDays.length, wizardDismissed]);
+  }, [projectId, dbScenes.length, storeScenes.length, cast.length, storeCast.length, shootingDays.length, wizardDismissed]);
 
   const handleWizardComplete = () => {
     setShowWizard(false);
     setWizardDismissed(true);
     localStorage.setItem(`wizard-dismissed-${projectId}`, "true");
+    localStorage.setItem("wizard-seen-first-project", "true");
   };
 
   const handleWizardSkip = () => {
     setShowWizard(false);
     setWizardDismissed(true);
     localStorage.setItem(`wizard-dismissed-${projectId}`, "true");
+    localStorage.setItem("wizard-seen-first-project", "true");
   };
 
   if (loading) {
@@ -174,6 +213,7 @@ export default function ProjectDetailPage() {
             shootingDays={shootingDays}
             scenes={storeScenes}
             locations={locations}
+            useMockData={false}
           />
         );
       case "cast":
@@ -210,20 +250,53 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <Header
-        breadcrumbs={[
-          { label: "Dashboard", href: "/" },
-          { label: "Projects", href: "/projects" },
-          { label: project.name },
-        ]}
-        actions={
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon-sm">
-              <MoreHorizontal className="h-4 w-4" />
+      {/* Header */}
+      <header className="flex h-14 items-center justify-between border-b border-border px-4">
+        <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+            <ChevronLeft className="h-4 w-4" />
+            <span className="text-sm font-medium">Projects</span>
+          </Link>
+          <span className="text-muted-foreground">/</span>
+          <span className="text-sm font-medium">{project.name}</span>
+        </div>
+
+        {/* User Menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-2">
+              <Avatar alt={user?.email || "User"} size="sm" />
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
-          </div>
-        }
-      />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <div className="px-2 py-1.5">
+              <p className="text-sm font-medium">{user?.email?.split("@")[0] || "User"}</p>
+              <p className="text-xs text-muted-foreground">{user?.email}</p>
+            </div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => router.push("/settings/account")}>
+              <User className="mr-2 h-4 w-4" />
+              Account
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/settings/billing")}>
+              <CreditCard className="mr-2 h-4 w-4" />
+              Billing
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/settings")}>
+              <Settings className="mr-2 h-4 w-4" />
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <form action="/auth/signout" method="post">
+              <DropdownMenuItem type="submit">
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign out
+              </DropdownMenuItem>
+            </form>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </header>
 
       <div className="flex-1 overflow-hidden flex">
         {/* Sidebar */}

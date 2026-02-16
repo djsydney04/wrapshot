@@ -14,6 +14,7 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle,
+  Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -24,47 +25,28 @@ import {
 } from "@/components/layout/settings-layout";
 import { useSubscription } from "@/lib/hooks/use-permissions";
 import { useAuth } from "@/components/providers/auth-provider";
+import { useTiers, getTierFeatures, formatPrice, type PlanTier } from "@/lib/hooks/use-tiers";
 
-const plans = [
-  {
-    id: "FREE",
-    name: "Free",
-    price: "$0",
-    description: "For individuals getting started",
-    features: ["Join 1 project", "Basic scheduling", "7-day history"],
-    icon: Zap,
-    color: "text-muted-foreground",
-    bg: "bg-muted",
-  },
-  {
-    id: "PRO",
-    name: "Pro",
-    price: "$29",
-    description: "For professionals on multiple productions",
-    features: ["Join unlimited projects", "Advanced scheduling", "Call sheet generation", "30-day history"],
-    icon: Sparkles,
-    color: "text-blue-600",
-    bg: "bg-blue-50",
-    popular: true,
-  },
-  {
-    id: "STUDIO",
-    name: "Studio",
-    price: "$99",
-    description: "For power users and studios",
-    features: ["Everything in Pro", "Priority support", "Custom integrations", "Unlimited history", "API access"],
-    icon: Crown,
-    color: "text-amber-600",
-    bg: "bg-amber-50",
-  },
-];
+// Icon and styling config per tier
+const tierConfig: Record<string, {
+  icon: typeof Zap;
+  color: string;
+  bg: string;
+  popular?: boolean;
+}> = {
+  FREE: { icon: Zap, color: "text-muted-foreground", bg: "bg-muted" },
+  PRO: { icon: Sparkles, color: "text-blue-600", bg: "bg-blue-50", popular: true },
+  STUDIO: { icon: Crown, color: "text-amber-600", bg: "bg-amber-50" },
+};
 
 function BillingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { user, refreshAuth } = useAuth();
   const subscription = useSubscription();
+  const { tiers, loading: tiersLoading } = useTiers();
   const currentPlan = subscription?.plan ?? "FREE";
+  const currentTier = tiers.find((t) => t.id === currentPlan);
 
   const [loadingPlan, setLoadingPlan] = React.useState<string | null>(null);
   const [loadingPortal, setLoadingPortal] = React.useState(false);
@@ -77,13 +59,38 @@ function BillingContent() {
 
     if (success === "true") {
       setMessage({ type: "success", text: "Your subscription has been updated!" });
+      // Refresh auth to get updated subscription/permissions from webhook
+      refreshAuth();
       // Clear the URL params
       router.replace("/settings/billing");
     } else if (canceled === "true") {
       setMessage({ type: "error", text: "Checkout was canceled." });
       router.replace("/settings/billing");
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, refreshAuth]);
+
+  // Sync invoice count from Stripe on page load for subscribed users
+  const hasSyncedRef = React.useRef(false);
+  React.useEffect(() => {
+    const syncInvoices = async () => {
+      if (!subscription?.stripeSubscriptionId || hasSyncedRef.current) return;
+      hasSyncedRef.current = true;
+
+      try {
+        const response = await fetch("/api/billing/sync-invoices", {
+          method: "POST",
+        });
+        if (response.ok) {
+          // Refresh to get the updated invoice count
+          refreshAuth();
+        }
+      } catch (error) {
+        console.error("Failed to sync invoices:", error);
+      }
+    };
+
+    syncInvoices();
+  }, [subscription?.stripeSubscriptionId, refreshAuth]);
 
   const handleUpgrade = async (planId: string) => {
     if (!user?.id) return;
@@ -204,7 +211,7 @@ function BillingContent() {
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="font-medium">
-                    {plans.find(p => p.id === currentPlan)?.name ?? "Free"} Plan
+                    {currentTier?.name ?? "Free"} Plan
                   </h3>
                   {subscription?.status === "TRIALING" && trialDaysLeft !== null && (
                     <Badge variant="secondary" className="bg-amber-50 text-amber-600 border-0">
@@ -220,7 +227,7 @@ function BillingContent() {
                 <p className="text-sm text-muted-foreground">
                   {currentPlan === "FREE"
                     ? "Upgrade to unlock more features"
-                    : `$${currentPlan === "PRO" ? "29" : "99"}/month`}
+                    : `${formatPrice(currentTier?.monthlyPriceCents ?? 0)}/month`}
                 </p>
               </div>
             </div>
@@ -241,73 +248,83 @@ function BillingContent() {
       {/* Plans */}
       <div>
         <h2 className="text-sm font-medium mb-3">Plans</h2>
-        <div className="grid md:grid-cols-3 gap-3">
-          {plans.map((plan) => {
-            const Icon = plan.icon;
-            const isCurrent = plan.id === currentPlan;
-            const isUpgrade =
-              (currentPlan === "FREE" && (plan.id === "PRO" || plan.id === "STUDIO")) ||
-              (currentPlan === "PRO" && plan.id === "STUDIO");
-            const isDowngrade =
-              (currentPlan === "STUDIO" && (plan.id === "PRO" || plan.id === "FREE")) ||
-              (currentPlan === "PRO" && plan.id === "FREE");
-            const isLoading = loadingPlan === plan.id;
+        {tiersLoading ? (
+          <div className="grid md:grid-cols-3 gap-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="animate-pulse bg-muted h-64 rounded-xl" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-3 gap-3">
+            {tiers.map((tier) => {
+              const config = tierConfig[tier.id] ?? tierConfig.FREE;
+              const Icon = config.icon;
+              const isCurrent = tier.id === currentPlan;
+              const isUpgrade =
+                (currentPlan === "FREE" && (tier.id === "PRO" || tier.id === "STUDIO")) ||
+                (currentPlan === "PRO" && tier.id === "STUDIO");
+              const isDowngrade =
+                (currentPlan === "STUDIO" && (tier.id === "PRO" || tier.id === "FREE")) ||
+                (currentPlan === "PRO" && tier.id === "FREE");
+              const isLoading = loadingPlan === tier.id;
+              const features = getTierFeatures(tier);
 
-            return (
-              <div
-                key={plan.id}
-                className={cn(
-                  "relative p-5 rounded-xl border-2 transition-all",
-                  isCurrent
-                    ? "border-foreground bg-muted/30"
-                    : "border-border bg-card hover:border-muted-foreground/30"
-                )}
-              >
-                {plan.popular && !isCurrent && (
-                  <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
-                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-foreground text-background">
-                      Popular
-                    </span>
-                  </div>
-                )}
-
-                <div className={cn("flex h-9 w-9 items-center justify-center rounded-lg mb-3", plan.bg)}>
-                  <Icon className={cn("h-4 w-4", plan.color)} />
-                </div>
-
-                <h3 className="font-medium">{plan.name}</h3>
-                <div className="mt-1 mb-2">
-                  <span className="text-xl font-bold">{plan.price}</span>
-                  <span className="text-muted-foreground text-sm">/month</span>
-                </div>
-                <p className="text-sm text-muted-foreground mb-3">{plan.description}</p>
-
-                <ul className="space-y-1.5 mb-4">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2 text-sm">
-                      <Check className="h-3.5 w-3.5 text-emerald-600" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-
-                <Button
-                  variant={isCurrent ? "outline" : isUpgrade ? "default" : "outline"}
-                  className="w-full"
-                  disabled={isCurrent || isDowngrade || isLoading}
-                  onClick={() => isUpgrade && handleUpgrade(plan.id)}
+              return (
+                <div
+                  key={tier.id}
+                  className={cn(
+                    "relative p-5 rounded-xl border-2 transition-all",
+                    isCurrent
+                      ? "border-foreground bg-muted/30"
+                      : "border-border bg-card hover:border-muted-foreground/30"
+                  )}
                 >
-                  {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  {isCurrent
-                    ? "Current Plan"
-                    : isDowngrade
-                    ? "Manage in Portal"
-                    : "Upgrade"}
-                </Button>
-              </div>
-            );
-          })}
-        </div>
+                  {config.popular && !isCurrent && (
+                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-foreground text-background">
+                        Popular
+                      </span>
+                    </div>
+                  )}
+
+                  <div className={cn("flex h-9 w-9 items-center justify-center rounded-lg mb-3", config.bg)}>
+                    <Icon className={cn("h-4 w-4", config.color)} />
+                  </div>
+
+                  <h3 className="font-medium">{tier.name}</h3>
+                  <div className="mt-1 mb-2">
+                    <span className="text-xl font-bold">{formatPrice(tier.monthlyPriceCents)}</span>
+                    <span className="text-muted-foreground text-sm">/month</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">{tier.description}</p>
+
+                  <ul className="space-y-1.5 mb-4">
+                    {features.slice(0, 5).map((feature) => (
+                      <li key={feature} className="flex items-center gap-2 text-sm">
+                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Button
+                    variant={isCurrent ? "outline" : isUpgrade ? "default" : "outline"}
+                    className="w-full"
+                    disabled={isCurrent || isDowngrade || isLoading}
+                    onClick={() => isUpgrade && handleUpgrade(tier.id)}
+                  >
+                    {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    {isCurrent
+                      ? "Current Plan"
+                      : isDowngrade
+                      ? "Manage in Portal"
+                      : "Upgrade"}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Payment Method - Only show if they have a subscription */}
@@ -351,6 +368,25 @@ function BillingContent() {
             description="View invoices in the billing portal"
           />
           <SettingsCardBody>
+            {/* Invoice Count Display */}
+            {subscription.invoiceCount > 0 && (
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-md bg-card border border-border">
+                    <Receipt className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Total Payments</p>
+                    <p className="text-xs text-muted-foreground">
+                      You have been billed {subscription.invoiceCount} {subscription.invoiceCount === 1 ? "time" : "times"}
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="secondary" className="bg-emerald-50 text-emerald-600 border-0">
+                  {subscription.invoiceCount} {subscription.invoiceCount === 1 ? "invoice" : "invoices"}
+                </Badge>
+              </div>
+            )}
             <div className="text-center py-6">
               <CreditCard className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground mb-3">

@@ -12,8 +12,11 @@ import {
   UserPlus,
   DollarSign,
   Settings,
+  MessageSquarePlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FeedbackButton } from "@/components/feedback/feedback-button";
+import { ShareButton } from "@/components/share/share-button";
 
 export type ProjectSection =
   | "overview"
@@ -70,8 +73,8 @@ export function ProjectSidebar({
   ];
 
   return (
-    <nav className={cn("py-2", className)}>
-      <ul className="space-y-0.5 px-2">
+    <nav className={cn("py-2 flex flex-col h-full", className)}>
+      <ul className="space-y-0.5 px-2 flex-1">
         {sections.map((section) => {
           const Icon = section.icon;
           const isActive = activeSection === section.id;
@@ -99,6 +102,12 @@ export function ProjectSidebar({
           );
         })}
       </ul>
+
+      {/* Share & Feedback at bottom */}
+      <div className="mt-auto pt-4 px-2 border-t border-border space-y-1">
+        <ShareButton variant="default" />
+        <FeedbackButton variant="default" />
+      </div>
     </nav>
   );
 }

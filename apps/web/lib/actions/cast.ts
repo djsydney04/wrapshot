@@ -400,6 +400,85 @@ export async function linkCastMemberToUser(castMemberId: string, linkedUserId: s
   return { data: data as CastMember, error: null };
 }
 
+export type CastMemberInviteStatus = "linked" | "invite_sent" | "invite_expired" | "no_account";
+
+export interface CastMemberWithInviteStatus extends CastMember {
+  inviteStatus: CastMemberInviteStatus;
+  inviteId?: string;
+  inviteExpiresAt?: string;
+}
+
+// Get all cast members with their invite status
+export async function getCastMembersWithInviteStatus(
+  projectId: string
+): Promise<{ data: CastMemberWithInviteStatus[] | null; error: string | null }> {
+  const supabase = await createClient();
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return { data: null, error: "Not authenticated" };
+  }
+
+  // Get cast members
+  const { data: castMembers, error: castError } = await supabase
+    .from("CastMember")
+    .select("*")
+    .eq("projectId", projectId)
+    .order("castNumber", { ascending: true, nullsFirst: false });
+
+  if (castError) {
+    console.error("Error fetching cast members:", castError);
+    return { data: null, error: castError.message };
+  }
+
+  if (!castMembers || castMembers.length === 0) {
+    return { data: [], error: null };
+  }
+
+  // Get all pending/active cast invites for this project
+  const { data: invites } = await supabase
+    .from("CastCrewInvite")
+    .select("id, email, targetId, expiresAt, acceptedAt")
+    .eq("projectId", projectId)
+    .eq("inviteType", "CAST")
+    .is("acceptedAt", null);
+
+  // Create a map of targetId -> invite
+  const inviteMap = new Map(
+    invites?.map((inv) => [inv.targetId, inv]) || []
+  );
+
+  // Determine invite status for each cast member
+  const result: CastMemberWithInviteStatus[] = castMembers.map((member) => {
+    const invite = inviteMap.get(member.id);
+
+    let inviteStatus: CastMemberInviteStatus;
+
+    if (member.userId) {
+      inviteStatus = "linked";
+    } else if (invite) {
+      if (new Date(invite.expiresAt) < new Date()) {
+        inviteStatus = "invite_expired";
+      } else {
+        inviteStatus = "invite_sent";
+      }
+    } else if (member.email) {
+      inviteStatus = "no_account";
+    } else {
+      inviteStatus = "no_account";
+    }
+
+    return {
+      ...(member as CastMember),
+      inviteStatus,
+      inviteId: invite?.id,
+      inviteExpiresAt: invite?.expiresAt,
+    };
+  });
+
+  return { data: result, error: null };
+}
+
 // Get cast member by userId for a project
 export async function getCastMemberByUserId(projectId: string, linkedUserId: string) {
   const supabase = await createClient();

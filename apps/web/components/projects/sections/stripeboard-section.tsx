@@ -3,15 +3,23 @@
 import * as React from "react";
 import {
   DndContext,
-  DragEndEvent,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+  type UniqueIdentifier,
   DragOverlay,
-  DragStartEvent,
   PointerSensor,
   useSensor,
   useSensors,
   rectIntersection,
 } from "@dnd-kit/core";
-import { Plus, LayoutGrid, Columns3, Clapperboard, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import {
+  SortableContext,
+  arrayMove,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { Plus, LayoutGrid, Columns3, Clapperboard, PanelLeftClose, PanelLeftOpen, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { SceneStrip } from "@/components/stripeboard/scene-strip";
 import { ShootDayContainer } from "@/components/stripeboard/shoot-day-container";
@@ -26,15 +34,36 @@ import {
   removeSceneFromShootingDay,
   type Scene,
 } from "@/lib/actions/scenes";
-import type { CastMember, ShootingDay } from "@/lib/mock-data";
+import { updateSceneOrder } from "@/lib/actions/shooting-days";
+import type { ShootingDay } from "@/lib/types";
+import type { CastMemberWithInviteStatus } from "@/lib/actions/cast";
 
 type ViewMode = "stripeboard" | "list";
 
 interface StripeboardSectionProps {
   projectId: string;
   scenes: Scene[];
-  cast: CastMember[];
+  cast: CastMemberWithInviteStatus[];
   shootingDays: ShootingDay[];
+}
+
+const UNSCHEDULED_CONTAINER_ID = "unscheduled-pool";
+
+function findContainerInMap(
+  containers: Record<string, string[]>,
+  id: string
+): string | undefined {
+  if (id in containers) return id;
+  return Object.keys(containers).find((containerId) => containers[containerId].includes(id));
+}
+
+function getSortableContainerId(
+  item: { id: UniqueIdentifier; data: { current?: unknown } } | null | undefined
+): string | undefined {
+  if (!item) return undefined;
+  const sortable = (item.data.current as { sortable?: { containerId?: string } } | undefined)
+    ?.sortable;
+  return sortable?.containerId;
 }
 
 export function StripeboardSection({
@@ -49,6 +78,8 @@ export function StripeboardSection({
   const [showBreakdownPanel, setShowBreakdownPanel] = React.useState(true);
   const [localScenes, setLocalScenes] = React.useState(scenes);
   const [activeId, setActiveId] = React.useState<string | null>(null);
+  const [itemsByContainer, setItemsByContainer] = React.useState<Record<string, string[]>>({});
+  const [isSaving, setIsSaving] = React.useState(false);
 
   // Update local scenes when props change
   React.useEffect(() => {
@@ -63,16 +94,60 @@ export function StripeboardSection({
     })
   );
 
-  // Get scenes assigned to a shooting day
-  const getScenesForDay = (shootingDayId: string) => {
-    const day = shootingDays.find((d) => d.id === shootingDayId);
-    if (!day) return [];
-    return localScenes.filter((s) => day.scenes.includes(s.id));
-  };
+  const sceneById = React.useMemo(() => {
+    return new Map(localScenes.map((scene) => [scene.id, scene]));
+  }, [localScenes]);
 
-  // Get unscheduled scenes
-  const assignedSceneIds = new Set(shootingDays.flatMap((d) => d.scenes));
-  const unscheduledScenes = localScenes.filter((s) => !assignedSceneIds.has(s.id));
+  const buildItemsByContainer = React.useCallback(() => {
+    const sceneIds = new Set(localScenes.map((scene) => scene.id));
+    const next: Record<string, string[]> = {};
+    const assigned = new Set<string>();
+
+    shootingDays.forEach((day) => {
+      const ids = (day.scenes || []).filter((id) => sceneIds.has(id));
+      next[`day-${day.id}`] = ids;
+      ids.forEach((id) => assigned.add(id));
+    });
+
+    const unscheduled = localScenes
+      .filter((scene) => !assigned.has(scene.id))
+      .sort((a, b) => {
+        const aNum = parseInt(a.sceneNumber);
+        const bNum = parseInt(b.sceneNumber);
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+          return aNum - bNum;
+        }
+        return a.sceneNumber.localeCompare(b.sceneNumber, undefined, {
+          numeric: true,
+        });
+      })
+      .map((scene) => scene.id);
+
+    next[UNSCHEDULED_CONTAINER_ID] = unscheduled;
+
+    return next;
+  }, [localScenes, shootingDays]);
+
+  React.useEffect(() => {
+    if (activeId) return;
+    setItemsByContainer(buildItemsByContainer());
+  }, [buildItemsByContainer, activeId]);
+
+  const assignedSceneIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    Object.entries(itemsByContainer).forEach(([containerId, sceneIds]) => {
+      if (containerId !== UNSCHEDULED_CONTAINER_ID) {
+        sceneIds.forEach((id) => ids.add(id));
+      }
+    });
+    return ids;
+  }, [itemsByContainer]);
+
+  const resolveScenes = React.useCallback(
+    (sceneIds: string[]) =>
+      sceneIds.map((id) => sceneById.get(id)).filter(Boolean) as Scene[],
+    [sceneById]
+  );
 
   // Sort scenes by sortOrder
   const sortedScenes = React.useMemo(() => {
@@ -88,34 +163,163 @@ export function StripeboardSection({
     setActiveId(event.active.id as string);
   };
 
+  const findContainer = React.useCallback(
+    (id: string) => {
+      return findContainerInMap(itemsByContainer, id);
+    },
+    [itemsByContainer]
+  );
+
+  const getDayId = (containerId: string) => containerId.replace("day-", "");
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeIdStr = active.id as string;
+    const overIdStr = over.id as string;
+
+    setItemsByContainer((prev) => {
+      const activeContainer =
+        getSortableContainerId(active) || findContainerInMap(prev, activeIdStr);
+      const overContainer =
+        getSortableContainerId(over) || findContainerInMap(prev, overIdStr);
+
+      if (!activeContainer || !overContainer || activeContainer === overContainer) {
+        return prev;
+      }
+
+      // Guard against undefined containers
+      if (!prev[activeContainer] || !prev[overContainer]) {
+        return prev;
+      }
+
+      const activeItems = prev[activeContainer].filter((id) => id !== activeIdStr);
+      const overItems = prev[overContainer];
+      const overIndex = overItems.indexOf(overIdStr);
+      const newIndex = overIndex >= 0 ? overIndex : overItems.length;
+
+      const nextOverItems = [
+        ...overItems.slice(0, newIndex),
+        activeIdStr,
+        ...overItems.slice(newIndex),
+      ];
+
+      return {
+        ...prev,
+        [activeContainer]: activeItems,
+        [overContainer]: nextOverItems,
+      };
+    });
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
 
     if (!over) return;
 
-    const sceneId = (active.id as string).replace("scene-", "");
-    const overId = over.id as string;
+    const activeIdStr = active.id as string;
+    const overIdStr = over.id as string;
 
-    // Dropped on a shooting day
-    if (overId.startsWith("day-")) {
-      const shootingDayId = overId.replace("day-", "");
-      await assignSceneToShootingDay(sceneId, shootingDayId, 0, projectId);
-    }
-    // Dropped on unscheduled pool
-    else if (overId === "unscheduled-pool") {
-      // Find which day this scene was in and unassign it
-      for (const day of shootingDays) {
-        if (day.scenes.includes(sceneId)) {
-          await removeSceneFromShootingDay(sceneId, day.id, projectId);
-          break;
+    const activeContainer =
+      getSortableContainerId(active) || findContainer(activeIdStr);
+    const overContainer =
+      getSortableContainerId(over) || findContainer(overIdStr);
+
+    if (!activeContainer || !overContainer) return;
+
+    // Store previous state for rollback
+    const previousItems = { ...itemsByContainer };
+    const previousScenes = [...localScenes];
+
+    if (activeContainer === overContainer) {
+      const items = itemsByContainer[activeContainer] || [];
+      const oldIndex = items.indexOf(activeIdStr);
+      const overIndex = items.indexOf(overIdStr);
+      const newIndex = overIndex >= 0 ? overIndex : items.length - 1;
+
+      if (oldIndex !== newIndex) {
+        const nextItems = arrayMove(items, oldIndex, newIndex);
+        setItemsByContainer((prev) => ({ ...prev, [activeContainer]: nextItems }));
+
+        if (activeContainer !== UNSCHEDULED_CONTAINER_ID) {
+          setIsSaving(true);
+          try {
+            await updateSceneOrder(getDayId(activeContainer), nextItems);
+            toast.success("Scene order updated");
+          } catch (error) {
+            console.error("Failed to update scene order:", error);
+            setItemsByContainer(previousItems);
+            toast.error("Failed to update scene order");
+          } finally {
+            setIsSaving(false);
+          }
         }
       }
+
+      return;
+    }
+
+    const sourceDayId =
+      activeContainer !== UNSCHEDULED_CONTAINER_ID ? getDayId(activeContainer) : null;
+    const targetDayId =
+      overContainer !== UNSCHEDULED_CONTAINER_ID ? getDayId(overContainer) : null;
+
+    let targetItems = itemsByContainer[overContainer] || [];
+    if (!targetItems.includes(activeIdStr)) {
+      targetItems = [...targetItems, activeIdStr];
+    }
+
+    const nextSourceItems =
+      itemsByContainer[activeContainer]?.filter((id) => id !== activeIdStr) || [];
+
+    // Optimistic update
+    setItemsByContainer((prev) => ({
+      ...prev,
+      [activeContainer]: nextSourceItems,
+      [overContainer]: targetItems,
+    }));
+
+    setIsSaving(true);
+    try {
+      if (targetDayId) {
+        const insertIndex = targetItems.indexOf(activeIdStr);
+        await assignSceneToShootingDay(activeIdStr, targetDayId, Math.max(insertIndex, 0), projectId);
+        await updateSceneOrder(targetDayId, targetItems);
+        setLocalScenes((prev) =>
+          prev.map((scene) =>
+            scene.id === activeIdStr ? { ...scene, status: "SCHEDULED" } : scene
+          )
+        );
+        toast.success("Scene scheduled");
+      } else if (sourceDayId) {
+        await removeSceneFromShootingDay(activeIdStr, sourceDayId, projectId);
+        setLocalScenes((prev) =>
+          prev.map((scene) =>
+            scene.id === activeIdStr ? { ...scene, status: "NOT_SCHEDULED" } : scene
+          )
+        );
+        toast.success("Scene unscheduled");
+      }
+
+      if (sourceDayId) {
+        await updateSceneOrder(sourceDayId, nextSourceItems);
+      }
+    } catch (error) {
+      console.error("Failed to move scene:", error);
+      // Rollback on error
+      setItemsByContainer(previousItems);
+      setLocalScenes(previousScenes);
+      toast.error("Failed to move scene. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleDragCancel = () => {
     setActiveId(null);
+    setItemsByContainer(buildItemsByContainer());
   };
 
   const handleDeleteScene = async (id: string) => {
@@ -131,19 +335,20 @@ export function StripeboardSection({
     await updateSceneAction(id, updates as Parameters<typeof updateSceneAction>[1]);
   };
 
-  const activeScene = activeId
-    ? localScenes.find((s) => s.id === activeId.replace("scene-", ""))
-    : null;
+  const activeScene = activeId ? sceneById.get(activeId) || null : null;
 
   const totalPages = localScenes.reduce((sum, s) => sum + s.pageCount, 0);
   const completedScenes = localScenes.filter((s) => s.status === "COMPLETED").length;
-  const scheduledScenes = localScenes.filter((s) => s.status === "SCHEDULED" || assignedSceneIds.has(s.id)).length;
+  const scheduledScenes = localScenes.filter(
+    (s) => s.status === "SCHEDULED" || assignedSceneIds.has(s.id)
+  ).length;
 
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={rectIntersection}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
@@ -160,6 +365,11 @@ export function StripeboardSection({
               <span>·</span>
               <span>{completedScenes} completed</span>
             </div>
+            {viewMode === "stripeboard" && (
+              <p className="hidden lg:block text-xs text-muted-foreground">
+                Drag scenes from the right column into shooting days to build your schedule.
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -218,6 +428,7 @@ export function StripeboardSection({
               <div className="w-80 flex-shrink-0">
                 <BreakdownPanel
                   scene={selectedScene}
+                  projectId={projectId}
                   cast={cast}
                   onUpdate={(updates) => handleUpdateScene(selectedScene.id, updates)}
                   onClose={() => setSelectedSceneId(null)}
@@ -232,13 +443,20 @@ export function StripeboardSection({
                   {/* Shooting Days */}
                   {shootingDays.length > 0 ? (
                     shootingDays.map((day) => (
-                      <ShootDayContainer
+                      <SortableContext
                         key={day.id}
-                        shootingDay={day}
-                        scenes={getScenesForDay(day.id)}
-                        onSceneClick={setSelectedSceneId}
-                        selectedSceneId={selectedSceneId}
-                      />
+                        items={itemsByContainer[`day-${day.id}`] || []}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <ShootDayContainer
+                          shootingDay={day}
+                          scenes={resolveScenes(itemsByContainer[`day-${day.id}`] || [])}
+                          onSceneClick={setSelectedSceneId}
+                          selectedSceneId={selectedSceneId}
+                          activeId={activeId}
+                          isSaving={isSaving}
+                        />
+                      </SortableContext>
                     ))
                   ) : (
                     <div className="rounded-lg border border-dashed border-border p-8 text-center">
@@ -271,9 +489,10 @@ export function StripeboardSection({
             {viewMode === "stripeboard" && (
               <div className="w-64 flex-shrink-0">
                 <UnscheduledPool
-                  scenes={unscheduledScenes}
+                  scenes={resolveScenes(itemsByContainer[UNSCHEDULED_CONTAINER_ID] || [])}
                   onSceneClick={setSelectedSceneId}
                   selectedSceneId={selectedSceneId}
+                  activeId={activeId}
                 />
               </div>
             )}
@@ -283,7 +502,8 @@ export function StripeboardSection({
             <Clapperboard className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
             <h3 className="font-medium mb-1">No scenes yet</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Add scenes manually or use AI breakdown to extract them from your script
+              Add scenes manually or use Wrapshot Intelligence breakdown to extract them from your
+              script
             </p>
             <Button onClick={() => setShowAddScene(true)}>
               <Plus className="h-4 w-4" />
@@ -302,13 +522,14 @@ export function StripeboardSection({
       </div>
 
       {/* Drag Overlay */}
-      <DragOverlay>
+      <DragOverlay dropAnimation={{ duration: 200, easing: "ease-out" }}>
         {activeScene && (
           <SceneStrip
             scene={activeScene}
             isSelected={false}
             isDragging
             layout="strip"
+            className="shadow-xl rotate-1"
           />
         )}
       </DragOverlay>

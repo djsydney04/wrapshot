@@ -13,6 +13,7 @@ export interface Subscription {
   stripeCurrentPeriodEnd: string | null;
   stripeSubscriptionId: string | null;
   cancelAtPeriodEnd: boolean;
+  invoiceCount: number;
 }
 
 interface User {
@@ -99,12 +100,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Fetch subscription for user
     const { data: subData } = await supabase
       .from("Subscription")
-      .select("plan, status, trialEndsAt, stripeCurrentPeriodEnd, stripeSubscriptionId, cancelAtPeriodEnd")
+      .select("plan, status, trialEndsAt, stripeCurrentPeriodEnd, stripeSubscriptionId, cancelAtPeriodEnd, invoiceCount")
       .eq("userId", userId)
       .maybeSingle();
 
     if (subData) {
-      setSubscription(subData as Subscription);
+      setSubscription({
+        ...subData,
+        invoiceCount: subData.invoiceCount ?? 0,
+      } as Subscription);
     } else {
       // Default to free plan if no subscription
       setSubscription({
@@ -114,6 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         stripeCurrentPeriodEnd: null,
         stripeSubscriptionId: null,
         cancelAtPeriodEnd: false,
+        invoiceCount: 0,
       });
     }
   }, [supabase]);
