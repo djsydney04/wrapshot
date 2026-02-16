@@ -31,6 +31,7 @@ import {
   Plus,
   X,
   Search,
+  Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ const BREAKDOWN_CATEGORIES: {
   column: "left" | "right";
 }[] = [
   // Left column - Production departments
+  { category: "NAME", label: "Names", icon: <Tag className="h-4 w-4" />, color: "bg-fuchsia-500/10 text-fuchsia-700 border-fuchsia-200", column: "left" },
   { category: "BACKGROUND", label: "Background", icon: <Users className="h-4 w-4" />, color: "bg-amber-500/10 text-amber-700 border-amber-200", column: "left" },
   { category: "PROP", label: "Props", icon: <Package className="h-4 w-4" />, color: "bg-blue-500/10 text-blue-700 border-blue-200", column: "left" },
   { category: "VEHICLE", label: "Vehicles", icon: <Car className="h-4 w-4" />, color: "bg-slate-500/10 text-slate-700 border-slate-200", column: "left" },
