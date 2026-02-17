@@ -3,6 +3,7 @@
  * Uses Fireworks AI as the inference provider
  */
 import { getFireworksApiKey } from "@/lib/ai/config";
+import { JsonParser } from "@/lib/agents/utils/json-parser";
 
 interface KimiMessage {
   role: "system" | "user" | "assistant";
@@ -13,6 +14,7 @@ interface KimiCompletionOptions {
   messages: KimiMessage[];
   maxTokens?: number;
   temperature?: number;
+  timeout?: number;
 }
 
 interface KimiResponse {
@@ -38,36 +40,57 @@ export class KimiClient {
   }
 
   async complete(options: KimiCompletionOptions): Promise<string> {
-    const { messages, maxTokens = 4000, temperature = 0.1 } = options;
+    const { messages, maxTokens = 4000, temperature = 0.1, timeout = 120000 } = options;
 
-    const response = await fetch(this.baseUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: this.model,
-        messages,
-        max_tokens: maxTokens,
-        temperature,
-      }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Kimi API error:", response.status, errorText);
-      throw new Error(`Kimi API error: ${response.status}`);
+    try {
+      const response = await fetch(this.baseUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages,
+          max_tokens: maxTokens,
+          temperature,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Kimi API error:", response.status, errorText);
+
+        // Provide more specific error messages
+        if (response.status === 429) {
+          throw new Error(`Kimi API rate limit exceeded (429)`);
+        }
+        if (response.status >= 500) {
+          throw new Error(`Kimi API server error (${response.status})`);
+        }
+        throw new Error(`Kimi API error: ${response.status}`);
+      }
+
+      const data: KimiResponse = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+
+      if (!content) {
+        throw new Error("No content in Kimi response");
+      }
+
+      return content;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Kimi API timeout after ${timeout}ms`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const data: KimiResponse = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-
-    if (!content) {
-      throw new Error("No content in Kimi response");
-    }
-
-    return content;
   }
 
   /**
@@ -137,19 +160,14 @@ export class KimiClient {
 
   /**
    * Extract JSON from a response that might contain markdown or extra text
+   * Uses the improved JsonParser with multiple extraction strategies
    */
   static extractJson<T>(content: string): T {
-    // Try to find JSON in the response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      // Try array
-      const arrayMatch = content.match(/\[[\s\S]*\]/);
-      if (!arrayMatch) {
-        throw new Error("No JSON found in response");
-      }
-      return JSON.parse(arrayMatch[0]) as T;
+    const result = JsonParser.parse<T>(content);
+    if (result === null) {
+      throw new Error("No JSON found in response");
     }
-    return JSON.parse(jsonMatch[0]) as T;
+    return result;
   }
 }
 
