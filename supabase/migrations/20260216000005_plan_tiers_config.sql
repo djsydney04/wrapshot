@@ -194,11 +194,13 @@ DROP POLICY IF EXISTS "Anyone can view plan tiers" ON "PlanTier";
 DROP POLICY IF EXISTS "Only service role can modify tiers" ON "PlanTier";
 
 -- Everyone can read plan tiers (public info)
+DROP POLICY IF EXISTS "Anyone can view plan tiers" ON "PlanTier";
 CREATE POLICY "Anyone can view plan tiers"
   ON "PlanTier" FOR SELECT
   USING (TRUE);
 
 -- Only service role can modify tiers
+DROP POLICY IF EXISTS "Only service role can modify tiers" ON "PlanTier";
 CREATE POLICY "Only service role can modify tiers"
   ON "PlanTier" FOR ALL
   USING (auth.role() = 'service_role');
