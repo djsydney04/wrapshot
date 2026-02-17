@@ -391,7 +391,7 @@ function ShareModal({
               <form onSubmit={handleEmailSubmit} className="space-y-4 pt-2">
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Friend's email
+                    Friend&apos;s email
                   </label>
                   <Input
                     type="email"

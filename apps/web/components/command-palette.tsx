@@ -5,13 +5,12 @@ import { useRouter } from "next/navigation";
 import { Command } from "cmdk";
 import {
   Film,
-  Calendar,
   Search,
-  Users,
-  MapPin,
-  FileText,
   LayoutDashboard,
   Plus,
+  Settings,
+  CreditCard,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLayoutStore } from "@/lib/stores/layout-store";
@@ -104,14 +103,6 @@ export function CommandPalette() {
                 <LayoutDashboard className="h-4 w-4" />
                 Go to Dashboard
               </Command.Item>
-              <Command.Item
-                value="schedule"
-                onSelect={() => runCommand(() => router.push("/schedule"))}
-                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm aria-selected:bg-accent"
-              >
-                <Calendar className="h-4 w-4" />
-                View Schedule
-              </Command.Item>
             </Command.Group>
 
             {/* Projects */}
@@ -144,20 +135,28 @@ export function CommandPalette() {
                 All Projects
               </Command.Item>
               <Command.Item
-                value="cast"
-                onSelect={() => runCommand(() => router.push("/cast"))}
+                value="finance"
+                onSelect={() => runCommand(() => router.push("/finance"))}
                 className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm aria-selected:bg-accent"
               >
-                <Users className="h-4 w-4" />
-                Cast & Crew
+                <DollarSign className="h-4 w-4" />
+                Finance
               </Command.Item>
               <Command.Item
-                value="locations"
-                onSelect={() => runCommand(() => router.push("/locations"))}
+                value="settings"
+                onSelect={() => runCommand(() => router.push("/settings"))}
                 className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm aria-selected:bg-accent"
               >
-                <MapPin className="h-4 w-4" />
-                Locations
+                <Settings className="h-4 w-4" />
+                Settings
+              </Command.Item>
+              <Command.Item
+                value="billing"
+                onSelect={() => runCommand(() => router.push("/settings/billing"))}
+                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm aria-selected:bg-accent"
+              >
+                <CreditCard className="h-4 w-4" />
+                Billing
               </Command.Item>
             </Command.Group>
           </Command.List>

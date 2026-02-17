@@ -142,6 +142,7 @@ export function useAgentJob({
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.id, jobId, job?.status, supabase]);
 
   // Fallback polling for environments where realtime might not work
@@ -159,6 +160,7 @@ export function useAgentJob({
     }, pollInterval);
 
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.id, jobId, job?.status, fetchJob, pollInterval]);
 
   // Computed states

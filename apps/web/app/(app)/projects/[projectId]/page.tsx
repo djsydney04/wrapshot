@@ -275,15 +275,15 @@ export default function ProjectDetailPage() {
               <p className="text-xs text-muted-foreground">{user?.email}</p>
             </div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push("/settings/account")}>
+            <DropdownMenuItem onClick={() => router.push("/settings")}>
               <User className="mr-2 h-4 w-4" />
-              Account
+              Profile
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push("/settings/billing")}>
               <CreditCard className="mr-2 h-4 w-4" />
               Billing
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push("/settings")}>
+            <DropdownMenuItem onClick={() => router.push("/settings/team")}>
               <Settings className="mr-2 h-4 w-4" />
               Settings
             </DropdownMenuItem>

@@ -384,7 +384,7 @@ function CategorySection({
                       className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left hover:bg-muted/50 text-primary"
                     >
                       <Plus className="h-4 w-4" />
-                      Create "{searchQuery}"
+                      Create &quot;{searchQuery}&quot;
                     </button>
                   )}
                   {searchQuery.trim() && filteredElements.length > 0 && (
@@ -394,7 +394,7 @@ function CategorySection({
                       className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left hover:bg-muted/50 text-primary border-t border-border"
                     >
                       <Plus className="h-4 w-4" />
-                      Create "{searchQuery}"
+                      Create &quot;{searchQuery}&quot;
                     </button>
                   )}
                 </div>
