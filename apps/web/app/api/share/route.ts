@@ -2,7 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createClient } from "@/lib/supabase/server";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialize Resend to avoid build-time errors when API key is not set
+let resend: Resend | null = null;
+function getResend(): Resend {
+  if (!resend) {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY is not configured");
+    }
+    resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resend;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -98,7 +108,7 @@ export async function POST(request: NextRequest) {
     `;
 
     // Send email via Resend
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: "wrapshoot <noreply@wrapshoot.com>",
       to: email,
       subject: `${senderName} invited you to try wrapshoot`,
