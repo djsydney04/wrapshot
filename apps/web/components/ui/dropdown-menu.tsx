@@ -36,16 +36,6 @@ const DropdownMenuContext = React.createContext<{
 
 function DropdownMenu({ children }: DropdownMenuProps) {
   const [open, setOpen] = React.useState(false);
-
-  return (
-    <DropdownMenuContext.Provider value={{ open, setOpen }}>
-      <div className="relative inline-block">{children}</div>
-    </DropdownMenuContext.Provider>
-  );
-}
-
-function DropdownMenuTrigger({ children, asChild }: DropdownMenuTriggerProps) {
-  const { open, setOpen } = React.useContext(DropdownMenuContext);
   const ref = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -62,11 +52,21 @@ function DropdownMenuTrigger({ children, asChild }: DropdownMenuTriggerProps) {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [open, setOpen]);
+  }, [open]);
+
+  return (
+    <DropdownMenuContext.Provider value={{ open, setOpen }}>
+      <div ref={ref} className="relative inline-block">{children}</div>
+    </DropdownMenuContext.Provider>
+  );
+}
+
+function DropdownMenuTrigger({ children, asChild }: DropdownMenuTriggerProps) {
+  const { open, setOpen } = React.useContext(DropdownMenuContext);
 
   if (asChild && React.isValidElement(children)) {
     return (
-      <div ref={ref}>
+      <div>
         {React.cloneElement(children as React.ReactElement<{ onClick?: () => void }>, {
           onClick: () => setOpen(!open),
         })}
@@ -75,7 +75,7 @@ function DropdownMenuTrigger({ children, asChild }: DropdownMenuTriggerProps) {
   }
 
   return (
-    <div ref={ref}>
+    <div>
       <button type="button" onClick={() => setOpen(!open)}>
         {children}
       </button>
