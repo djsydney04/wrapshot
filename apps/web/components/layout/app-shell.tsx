@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Sidebar } from "./sidebar";
 import { TimedSurvey } from "@/components/feedback/timed-survey";
 
 interface AppShellProps {
@@ -14,9 +13,8 @@ interface AppShellProps {
 
 export function AppShell({ children, user }: AppShellProps) {
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar user={user} />
-      <main className="flex-1 h-full overflow-auto">
+    <div className="h-screen overflow-hidden bg-background">
+      <main className="h-full overflow-auto">
         {children}
       </main>
       {/* Timed feedback survey - shows after 5 minutes */}
