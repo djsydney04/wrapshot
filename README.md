@@ -1,11 +1,11 @@
 # Wrapshoot - Film Production Management Platform
 
-AI-powered film production scheduling and management platform designed to help modern filmmakers organize scenes, schedules, call sheets, budgets, and crew logistics in a single, intuitive interface.
+Smart film production scheduling and management platform designed to help modern filmmakers organize scenes, schedules, call sheets, budgets, and crew logistics in a single, intuitive interface.
 
 ## Tech Stack
 
 ### Core
-- **Framework**: Next.js 15 (App Router with React Server Components)
+- **Framework**: Next.js 16 (App Router with React Server Components)
 - **Language**: TypeScript 5.7
 - **Runtime**: React 19
 - **Styling**: Tailwind CSS 3.4
@@ -24,7 +24,7 @@ AI-powered film production scheduling and management platform designed to help m
 - **Database**: PostgreSQL via Supabase
 - **ORM**: Prisma 5.x
 - **Auth**: Supabase Auth (email/password)
-- **Real-time**: Liveblocks (foundation for collaboration)
+- **Real-time**: Supabase Realtime + Liveblocks
 
 ### State Management
 - **Client State**: Zustand 5.0
@@ -35,11 +35,120 @@ AI-powered film production scheduling and management platform designed to help m
 - **Email**: Resend (transactional emails)
 - **Job Queue**: Inngest (background jobs)
 - **Analytics**: PostHog + Sentry (error tracking)
-- **AI**: Anthropic Claude API (planned for script breakdown)
+- **Smart Features**: Fireworks AI (LLM-powered script analysis)
 
 ### Build Tools
-- **Monorepo**: Turbo 2.7 + npm workspaces
+- **Monorepo**: Turbo 2.8 + npm workspaces
 - **Node**: 18+ required
+
+---
+
+## Features
+
+### Project Management
+- Create, edit, and delete film projects
+- Project status tracking (Development → Post-Production)
+- Multi-user project access with role-based permissions
+- Project invitations via email with token-based acceptance
+- Setup wizard for new projects
+
+### Scene Breakdown
+- Add scenes with script details (scene number, synopsis)
+- INT/EXT and DAY/NIGHT categorization
+- Page count tracking (in eighths)
+- Scene status workflow (NOT_SCHEDULED → COMPLETED)
+- Assign cast and elements to scenes
+- Bulk scene management
+
+### Cast & Crew Management
+- Cast member profiles with character names
+- Contract dates and rates (daily/weekly)
+- Agent information and contact details
+- Cast availability calendar
+- Work status tracking (ON_HOLD → WRAPPED)
+- Crew invitations with role-based access
+
+### Location Management
+- Location database with addresses and coordinates
+- Permit status tracking
+- Technical notes (parking, load-in, sound)
+- Backup location support
+
+### Shooting Schedule
+- Calendar-based schedule view
+- Stripeboard scheduling with drag-and-drop
+- Shooting day creation with multi-unit support
+- Assign scenes to shooting days
+- Cast call times per shooting day
+- Weather and special notes
+
+### Call Sheets
+- Auto-generated from shooting days
+- Department-specific call times
+- Safety and logistics information
+- PDF export
+
+### Finance & Budgeting
+- Budget creation with templates
+- Hierarchical budget categories
+- Line items with quantities and rates
+- Transaction/expense tracking
+- Budget vs. actual reporting
+- Receipt parsing
+
+### Team & Permissions
+- Organization and project-level roles
+- Role-based access control (RBAC)
+- Permission matrix for all features
+- Team invitation system
+
+### Billing & Subscriptions
+- Stripe subscription integration
+- Free, Pro, and Studio plans
+- Usage limits enforcement
+- Invoice history and management
+
+### Smart Features
+
+Wrapshoot includes intelligent features powered by LLMs to streamline production workflows:
+
+**Smart Script Breakdown**
+- Automatic scene extraction from uploaded scripts
+- Intelligent parsing of scene headers, action, and dialogue
+- Script chunking for efficient processing of full-length screenplays
+- Progress tracking with real-time status updates
+
+**Smart Element Recognition**
+- Automatic detection of props, wardrobe, vehicles, and special equipment
+- Character recognition and cast suggestions
+- Element categorization (PROP, WARDROBE, VEHICLE, MAKEUP, VFX, SFX, ANIMAL, GREENERY)
+- Smart element suggestions based on scene content
+
+**Smart Synopsis Generation**
+- Automatic scene synopsis creation from script content
+- Concise, production-focused summaries
+- Batch processing for entire scripts
+
+**Smart Time Estimation**
+- Intelligent shooting time estimates based on scene complexity
+- Factors in dialogue, action, and technical requirements
+- Helps with schedule planning and day-out-of-days
+
+**Smart Script Comparison**
+- Detect changes between script revisions
+- Highlight added, removed, and modified scenes
+- Track script evolution throughout production
+
+**Agent-Based Processing**
+- Multi-step pipeline for complex analysis tasks
+- Background job processing with progress tracking
+- Automatic retry handling for reliability
+- Real-time status updates via Supabase Realtime
+
+### Sharing & Collaboration
+- Share projects with team members
+- Email invitations to collaborators
+- Real-time updates across users
 
 ---
 
@@ -80,24 +189,12 @@ Open [http://localhost:3000](http://localhost:3000) and sign up for an account.
 
 ---
 
-## Documentation
-
-- docs/README.md
-- docs/codebase.md
-- docs/architecture.md
-- docs/load-map.md
-- docs/usage.md
-- docs/api.md
-- docs/setup.md
-- docs/implementation-guides/finance.md
-- docs/finance-flow.md
-
 ## Project Structure
 
 ```
 ProdAI/
 ├── apps/
-│   └── web/                          # Next.js 15 application
+│   └── web/                          # Next.js 16 application
 │       ├── app/
 │       │   ├── (app)/                # Protected routes (require auth)
 │       │   │   ├── page.tsx          # Dashboard home
@@ -119,33 +216,43 @@ ProdAI/
 │       │   │   ├── callback/         # OAuth redirect handler
 │       │   │   └── signout/
 │       │   └── api/                  # API routes
+│       │       ├── ai/               # Smart feature endpoints
+│       │       │   ├── estimate-time/
+│       │       │   ├── recognize-elements/
+│       │       │   ├── script-diff/
+│       │       │   ├── suggestions/
+│       │       │   └── synopsis/
+│       │       ├── agents/           # Agent job management
+│       │       │   ├── start/
+│       │       │   ├── status/
+│       │       │   └── cancel/
 │       │       ├── billing/          # Stripe checkout/portal
+│       │       ├── scripts/          # Script processing
+│       │       ├── receipts/         # Receipt parsing
+│       │       ├── share/            # Sharing functionality
 │       │       └── webhooks/stripe/  # Stripe webhook handler
 │       ├── components/
 │       │   ├── ui/                   # shadcn/ui primitives
-│       │   ├── forms/                # Entity forms (project, scene, cast, etc.)
+│       │   ├── agents/               # Agent progress UI
+│       │   ├── forms/                # Entity forms
 │       │   ├── layout/               # Sidebar, header, navigation
 │       │   ├── projects/             # Project-specific components
 │       │   ├── scenes/               # Scene management UI
 │       │   ├── calendar/             # Calendar views
+│       │   ├── feedback/             # User feedback components
+│       │   ├── share/                # Sharing components
 │       │   └── providers/            # React context providers
 │       ├── lib/
+│       │   ├── agents/               # Smart feature agents
+│       │   │   ├── orchestrator/     # Job management & progress
+│       │   │   ├── script-analysis/  # Script processing steps
+│       │   │   └── utils/            # JSON parsing, retry handling
 │       │   ├── supabase/             # Supabase client setup
-│       │   │   ├── client.ts         # Browser client
-│       │   │   ├── server.ts         # Server client
-│       │   │   └── middleware.ts     # Auth middleware
 │       │   ├── actions/              # Server Actions (all CRUD)
-│       │   │   ├── projects.ts
-│       │   │   ├── scenes.ts
-│       │   │   ├── cast.ts
-│       │   │   ├── locations.ts
-│       │   │   ├── shooting-days.ts
-│       │   │   ├── budgets.ts
-│       │   │   └── project-members.ts
 │       │   ├── permissions/          # RBAC authorization
-│       │   │   ├── index.ts          # Role definitions
-│       │   │   └── server.ts         # Permission checks
+│       │   ├── billing/              # Billing utilities
 │       │   ├── stores/               # Zustand stores
+│       │   ├── hooks/                # Custom React hooks
 │       │   └── stripe/               # Stripe utilities
 │       └── middleware.ts             # Next.js auth middleware
 ├── packages/
@@ -161,81 +268,6 @@ ProdAI/
 ├── .env.example                      # Environment template
 └── package.json                      # Workspace root
 ```
-
----
-
-## Features
-
-### Completed (MVP)
-
-**Project Management**
-- Create, edit, and delete film projects
-- Project status tracking (Development → Post-Production)
-- Multi-user project access with role-based permissions
-- Project invitations via email with token-based acceptance
-
-**Scene Breakdown**
-- Add scenes with script details (scene number, synopsis)
-- INT/EXT and DAY/NIGHT categorization
-- Page count tracking (in eighths)
-- Scene status workflow (NOT_SCHEDULED → COMPLETED)
-- Assign cast and elements to scenes
-
-**Cast Management**
-- Cast member profiles with character names
-- Contract dates and rates (daily/weekly)
-- Agent information and contact details
-- Cast availability calendar
-- Work status tracking (ON_HOLD → WRAPPED)
-
-**Location Management**
-- Location database with addresses and coordinates
-- Permit status tracking
-- Technical notes (parking, load-in, sound)
-- Backup location support
-
-**Shooting Schedule**
-- Calendar-based schedule view
-- Shooting day creation with multi-unit support
-- Assign scenes to shooting days with drag-and-drop
-- Cast call times per shooting day
-- Weather and special notes
-
-**Call Sheets**
-- Auto-generated from shooting days
-- Department-specific call times
-- Safety and logistics information
-- PDF export
-
-**Team & Permissions**
-- Organization and project-level roles
-- Role-based access control (RBAC)
-- Permission matrix for all features
-- Team invitation system
-
-**Billing**
-- Stripe subscription integration
-- Free, Pro, and Studio plans
-- Usage limits enforcement
-
-### In Progress
-
-**Finance Module**
-- Budget creation with templates
-- Budget categories (hierarchical)
-- Line items with quantities and rates
-- Transaction/expense tracking
-- Budget vs. actual reporting
-
-### Planned (Phase 2)
-
-- AI script breakdown via Claude API
-- AI schedule optimization
-- Real-time collaboration (Liveblocks)
-- Production reports
-- Google Calendar sync
-- Slack notifications
-- Mobile apps
 
 ---
 
@@ -255,6 +287,7 @@ ProdAI/
 | `CallSheet` | Published call sheet for a shooting day |
 | `Budget` | Project budget with categories and line items |
 | `Transaction` | Expense/payment against budget items |
+| `AgentJob` | Background job for smart feature processing |
 
 ### Authorization Entities
 
@@ -264,6 +297,7 @@ ProdAI/
 | `ProjectMember` | User role on a project (ADMIN → VIEWER) |
 | `ProjectInvite` | Pending invitation with token |
 | `Subscription` | Stripe subscription for billing |
+| `PlanTier` | Subscription plan configuration |
 
 ### Project Roles & Permissions
 
@@ -280,81 +314,46 @@ See `apps/web/lib/permissions/index.ts` for the complete permission matrix.
 
 ---
 
-## Architecture Patterns
+## Smart Features Architecture
 
-### Server Actions
+### Agent Pipeline
 
-All data mutations use Next.js Server Actions in `lib/actions/`:
+Smart features use a multi-step agent pipeline for complex processing:
 
-```typescript
-// lib/actions/projects.ts
-"use server";
-
-export async function createProject(data: CreateProjectData) {
-  const userId = await getCurrentUserId();
-  if (!userId) throw new Error("Not authenticated");
-
-  // Check plan limits
-  const canCreate = await checkPlanLimit(userId, "projects");
-  if (!canCreate) throw new Error("PLAN_LIMIT_REACHED");
-
-  // Create project and add user as ADMIN
-  const project = await prisma.project.create({ data });
-  await prisma.projectMember.create({
-    data: { projectId: project.id, userId, role: "ADMIN" }
-  });
-
-  revalidatePath("/projects");
-  return project;
-}
+```
+Script Upload → Chunking → Scene Extraction → Element Recognition → Synopsis Generation → Time Estimation
 ```
 
-### Permission Checking
+Each step runs as part of a managed job with:
+- Progress tracking (0-100%)
+- Real-time status updates
+- Automatic retry on failure
+- Cancellation support
 
-```typescript
-// In server actions or API routes
-import { requireProjectPermission } from "@/lib/permissions/server";
+### Available Agents
 
-export async function updateScene(projectId: string, sceneId: string, data) {
-  await requireProjectPermission(projectId, "scenes:write");
-  // Proceed with update...
-}
-```
+| Agent | Purpose |
+|-------|---------|
+| `ChunkingStep` | Split scripts into processable chunks |
+| `SceneExtractor` | Extract scenes from script text |
+| `ElementExtractor` | Identify props, wardrobe, vehicles, etc. |
+| `SynopsisGenerator` | Generate scene synopses |
+| `TimeEstimator` | Estimate shooting duration |
+| `CastLinker` | Link characters to cast members |
+| `SceneCreator` | Create scenes in database |
 
-### Form Components (React Hook Form + Zod)
+### API Endpoints
 
-```typescript
-// components/forms/add-scene-form.tsx
-const schema = z.object({
-  sceneNumber: z.string().min(1),
-  synopsis: z.string().optional(),
-  intExt: z.enum(["INT", "EXT", "BOTH"]),
-  dayNight: z.enum(["DAY", "NIGHT", "DAWN", "DUSK"]),
-});
-
-export function AddSceneForm({ projectId }: Props) {
-  const form = useForm({ resolver: zodResolver(schema) });
-
-  const onSubmit = async (data) => {
-    await createScene(projectId, data);
-    toast.success("Scene created");
-  };
-
-  return <form onSubmit={form.handleSubmit(onSubmit)}>...</form>;
-}
-```
-
-### Zustand Stores
-
-```typescript
-// lib/stores/project-store.ts
-export const useProjectStore = create<ProjectState>((set) => ({
-  projects: [],
-  currentProject: null,
-  setProjects: (projects) => set({ projects }),
-  setCurrentProject: (project) => set({ currentProject: project }),
-}));
-```
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/agents/start` | POST | Start a new agent job |
+| `/api/agents/status` | GET | Get job status and progress |
+| `/api/agents/cancel` | POST | Cancel a running job |
+| `/api/ai/synopsis` | POST | Generate scene synopsis |
+| `/api/ai/estimate-time` | POST | Estimate shooting time |
+| `/api/ai/recognize-elements` | POST | Detect elements in text |
+| `/api/ai/suggestions/elements` | POST | Get element suggestions |
+| `/api/ai/script-diff` | POST | Compare script versions |
 
 ---
 
@@ -385,8 +384,8 @@ STRIPE_STUDIO_PRICE_ID=price_...
 # Email (optional)
 RESEND_API_KEY=re_...
 
-# AI (planned)
-ANTHROPIC_API_KEY=sk-ant-...
+# Smart Features
+FIREWORKS_API_KEY=fw_...
 ```
 
 ---
@@ -406,84 +405,24 @@ npm run db:push          # Push schema to database (no migration)
 npm run db:migrate       # Create migration file
 npm run db:seed          # Seed sample data
 npm run db:studio        # Open Prisma Studio (port 5555)
+
+# Testing
+npm run test             # Run all tests
+npm run test:unit        # Run unit tests
+npm run test:integration # Run integration tests
+npm run test:e2e         # Run end-to-end tests
 ```
 
 ---
 
-## Sample Data
+## Documentation
 
-After running `npm run db:seed`, you'll have:
-
-- **1 Organization**: Acme Productions
-- **1 Project**: Demo Feature Film (Pre-Production)
-- **5 Cast Members**: With characters, rates, and availability
-- **3 Locations**: Coffee Shop, Park, Warehouse
-- **5 Scenes**: Fully populated with cast and elements
-- **3 Shooting Days**: Scheduled with scenes
-- **1 Call Sheet**: Ready to view/edit
-
----
-
-## Key Files Reference
-
-| File | Purpose |
-|------|---------|
-| `apps/web/middleware.ts` | Auth session refresh |
-| `apps/web/app/(app)/layout.tsx` | Protected app layout |
-| `apps/web/lib/supabase/server.ts` | Server-side Supabase client |
-| `apps/web/lib/permissions/index.ts` | Role-permission mappings |
-| `apps/web/lib/permissions/server.ts` | Permission check utilities |
-| `apps/web/lib/actions/*.ts` | All Server Actions |
-| `apps/web/components/layout/sidebar.tsx` | Main navigation |
-| `packages/database/prisma/schema.prisma` | Database schema |
-
----
-
-## Adding New Features
-
-1. **Schema**: Add model to `packages/database/prisma/schema.prisma`
-2. **Push**: Run `npm run db:push` to update database
-3. **Actions**: Create server action in `apps/web/lib/actions/`
-4. **Permissions**: Update `lib/permissions/index.ts` if needed
-5. **Form**: Create form component in `apps/web/components/forms/`
-6. **Page**: Add route in `apps/web/app/(app)/`
-7. **Nav**: Add link to `components/layout/sidebar.tsx`
-
----
-
-## Troubleshooting
-
-See [SETUP.md](./SETUP.md) for detailed troubleshooting.
-
-| Issue | Solution |
-|-------|----------|
-| Database connection error | Check `DATABASE_URL` and `DIRECT_URL` in `.env.local` |
-| Prisma client not found | Run `npm run db:generate` |
-| Auth redirect loop | Clear cookies, check Supabase URL config |
-| Email not arriving | Check spam or disable email confirmation in Supabase |
-| Port 3000 in use | Kill process or use `npm run dev -- -p 3001` |
-
----
-
-## Architecture Decisions
-
-### Why Supabase?
-- All-in-one: Auth + Database + Storage + Real-time
-- PostgreSQL with direct access via Prisma
-- Row Level Security for fine-grained permissions
-- Generous free tier, can self-host
-
-### Why Server Actions over API Routes?
-- Type-safe end-to-end with TypeScript
-- Automatic revalidation with `revalidatePath`
-- Simpler code organization
-- Built-in CSRF protection
-
-### Why Zustand over Redux?
-- Minimal boilerplate
-- TypeScript-first
-- No providers needed
-- Works with Server Components
+- [docs/README.md](./docs/README.md) - Documentation overview
+- [docs/codebase.md](./docs/codebase.md) - Codebase guide
+- [docs/architecture.md](./docs/architecture.md) - Architecture details
+- [docs/setup.md](./docs/setup.md) - Setup instructions
+- [docs/api.md](./docs/api.md) - API reference
+- [docs/usage.md](./docs/usage.md) - Usage guide
 
 ---
 
