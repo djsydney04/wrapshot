@@ -163,7 +163,7 @@ export function SetupWizard({
           setScriptState("error");
         }
       } else {
-        throw new Error("Failed to save script");
+        throw new Error(result.error || "Failed to save script");
       }
     } catch (err) {
       console.error("Error creating script:", err);

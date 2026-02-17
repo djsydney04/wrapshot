@@ -34,6 +34,7 @@ import { GearSection } from "@/components/projects/sections/gear-section";
 import { ScriptSection } from "@/components/projects/sections/script-section";
 import { TeamSection } from "@/components/projects/sections/team-section";
 import { BudgetSection } from "@/components/projects/sections/budget-section";
+import { CallSheetsSection } from "@/components/projects/sections/callsheets-section";
 import { SettingsSection } from "@/components/projects/sections/settings-section";
 import { SetupWizard } from "@/components/projects/setup-wizard";
 import { useProjectStore } from "@/lib/stores/project-store";
@@ -43,6 +44,7 @@ import { getScenes, type Scene as DBScene } from "@/lib/actions/scenes";
 import { getBudgetsForProject, type Budget } from "@/lib/actions/budgets";
 import { getCrewMembersWithInviteStatus, type CrewMemberWithInviteStatus } from "@/lib/actions/crew";
 import { getCastMembersWithInviteStatus, type CastMemberWithInviteStatus } from "@/lib/actions/cast";
+import { getScripts, type Script as DBScript } from "@/lib/actions/scripts";
 import { useShootingDays } from "@/lib/hooks/use-shooting-days";
 import { trackProjectViewed } from "@/lib/analytics/posthog";
 
@@ -78,6 +80,7 @@ export default function ProjectDetailPage() {
 
   // Database-backed data
   const [dbScenes, setDbScenes] = React.useState<DBScene[]>([]);
+  const [dbScripts, setDbScripts] = React.useState<DBScript[]>([]);
   const [budgets, setBudgets] = React.useState<Budget[]>([]);
   const [crew, setCrew] = React.useState<CrewMemberWithInviteStatus[]>([]);
   const [cast, setCast] = React.useState<CastMemberWithInviteStatus[]>([]);
@@ -92,34 +95,55 @@ export default function ProjectDetailPage() {
     getScriptsForProject,
   } = useProjectStore();
 
-  // Fetch project, scenes, budgets, cast, and crew from database
-  React.useEffect(() => {
-    async function loadProject() {
-      try {
-        const [projectData, scenesResult, budgetsData, castResult, crewResult] = await Promise.all([
-          getProject(projectId),
-          getScenes(projectId),
-          getBudgetsForProject(projectId),
-          getCastMembersWithInviteStatus(projectId),
-          getCrewMembersWithInviteStatus(projectId),
-        ]);
-        setProject(projectData);
-        if (scenesResult.data) setDbScenes(scenesResult.data);
-        setBudgets(budgetsData);
-        if (castResult.data) setCast(castResult.data);
-        if (crewResult.data) setCrew(crewResult.data);
+  // Fetch all data from database
+  const loadAllData = React.useCallback(async () => {
+    try {
+      const [projectData, scenesResult, budgetsData, castResult, crewResult, scriptsResult] = await Promise.all([
+        getProject(projectId),
+        getScenes(projectId),
+        getBudgetsForProject(projectId),
+        getCastMembersWithInviteStatus(projectId),
+        getCrewMembersWithInviteStatus(projectId),
+        getScripts(projectId),
+      ]);
+      setProject(projectData);
+      if (scenesResult.data) setDbScenes(scenesResult.data);
+      setBudgets(budgetsData);
+      if (castResult.data) setCast(castResult.data);
+      if (crewResult.data) setCrew(crewResult.data);
+      if (scriptsResult.data) setDbScripts(scriptsResult.data);
 
-        // Track project view
-        if (projectData) {
-          trackProjectViewed(projectData.id, projectData.name);
-        }
-      } catch (err) {
-        console.error("Error loading project:", err);
-      } finally {
-        setLoading(false);
+      // Track project view
+      if (projectData) {
+        trackProjectViewed(projectData.id, projectData.name);
       }
+    } catch (err) {
+      console.error("Error loading project:", err);
+    } finally {
+      setLoading(false);
     }
-    loadProject();
+  }, [projectId]);
+
+  React.useEffect(() => {
+    loadAllData();
+  }, [loadAllData]);
+
+  // Callback to refresh data after analysis completes
+  const refreshData = React.useCallback(async () => {
+    try {
+      const [scenesResult, castResult, crewResult, scriptsResult] = await Promise.all([
+        getScenes(projectId),
+        getCastMembersWithInviteStatus(projectId),
+        getCrewMembersWithInviteStatus(projectId),
+        getScripts(projectId),
+      ]);
+      if (scenesResult.data) setDbScenes(scenesResult.data);
+      if (castResult.data) setCast(castResult.data);
+      if (crewResult.data) setCrew(crewResult.data);
+      if (scriptsResult.data) setDbScripts(scriptsResult.data);
+    } catch (err) {
+      console.error("Error refreshing data:", err);
+    }
   }, [projectId]);
 
   // Store data (for sections not yet migrated to use DB types)
@@ -129,7 +153,8 @@ export default function ProjectDetailPage() {
   const storeShootingDays = getShootingDaysForProject(projectId);
   const { shootingDays: dbShootingDays } = useShootingDays({ projectId });
   const gear = getGearForProject(projectId);
-  const scripts = getScriptsForProject(projectId);
+  const storeScripts = getScriptsForProject(projectId);
+  const scripts = dbScripts.length > 0 ? dbScripts : storeScripts;
 
   // Use DB scenes for the scenes section, store scenes for others (until migrated)
   const scenes = dbScenes.length > 0 ? dbScenes : storeScenes;
@@ -201,12 +226,20 @@ export default function ProjectDetailPage() {
             crew={crew}
             shootingDays={shootingDays}
             gear={gear}
-            scripts={scripts}
+            scripts={scripts as any}
             onNavigate={(section) => setActiveSection(section as ProjectSection)}
           />
         );
       case "script":
-        return <ScriptSection projectId={projectId} scripts={scripts} />;
+        return (
+          <ScriptSection
+            projectId={projectId}
+            scripts={scripts}
+            onScriptUploaded={refreshData}
+            onAnalysisComplete={refreshData}
+            onNavigate={(section) => setActiveSection(section as ProjectSection)}
+          />
+        );
       case "schedule":
         return (
           <ScheduleSection
@@ -215,6 +248,16 @@ export default function ProjectDetailPage() {
             scenes={storeScenes}
             locations={locations}
             useMockData={false}
+          />
+        );
+      case "callsheets":
+        return (
+          <CallSheetsSection
+            projectId={projectId}
+            shootingDays={shootingDays}
+            scenes={dbScenes}
+            cast={cast}
+            crew={crew}
           />
         );
       case "cast":
@@ -326,6 +369,7 @@ export default function ProjectDetailPage() {
               cast: cast.length,
               crew: crew.length,
               shootingDays: shootingDays.length,
+              callSheets: shootingDays.length,
               gear: gear.length,
               hasScript: scripts.length > 0,
               budgets: budgets.length,
@@ -339,7 +383,7 @@ export default function ProjectDetailPage() {
           {/* Mobile Section Tabs (hidden on desktop) */}
           <div className="md:hidden border-b border-border px-4 py-2 overflow-x-auto">
             <div className="flex gap-2">
-              {(["overview", "scenes", "cast", "crew", "team", "schedule", "gear", "budget", "script", "settings"] as ProjectSection[]).map(
+              {(["overview", "scenes", "cast", "crew", "team", "schedule", "callsheets", "gear", "budget", "script", "settings"] as ProjectSection[]).map(
                 (section) => (
                   <button
                     key={section}
@@ -350,7 +394,7 @@ export default function ProjectDetailPage() {
                         : "text-muted-foreground hover:bg-muted"
                     }`}
                   >
-                    {section === "team" ? "Team Access" : section.charAt(0).toUpperCase() + section.slice(1)}
+                    {section === "team" ? "Team Access" : section === "callsheets" ? "Call Sheets" : section.charAt(0).toUpperCase() + section.slice(1)}
                   </button>
                 )
               )}

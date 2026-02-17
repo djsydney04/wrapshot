@@ -30,6 +30,8 @@ const RUNNING_STATUSES: AgentJobStatus[] = [
   'linking_cast',
   'generating_synopses',
   'estimating_time',
+  'creating_records',
+  'suggesting_crew',
 ];
 
 const TERMINAL_STATUSES: AgentJobStatus[] = ['completed', 'failed', 'cancelled'];

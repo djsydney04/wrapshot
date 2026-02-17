@@ -214,6 +214,7 @@ export class AgentOrchestrator {
       createdSceneIds: [],
       createdElementIds: [],
       createdCastIds: [],
+      suggestedCrewRoles: [],
     };
   }
 }

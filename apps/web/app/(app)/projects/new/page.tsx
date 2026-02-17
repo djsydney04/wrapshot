@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PROJECT_ROLE_LABELS, type ProjectRole } from "@/lib/permissions";
+import { toast } from "sonner";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -128,6 +129,8 @@ export default function NewProjectPage() {
         endDate: endDate || undefined,
         crewInvites: crewInvites.length > 0 ? crewInvites : undefined,
       });
+
+      toast.info("Upload your script to auto-generate scenes, cast, and elements");
 
       if (withSetup) {
         router.push(`/projects/${newProject.id}?setup=true`);

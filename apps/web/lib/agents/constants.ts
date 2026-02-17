@@ -46,6 +46,7 @@ export const STEP_DEFINITIONS: Record<
   generating_synopses: { description: 'Generating scene synopses', weight: 15 },
   estimating_time: { description: 'Estimating shooting times', weight: 10 },
   creating_records: { description: 'Saving scenes and elements', weight: 10 },
+  suggesting_crew: { description: 'Suggesting crew roles', weight: 5 },
   completed: { description: 'Analysis complete', weight: 0 },
   failed: { description: 'Analysis failed', weight: 0 },
   cancelled: { description: 'Analysis cancelled', weight: 0 },
@@ -61,6 +62,7 @@ export const SCRIPT_ANALYSIS_STEPS: AgentJobStatus[] = [
   'generating_synopses',
   'estimating_time',
   'creating_records',
+  'suggesting_crew',
 ];
 
 // Time estimation heuristics
@@ -102,6 +104,7 @@ export const STATUS_CONFIG: Record<
   generating_synopses: { label: 'Writing Synopses', color: 'blue', icon: 'edit' },
   estimating_time: { label: 'Estimating Time', color: 'blue', icon: 'clock' },
   creating_records: { label: 'Saving Records', color: 'blue', icon: 'database' },
+  suggesting_crew: { label: 'Suggesting Crew', color: 'blue', icon: 'users' },
   completed: { label: 'Completed', color: 'green', icon: 'check-circle' },
   failed: { label: 'Failed', color: 'red', icon: 'x-circle' },
   cancelled: { label: 'Cancelled', color: 'gray', icon: 'x' },

@@ -22,6 +22,7 @@ import { executeCastLinker } from './cast-linker';
 import { executeSynopsisGenerator } from './synopsis-generator';
 import { executeTimeEstimator } from './time-estimator';
 import { executeSceneCreator } from './scene-creator';
+import { executeCrewSuggester } from './crew-suggester';
 import type { AgentContext, AgentJobResult, AgentJobStatus } from '../types';
 
 // Step definitions for the script analysis pipeline
@@ -38,6 +39,8 @@ const SCRIPT_ANALYSIS_STEPS: Array<{
   { status: 'estimating_time', execute: executeTimeEstimator },
   // Final step: create all records in database
   { status: 'creating_records', execute: executeSceneCreator },
+  // Suggest crew roles based on script content (non-blocking)
+  { status: 'suggesting_crew', execute: executeCrewSuggester },
 ];
 
 export class ScriptAnalysisAgent {
@@ -125,4 +128,5 @@ export { executeCastLinker } from './cast-linker';
 export { executeSynopsisGenerator } from './synopsis-generator';
 export { executeTimeEstimator } from './time-estimator';
 export { executeSceneCreator } from './scene-creator';
+export { executeCrewSuggester } from './crew-suggester';
 export { ScriptChunker } from './chunker';

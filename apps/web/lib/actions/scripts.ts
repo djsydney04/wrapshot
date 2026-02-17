@@ -9,6 +9,7 @@ export interface ScriptInput {
   version: string;
   color?: string;
   fileUrl?: string;
+  fileName?: string;
   content?: string;
   isActive?: boolean;
 }
@@ -18,6 +19,7 @@ export interface Script {
   projectId: string;
   version: string;
   color: string | null;
+  fileName: string | null;
   uploadedAt: string;
   fileUrl: string | null;
   content: string | null;
@@ -91,19 +93,32 @@ export async function createScript(input: ScriptInput) {
       .eq("projectId", input.projectId);
   }
 
-  const { data, error } = await supabase
+  const insertPayload: Record<string, unknown> = {
+    projectId: input.projectId,
+    version: input.version,
+    color: input.color || "WHITE",
+    fileUrl: input.fileUrl || null,
+    fileName: input.fileName || null,
+    content: input.content || null,
+    isActive: input.isActive ?? false,
+    breakdownStatus: "NOT_STARTED",
+  };
+
+  let { data, error } = await supabase
     .from("Script")
-    .insert({
-      projectId: input.projectId,
-      version: input.version,
-      color: input.color || "WHITE",
-      fileUrl: input.fileUrl || null,
-      content: input.content || null,
-      isActive: input.isActive ?? false,
-      breakdownStatus: "NOT_STARTED",
-    })
+    .insert(insertPayload)
     .select()
     .single();
+
+  // Retry without fileName if column doesn't exist yet (migration pending)
+  if (error && error.message?.includes("fileName")) {
+    const { fileName: _, ...withoutFileName } = insertPayload;
+    ({ data, error } = await supabase
+      .from("Script")
+      .insert(withoutFileName)
+      .select()
+      .single());
+  }
 
   if (error) {
     console.error("Error creating script:", error);
