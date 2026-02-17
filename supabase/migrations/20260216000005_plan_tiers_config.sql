@@ -93,6 +93,9 @@ ON CONFLICT (id) DO UPDATE SET
 -- UPDATED_AT TRIGGER
 -- ============================================
 
+-- Drop first so reruns and remote pushes stay idempotent
+DROP TRIGGER IF EXISTS update_plan_tier_updated_at ON "PlanTier";
+
 CREATE TRIGGER update_plan_tier_updated_at
   BEFORE UPDATE ON "PlanTier"
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -185,6 +188,10 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ============================================
 
 ALTER TABLE "PlanTier" ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies to keep migration idempotent
+DROP POLICY IF EXISTS "Anyone can view plan tiers" ON "PlanTier";
+DROP POLICY IF EXISTS "Only service role can modify tiers" ON "PlanTier";
 
 -- Everyone can read plan tiers (public info)
 CREATE POLICY "Anyone can view plan tiers"

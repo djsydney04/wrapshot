@@ -12,17 +12,19 @@ import {
   UserCircle,
   Clapperboard,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { FileUpload } from "@/components/ui/file-upload";
 import { AddShootingDayForm } from "@/components/forms/add-shooting-day-form";
 import { AddCastForm } from "@/components/forms/add-cast-form";
 import { AddCrewForm } from "@/components/forms/add-crew-form";
-import { ScriptBreakdownStep } from "@/components/projects/script-breakdown-step";
+import { AgentProgressCard } from "@/components/agents/agent-progress-card";
 import { useProjectStore } from "@/lib/stores/project-store";
+import { useAgentJob, useStartAgentJob } from "@/lib/hooks/use-agent-job";
 import { cn } from "@/lib/utils";
 import type { Project } from "@/lib/actions/projects.types";
+import type { AgentJobResult } from "@/lib/agents/types";
 
 interface SetupWizardProps {
   projectId: string;
@@ -31,17 +33,19 @@ interface SetupWizardProps {
   onSkip: () => void;
 }
 
-type WizardStep = "welcome" | "script" | "breakdown" | "schedule" | "cast" | "crew" | "complete";
+type WizardStep = "welcome" | "script" | "schedule" | "cast" | "crew" | "complete";
 
+// Script step now includes upload + auto-analysis in one step
 const STEPS: { id: WizardStep; label: string; icon: React.ElementType }[] = [
   { id: "welcome", label: "Welcome", icon: Clapperboard },
   { id: "script", label: "Script", icon: FileText },
-  { id: "breakdown", label: "Breakdown", icon: Sparkles },
   { id: "schedule", label: "Schedule", icon: Calendar },
   { id: "cast", label: "Cast", icon: Users },
   { id: "crew", label: "Crew", icon: UserCircle },
   { id: "complete", label: "Done", icon: Check },
 ];
+
+type ScriptState = "idle" | "uploading" | "analyzing" | "complete" | "error";
 
 export function SetupWizard({
   projectId,
@@ -59,6 +63,17 @@ export function SetupWizard({
   const [scenesImported, setScenesImported] = React.useState(0);
   const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
 
+  // Script analysis state
+  const [scriptState, setScriptState] = React.useState<ScriptState>("idle");
+  const [activeJobId, setActiveJobId] = React.useState<string | null>(null);
+  const [analysisError, setAnalysisError] = React.useState<string | null>(null);
+
+  // Agent hooks
+  const { startJob } = useStartAgentJob();
+  const { job, isComplete: agentComplete, isFailed: agentFailed } = useAgentJob({
+    jobId: activeJobId || undefined,
+  });
+
   const { addScript, getShootingDaysForProject, getCastForProject, getCrewForProject } =
     useProjectStore();
 
@@ -67,6 +82,23 @@ export function SetupWizard({
   const crew = getCrewForProject(projectId);
 
   const currentStepIndex = STEPS.findIndex((s) => s.id === currentStep);
+
+  // Handle agent completion
+  React.useEffect(() => {
+    if (agentComplete && job?.result) {
+      const result = job.result as AgentJobResult;
+      setScenesImported(result.scenesCreated);
+      setScriptState("complete");
+    }
+  }, [agentComplete, job?.result]);
+
+  // Handle agent failure
+  React.useEffect(() => {
+    if (agentFailed && job?.errorMessage) {
+      setAnalysisError(job.errorMessage);
+      setScriptState("error");
+    }
+  }, [agentFailed, job?.errorMessage]);
 
   const handleNext = () => {
     const nextIndex = currentStepIndex + 1;
@@ -82,49 +114,81 @@ export function SetupWizard({
     }
   };
 
-  const handleUploadScript = async () => {
-    if (scriptUrl && scriptName) {
-      // Add to local store for UI
-      addScript({
+  // Handle file upload and immediately trigger analysis
+  const handleScriptUpload = async (url: string | null, name?: string) => {
+    setScriptUrl(url);
+    setScriptName(name || "");
+
+    if (!url || !name) {
+      setScriptState("idle");
+      return;
+    }
+
+    setScriptState("uploading");
+    setAnalysisError(null);
+
+    // Add to local store for UI
+    addScript({
+      projectId,
+      version: 1,
+      color: "WHITE",
+      fileUrl: url,
+      fileName: name,
+      uploadedAt: new Date().toISOString(),
+    });
+
+    // Create in database and auto-start analysis
+    try {
+      const { createScript } = await import("@/lib/actions/scripts");
+      const result = await createScript({
         projectId,
-        version: 1,
+        version: "1",
         color: "WHITE",
-        fileUrl: scriptUrl,
-        fileName: scriptName,
-        uploadedAt: new Date().toISOString(),
+        fileUrl: url,
+        isActive: true,
       });
 
-      // Also create in database to get scriptId for breakdown
-      try {
-        const { createScript } = await import("@/lib/actions/scripts");
-        const result = await createScript({
-          projectId,
-          version: "1",
-          color: "WHITE",
-          fileUrl: scriptUrl,
-          isActive: true,
-        });
-        if (result.data) {
-          setUploadedScriptId(result.data.id);
-        }
-      } catch (err) {
-        console.error("Error creating script:", err);
-      }
+      if (result.data) {
+        const newScriptId = result.data.id;
+        setUploadedScriptId(newScriptId);
 
-      handleNext();
-    } else {
-      // Skip script step and breakdown step
-      setCurrentStep("schedule");
+        // Auto-start the agent analysis
+        setScriptState("analyzing");
+        const jobId = await startJob(projectId, newScriptId, "script_analysis");
+
+        if (jobId) {
+          setActiveJobId(jobId);
+        } else {
+          setAnalysisError("Failed to start script analysis");
+          setScriptState("error");
+        }
+      } else {
+        throw new Error("Failed to save script");
+      }
+    } catch (err) {
+      console.error("Error creating script:", err);
+      setAnalysisError(err instanceof Error ? err.message : "Failed to upload script");
+      setScriptState("error");
     }
   };
 
-  const handleBreakdownComplete = (count: number) => {
-    setScenesImported(count);
-    handleNext();
+  const handleRetryAnalysis = async () => {
+    if (!uploadedScriptId) return;
+
+    setScriptState("analyzing");
+    setAnalysisError(null);
+
+    const jobId = await startJob(projectId, uploadedScriptId, "script_analysis");
+    if (jobId) {
+      setActiveJobId(jobId);
+    } else {
+      setAnalysisError("Failed to start script analysis");
+      setScriptState("error");
+    }
   };
 
-  const handleBreakdownSkip = () => {
-    handleNext();
+  const handleSkipScript = () => {
+    setCurrentStep("schedule");
   };
 
   const renderStepContent = () => {
@@ -144,38 +208,103 @@ export function SetupWizard({
         );
 
       case "script":
+        // Combined script upload + AI analysis step
         return (
           <div className="py-4">
-            <h2 className="text-xl font-semibold mb-2">Upload Your Script</h2>
-            <p className="text-muted-foreground mb-6">
-              Upload a PDF of your script to keep track of revisions. You can skip this
-              if you don&apos;t have a script ready yet.
-            </p>
-            <FileUpload
-              value={scriptUrl}
-              onChange={(url, name) => {
-                setScriptUrl(url);
-                setScriptName(name || "");
-              }}
-              bucket="scripts"
-              folder={projectId}
-              accept="application/pdf"
-              placeholder="Drop your script PDF here"
-              fileName={scriptName}
-            />
-          </div>
-        );
+            {/* Initial upload state */}
+            {scriptState === "idle" && (
+              <>
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                    <Sparkles className="h-8 w-8 text-primary" />
+                  </div>
+                  <h2 className="text-xl font-semibold mb-2">Upload Your Script</h2>
+                  <p className="text-muted-foreground max-w-sm mx-auto">
+                    Drop your script PDF below. Wrapshot Intelligence will automatically analyze it
+                    and extract all scenes, characters, and production elements.
+                  </p>
+                </div>
+                <FileUpload
+                  value={scriptUrl}
+                  onChange={handleScriptUpload}
+                  bucket="scripts"
+                  folder={projectId}
+                  accept="application/pdf"
+                  placeholder="Drop your script PDF here to begin"
+                  fileName={scriptName}
+                />
+              </>
+            )}
 
-      case "breakdown":
-        return (
-          <ScriptBreakdownStep
-            projectId={projectId}
-            scriptId={uploadedScriptId || undefined}
-            scriptUrl={scriptUrl || undefined}
-            scriptName={scriptName || undefined}
-            onComplete={handleBreakdownComplete}
-            onSkip={handleBreakdownSkip}
-          />
+            {/* Uploading state */}
+            {scriptState === "uploading" && (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                </div>
+                <h2 className="text-xl font-semibold mb-2">Uploading Script...</h2>
+                <p className="text-muted-foreground">{scriptName}</p>
+              </div>
+            )}
+
+            {/* Analyzing state */}
+            {scriptState === "analyzing" && activeJobId && (
+              <div className="py-2">
+                <div className="text-center mb-4">
+                  <h2 className="text-xl font-semibold mb-2">Analyzing Your Script</h2>
+                  <p className="text-muted-foreground text-sm">
+                    Wrapshot Intelligence is extracting scenes, characters, and production elements.
+                  </p>
+                </div>
+                <AgentProgressCard
+                  jobId={activeJobId}
+                  onRetry={handleRetryAnalysis}
+                />
+                <div className="mt-4 rounded-lg border border-border p-3 bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{scriptName}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Complete state */}
+            {scriptState === "complete" && (
+              <div className="text-center py-6">
+                <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
+                  <Check className="h-8 w-8 text-green-500" />
+                </div>
+                <h2 className="text-xl font-semibold mb-2">Script Analysis Complete!</h2>
+                <p className="text-muted-foreground mb-4">
+                  {scenesImported} scenes have been imported from your script.
+                </p>
+                {job?.result && (
+                  <div className="inline-flex flex-col items-center gap-1 rounded-lg bg-muted px-4 py-2 text-sm">
+                    <span>{(job.result as AgentJobResult).elementsCreated} production elements</span>
+                    <span>{(job.result as AgentJobResult).castLinked} characters linked</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Error state */}
+            {scriptState === "error" && (
+              <div className="py-4">
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 mb-4 dark:border-red-900 dark:bg-red-950">
+                  <h3 className="font-medium text-red-800 dark:text-red-200 mb-1">Analysis Failed</h3>
+                  <p className="text-sm text-red-700 dark:text-red-300">{analysisError}</p>
+                </div>
+                <div className="space-y-2">
+                  <Button onClick={handleRetryAnalysis} variant="outline" className="w-full">
+                    Try Again
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         );
 
       case "schedule":
@@ -371,6 +500,7 @@ export function SetupWizard({
               <Button
                 variant="ghost"
                 onClick={currentStep === "welcome" ? onSkip : handlePrev}
+                disabled={currentStep === "script" && (scriptState === "uploading" || scriptState === "analyzing")}
               >
                 {currentStep === "welcome" ? (
                   "Skip Setup"
@@ -381,12 +511,37 @@ export function SetupWizard({
                   </>
                 )}
               </Button>
-              <Button
-                onClick={currentStep === "script" ? handleUploadScript : handleNext}
-              >
-                {currentStep === "welcome" ? "Get Started" : "Continue"}
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
+
+              {/* Script step has conditional buttons */}
+              {currentStep === "script" ? (
+                <div className="flex items-center gap-2">
+                  {/* During idle/error, show skip option */}
+                  {(scriptState === "idle" || scriptState === "error") && (
+                    <Button variant="ghost" onClick={handleSkipScript}>
+                      Skip for now
+                    </Button>
+                  )}
+                  {/* After complete, show continue */}
+                  {scriptState === "complete" && (
+                    <Button onClick={handleNext}>
+                      Continue
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  )}
+                  {/* During analysis, show waiting state */}
+                  {(scriptState === "uploading" || scriptState === "analyzing") && (
+                    <Button disabled>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Analyzing...
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <Button onClick={handleNext}>
+                  {currentStep === "welcome" ? "Get Started" : "Continue"}
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              )}
             </div>
           )}
         </div>
