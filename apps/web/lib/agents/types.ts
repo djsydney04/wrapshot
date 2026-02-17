@@ -14,6 +14,7 @@ export type AgentJobStatus =
   | 'linking_cast'
   | 'generating_synopses'
   | 'estimating_time'
+  | 'creating_records'
   | 'completed'
   | 'failed'
   | 'cancelled';

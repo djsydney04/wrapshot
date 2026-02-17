@@ -37,7 +37,7 @@ const SCRIPT_ANALYSIS_STEPS: Array<{
   { status: 'generating_synopses', execute: executeSynopsisGenerator },
   { status: 'estimating_time', execute: executeTimeEstimator },
   // Final step: create all records in database
-  { status: 'completed' as AgentJobStatus, execute: executeSceneCreator },
+  { status: 'creating_records', execute: executeSceneCreator },
 ];
 
 export class ScriptAnalysisAgent {
@@ -65,20 +65,15 @@ export class ScriptAnalysisAgent {
       this.userId
     );
 
-    // Create and run orchestrator
+    // Create and run orchestrator with all steps including database creation
     const orchestrator = AgentOrchestrator.create(
       this.jobId,
       context,
-      SCRIPT_ANALYSIS_STEPS.slice(0, -1) // Exclude the scene creator from normal steps
+      SCRIPT_ANALYSIS_STEPS
     );
 
-    // Run all extraction steps
-    const result = await orchestrator.run();
-
-    // If successful, create database records
-    // This is already handled by the orchestrator completing with results
-
-    return result;
+    // Run all steps including final database record creation
+    return await orchestrator.run();
   }
 
   /**

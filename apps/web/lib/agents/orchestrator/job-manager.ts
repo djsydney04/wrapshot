@@ -138,6 +138,7 @@ export class JobManager {
       'linking_cast',
       'generating_synopses',
       'estimating_time',
+      'creating_records',
     ];
 
     const { data, error } = await supabase

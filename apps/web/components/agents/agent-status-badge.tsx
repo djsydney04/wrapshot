@@ -15,6 +15,7 @@ import {
   XCircle,
   X,
   Loader2,
+  Database,
 } from "lucide-react";
 
 interface AgentStatusBadgeProps {
@@ -32,6 +33,7 @@ const iconMap = {
   package: Package,
   users: Users,
   edit: Edit,
+  database: Database,
   "check-circle": CheckCircle,
   "x-circle": XCircle,
   x: X,
