@@ -148,9 +148,9 @@ export function TimedSurvey() {
                 <MessageSquarePlus className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold">How's your experience so far?</h2>
+                <h2 className="text-lg font-semibold">How&apos;s your experience so far?</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  We'd love to hear your thoughts on wrapshoot. Your feedback helps us build a better product.
+                  We&apos;d love to hear your thoughts on wrapshoot. Your feedback helps us build a better product.
                 </p>
               </div>
             </div>

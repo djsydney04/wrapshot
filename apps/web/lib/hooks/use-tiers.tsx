@@ -2,12 +2,12 @@
 
 import * as React from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { PlanTier } from "@/lib/billing/tiers";
-import { getDefaultTiers, getTierFeatures, formatPrice } from "@/lib/billing/tiers";
+import type { PlanTier } from "@/lib/billing/tiers-shared";
+import { getDefaultTiers, getTierFeatures, formatPrice } from "@/lib/billing/tiers-shared";
 
 // Re-export helpers for convenience
-export { getTierFeatures, formatPrice, formatLimit } from "@/lib/billing/tiers";
-export type { PlanTier } from "@/lib/billing/tiers";
+export { getTierFeatures, formatPrice, formatLimit } from "@/lib/billing/tiers-shared";
+export type { PlanTier } from "@/lib/billing/tiers-shared";
 
 interface TiersContextType {
   tiers: PlanTier[];

@@ -1,10 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, FileText, Sparkles, Check, AlertCircle } from "lucide-react";
+import { Loader2, FileText, Sparkles, Check, AlertCircle, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BreakdownPreviewModal } from "./breakdown-preview-modal";
+import { AgentProgressCard } from "@/components/agents/agent-progress-card";
+import { useAgentJob, useStartAgentJob } from "@/lib/hooks/use-agent-job";
 import type { ExtractedScene, BreakdownResult } from "@/lib/actions/script-breakdown";
+import type { AgentJobResult } from "@/lib/agents/types";
 
 interface ScriptBreakdownStepProps {
   projectId: string;
@@ -15,7 +18,7 @@ interface ScriptBreakdownStepProps {
   onSkip: () => void;
 }
 
-type BreakdownState = "idle" | "analyzing" | "preview" | "importing" | "complete" | "error";
+type BreakdownState = "idle" | "analyzing" | "agent_running" | "preview" | "importing" | "complete" | "error";
 
 export function ScriptBreakdownStep({
   projectId,
@@ -29,8 +32,50 @@ export function ScriptBreakdownStep({
   const [breakdownResult, setBreakdownResult] = React.useState<BreakdownResult | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [scenesToImport, setScenesToImport] = React.useState<ExtractedScene[]>([]);
+  const [useAdvancedAgent, setUseAdvancedAgent] = React.useState(true);
+  const [activeJobId, setActiveJobId] = React.useState<string | null>(null);
 
-  const handleAnalyze = async () => {
+  const { startJob, loading: startingJob } = useStartAgentJob();
+  const { job, isComplete: agentComplete, isFailed: agentFailed } = useAgentJob({
+    jobId: activeJobId || undefined,
+  });
+
+  // Handle agent completion
+  React.useEffect(() => {
+    if (agentComplete && job?.result) {
+      const result = job.result as AgentJobResult;
+      setState("complete");
+      onComplete(result.scenesCreated);
+    }
+  }, [agentComplete, job?.result, onComplete]);
+
+  // Handle agent failure
+  React.useEffect(() => {
+    if (agentFailed && job?.errorMessage) {
+      setError(job.errorMessage);
+      setState("error");
+    }
+  }, [agentFailed, job?.errorMessage]);
+
+  const handleAnalyzeWithAgent = async () => {
+    if (!scriptId) {
+      setError("No script available to analyze");
+      return;
+    }
+
+    setState("agent_running");
+    setError(null);
+
+    const jobId = await startJob(projectId, scriptId, "script_analysis");
+    if (jobId) {
+      setActiveJobId(jobId);
+    } else {
+      setError("Failed to start analysis agent");
+      setState("error");
+    }
+  };
+
+  const handleAnalyzeLegacy = async () => {
     if (!scriptId || !scriptUrl) {
       setError("No script available to analyze");
       return;
@@ -59,6 +104,14 @@ export function ScriptBreakdownStep({
       console.error("Breakdown error:", err);
       setError(err instanceof Error ? err.message : "Failed to analyze script");
       setState("error");
+    }
+  };
+
+  const handleAnalyze = () => {
+    if (useAdvancedAgent) {
+      handleAnalyzeWithAgent();
+    } else {
+      handleAnalyzeLegacy();
     }
   };
 
@@ -92,6 +145,12 @@ export function ScriptBreakdownStep({
     setScenesToImport((prev) =>
       prev.map((scene, i) => (i === index ? { ...scene, ...updates } : scene))
     );
+  };
+
+  const handleRetry = () => {
+    setActiveJobId(null);
+    setState("idle");
+    setError(null);
   };
 
   // No script uploaded
@@ -135,9 +194,38 @@ export function ScriptBreakdownStep({
           </div>
         </div>
 
+        {/* Analysis mode toggle */}
+        <div className="mb-4 p-3 rounded-lg bg-muted/50">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={useAdvancedAgent}
+              onChange={(e) => setUseAdvancedAgent(e.target.checked)}
+              className="rounded border-gray-300 text-primary focus:ring-primary"
+            />
+            <div className="flex items-center gap-1.5">
+              <Zap className="h-4 w-4 text-amber-500" />
+              <span className="text-sm font-medium">Use Advanced Agent</span>
+            </div>
+          </label>
+          <p className="text-xs text-muted-foreground ml-6 mt-1">
+            {useAdvancedAgent
+              ? "Extracts scenes, elements, cast, synopses, and time estimates. Handles large scripts better."
+              : "Basic scene extraction only. Faster but less comprehensive."}
+          </p>
+        </div>
+
         <div className="space-y-2">
-          <Button onClick={handleAnalyze} className="w-full">
-            <Sparkles className="h-4 w-4 mr-2" />
+          <Button
+            onClick={handleAnalyze}
+            className="w-full"
+            disabled={startingJob}
+          >
+            {startingJob ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4 mr-2" />
+            )}
             Analyze Script with Wrapshot Intelligence
           </Button>
           <Button variant="ghost" onClick={onSkip} className="w-full text-muted-foreground">
@@ -148,7 +236,25 @@ export function ScriptBreakdownStep({
     );
   }
 
-  // Analyzing state
+  // Agent running state
+  if (state === "agent_running" && activeJobId) {
+    return (
+      <div className="py-4">
+        <h2 className="text-xl font-semibold mb-4">Analyzing Script...</h2>
+        <AgentProgressCard
+          jobId={activeJobId}
+          onRetry={handleRetry}
+          className="mb-4"
+        />
+        <p className="text-sm text-muted-foreground text-center mt-4">
+          The agent is extracting scenes, characters, elements, and generating synopses.
+          This process handles large scripts in chunks for better accuracy.
+        </p>
+      </div>
+    );
+  }
+
+  // Legacy analyzing state
   if (state === "analyzing") {
     return (
       <div className="py-8 text-center">
@@ -196,6 +302,10 @@ export function ScriptBreakdownStep({
 
   // Complete state
   if (state === "complete") {
+    const scenesCount = job?.result
+      ? (job.result as AgentJobResult).scenesCreated
+      : scenesToImport.length;
+
     return (
       <div className="py-8 text-center">
         <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
@@ -203,9 +313,15 @@ export function ScriptBreakdownStep({
         </div>
         <h2 className="text-xl font-semibold mb-2">Breakdown Complete!</h2>
         <p className="text-muted-foreground max-w-md mx-auto mb-6">
-          {scenesToImport.length} scenes have been imported from your script.
+          {scenesCount} scenes have been imported from your script.
           You can review and edit them in the Stripeboard.
         </p>
+        {job?.result && (
+          <div className="text-sm text-muted-foreground space-y-1">
+            <p>{(job.result as AgentJobResult).elementsCreated} production elements identified</p>
+            <p>{(job.result as AgentJobResult).castLinked} cast members linked</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -225,7 +341,7 @@ export function ScriptBreakdownStep({
         </div>
 
         <div className="space-y-2">
-          <Button onClick={handleAnalyze} variant="outline" className="w-full">
+          <Button onClick={handleRetry} variant="outline" className="w-full">
             Try Again
           </Button>
           <Button variant="ghost" onClick={onSkip} className="w-full text-muted-foreground">

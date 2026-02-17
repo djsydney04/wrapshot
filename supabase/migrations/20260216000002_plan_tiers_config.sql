@@ -93,6 +93,7 @@ ON CONFLICT (id) DO UPDATE SET
 -- UPDATED_AT TRIGGER
 -- ============================================
 
+DROP TRIGGER IF EXISTS update_plan_tier_updated_at ON "PlanTier";
 CREATE TRIGGER update_plan_tier_updated_at
   BEFORE UPDATE ON "PlanTier"
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -187,11 +188,13 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 ALTER TABLE "PlanTier" ENABLE ROW LEVEL SECURITY;
 
 -- Everyone can read plan tiers (public info)
+DROP POLICY IF EXISTS "Anyone can view plan tiers" ON "PlanTier";
 CREATE POLICY "Anyone can view plan tiers"
   ON "PlanTier" FOR SELECT
   USING (TRUE);
 
 -- Only service role can modify tiers
+DROP POLICY IF EXISTS "Only service role can modify tiers" ON "PlanTier";
 CREATE POLICY "Only service role can modify tiers"
   ON "PlanTier" FOR ALL
   USING (auth.role() = 'service_role');

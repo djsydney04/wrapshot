@@ -85,6 +85,7 @@ export default function ProjectDetailPage() {
   // Still using store for other data (not yet migrated to DB)
   const {
     getScenesForProject,
+    getCastForProject,
     getLocationsForProject,
     getShootingDaysForProject,
     getGearForProject,
@@ -123,7 +124,7 @@ export default function ProjectDetailPage() {
 
   // Store data (for sections not yet migrated to use DB types)
   const storeScenes = getScenesForProject(projectId);
-  const storeCast = useProjectStore((s) => s.getCastForProject(projectId));
+  const storeCast = getCastForProject(projectId);
   const locations = getLocationsForProject(projectId);
   const storeShootingDays = getShootingDaysForProject(projectId);
   const { shootingDays: dbShootingDays } = useShootingDays({ projectId });
