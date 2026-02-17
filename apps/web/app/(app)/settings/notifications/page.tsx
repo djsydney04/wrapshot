@@ -97,7 +97,7 @@ export default function NotificationSettingsPage() {
     <SettingsLayout
       title="Notifications"
       description="Choose how and when you want to be notified"
-      breadcrumbs={[{ label: "Settings" }, { label: "Notifications" }]}
+      breadcrumbs={[{ label: "Projects", href: "/" }, { label: "Settings", href: "/settings" }, { label: "Notifications" }]}
     >
       <SettingsCard>
         {/* Channel Headers */}

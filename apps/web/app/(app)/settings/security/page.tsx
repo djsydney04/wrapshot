@@ -57,7 +57,7 @@ export default function SecuritySettingsPage() {
     <SettingsLayout
       title="Security"
       description="Manage your password and account security"
-      breadcrumbs={[{ label: "Settings" }, { label: "Security" }]}
+      breadcrumbs={[{ label: "Projects", href: "/" }, { label: "Settings", href: "/settings" }, { label: "Security" }]}
     >
       {/* Password */}
       <SettingsCard>

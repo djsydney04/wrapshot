@@ -436,7 +436,7 @@ export default function BillingSettingsPage() {
     <SettingsLayout
       title="Billing"
       description="Manage your subscription and payment methods"
-      breadcrumbs={[{ label: "Settings" }, { label: "Billing" }]}
+      breadcrumbs={[{ label: "Projects", href: "/" }, { label: "Settings", href: "/settings" }, { label: "Billing" }]}
     >
       <React.Suspense fallback={<div className="animate-pulse bg-muted h-48 rounded-xl" />}>
         <BillingWrapper />

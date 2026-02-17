@@ -28,7 +28,7 @@ const settingsNav = [
 interface SettingsLayoutProps {
   title: string;
   description: string;
-  breadcrumbs?: { label: string }[];
+  breadcrumbs?: { label: string; href?: string }[];
   actions?: React.ReactNode;
   children: React.ReactNode;
 }
@@ -36,7 +36,7 @@ interface SettingsLayoutProps {
 export function SettingsLayout({
   title,
   description,
-  breadcrumbs = [{ label: "Settings" }],
+  breadcrumbs = [{ label: "Projects", href: "/" }, { label: "Settings" }],
   actions,
   children,
 }: SettingsLayoutProps) {

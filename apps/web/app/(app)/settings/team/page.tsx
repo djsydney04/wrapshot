@@ -279,7 +279,7 @@ export default function TeamSettingsPage() {
     <SettingsLayout
       title="Team"
       description="Manage your account team members"
-      breadcrumbs={[{ label: "Settings" }, { label: "Team" }]}
+      breadcrumbs={[{ label: "Projects", href: "/" }, { label: "Settings", href: "/settings" }, { label: "Team" }]}
       actions={
         <Button className="gap-2" size="sm">
           <Plus className="h-4 w-4" />
