@@ -1,14 +1,17 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 // Create a Supabase client with the service role key for admin operations
 // This should ONLY be used server-side for privileged operations like:
 // - Inviting users by email (auth.admin.inviteUserByEmail)
 // - Managing users
 // - Bypassing RLS policies when necessary
+// - Background agent jobs (no request cookies available)
 
-let adminClient: ReturnType<typeof createClient> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let adminClient: SupabaseClient<any, "public", any> | null = null;
 
-export function createAdminClient() {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function createAdminClient(): SupabaseClient<any, "public", any> {
   if (adminClient) {
     return adminClient;
   }

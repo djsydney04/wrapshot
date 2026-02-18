@@ -14,7 +14,7 @@ export const CHUNK_CONFIG = {
 
 // LLM configuration
 export const LLM_CONFIG = {
-  MODEL: 'accounts/fireworks/models/kimi-k2-5-instruct',
+  MODEL: 'accounts/fireworks/models/kimi-k2p5',
   MAX_TOKENS_SCENE_EXTRACTION: 8000,
   MAX_TOKENS_ELEMENT_EXTRACTION: 4000,
   MAX_TOKENS_SYNOPSIS: 2000,

@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ScriptAnalysisAgent } from '@/lib/agents/script-analysis';
+import { JobManager } from '@/lib/agents/orchestrator/job-manager';
 import { getFireworksApiKey } from '@/lib/ai/config';
 import type { AgentJobType, StartAgentJobRequest, StartAgentJobResponse } from '@/lib/agents/types';
 
@@ -123,6 +124,9 @@ export async function POST(request: Request) {
     // Handle job type
     if (jobType === 'script_analysis') {
       try {
+        // Cancel any stale jobs that are stuck (older than 10 minutes)
+        await JobManager.cancelStaleJobs(scriptId);
+
         // Create and start the agent
         const { jobId, agent } = await ScriptAnalysisAgent.start(
           projectId,

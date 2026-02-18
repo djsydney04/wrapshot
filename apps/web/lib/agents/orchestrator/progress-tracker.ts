@@ -4,7 +4,7 @@
  * Updates AgentJob progress in the database for real-time UI updates via Supabase Realtime.
  */
 
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { sanitizeForJsonb } from '@/lib/scripts/parser';
 import { STEP_DEFINITIONS, SCRIPT_ANALYSIS_STEPS } from '../constants';
 import type { AgentJob, AgentJobStatus, AgentJobResult, AgentContext } from '../types';
@@ -33,7 +33,7 @@ export class ProgressTracker {
    * Get the current job state
    */
   async getJob(): Promise<AgentJob | null> {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { data, error } = await supabase
       .from('AgentJob')
@@ -54,7 +54,7 @@ export class ProgressTracker {
    * Update job progress
    */
   async update(update: ProgressUpdate): Promise<void> {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const updateData: Record<string, unknown> = {};
 
@@ -105,7 +105,7 @@ export class ProgressTracker {
    * Mark job as started
    */
   async start(): Promise<void> {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     await supabase
       .from('AgentJob')
@@ -173,7 +173,7 @@ export class ProgressTracker {
    * Mark job as completed with results
    */
   async complete(result: AgentJobResult): Promise<void> {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const job = await this.getJob();
 
     const processingTimeMs = job?.startedAt
@@ -197,7 +197,7 @@ export class ProgressTracker {
    * Mark job as failed
    */
   async fail(errorMessage: string, errorDetails?: Record<string, unknown>): Promise<void> {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const job = await this.getJob();
 
     const processingTimeMs = job?.startedAt

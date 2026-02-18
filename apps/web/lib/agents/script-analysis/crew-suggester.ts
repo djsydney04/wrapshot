@@ -6,7 +6,7 @@
  * from element categories to crew departments/roles.
  */
 
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { AgentContext, AgentStepResult, SuggestedCrewRole, ExtractedElement } from '../types';
 import type { ProgressTracker } from '../orchestrator/progress-tracker';
 
@@ -96,7 +96,7 @@ export async function executeCrewSuggester(
     await tracker.updateProgress(0, suggestions.length, `Saving ${suggestions.length} crew suggestions...`);
 
     // Save to database
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const records = suggestions.map((s) => ({
       projectId: context.projectId,
       jobId: context.jobId,
