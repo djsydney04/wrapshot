@@ -7,10 +7,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 // - Bypassing RLS policies when necessary
 // - Background agent jobs (no request cookies available)
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let adminClient: SupabaseClient<any, "public", any> | null = null;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createAdminClient(): SupabaseClient<any, "public", any> {
   if (adminClient) {
     return adminClient;
