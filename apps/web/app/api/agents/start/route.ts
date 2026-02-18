@@ -2,10 +2,13 @@
  * POST /api/agents/start
  *
  * Initiates an AI agent job for script analysis or schedule planning.
- * Returns immediately with jobId - processing happens in background.
+ * Returns immediately with jobId - processing continues via next/server after().
  */
 
-import { NextResponse } from 'next/server';
+// Allow up to 5 minutes for the background pipeline (after() inherits this)
+export const maxDuration = 300;
+
+import { NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ScriptAnalysisAgent } from '@/lib/agents/script-analysis';
 import { JobManager } from '@/lib/agents/orchestrator/job-manager';
@@ -134,8 +137,15 @@ export async function POST(request: Request) {
           user.id
         );
 
-        // Start processing in background
-        agent.runInBackground();
+        // Schedule pipeline to run after the response is sent.
+        // next/server `after()` keeps the runtime alive for this work.
+        after(async () => {
+          try {
+            await agent.run();
+          } catch (error) {
+            console.error(`[AgentStart] Background job ${jobId} failed:`, error);
+          }
+        });
 
         const response: StartAgentJobResponse = {
           jobId,
