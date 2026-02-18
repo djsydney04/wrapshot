@@ -103,7 +103,7 @@ Return ONLY the JSON object, no other text.`;
           Authorization: `Bearer ${fireworksKey}`,
         },
         body: JSON.stringify({
-          model: "accounts/fireworks/models/kimi-k2-5-instruct",
+          model: "accounts/fireworks/models/kimi-k2p5",
           messages,
           max_tokens: 1000,
           temperature: 0.1, // Low temperature for consistent extraction

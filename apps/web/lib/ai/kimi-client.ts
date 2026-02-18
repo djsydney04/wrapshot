@@ -28,7 +28,7 @@ interface KimiResponse {
 export class KimiClient {
   private apiKey: string;
   private baseUrl = "https://api.fireworks.ai/inference/v1/chat/completions";
-  private model = "accounts/fireworks/models/kimi-k2-5-instruct";
+  private model = "accounts/fireworks/models/kimi-k2p5";
 
   constructor(apiKey?: string) {
     this.apiKey = getFireworksApiKey(apiKey);

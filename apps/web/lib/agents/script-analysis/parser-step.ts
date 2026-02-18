@@ -5,7 +5,7 @@
  */
 
 import { parsePdfScript, normalizeScriptText } from '@/lib/scripts/parser';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { AgentContext, AgentStepResult } from '../types';
 import type { ProgressTracker } from '../orchestrator/progress-tracker';
 
@@ -17,7 +17,7 @@ export async function executeParserStep(
     await tracker.updateProgress(0, 3, 'Fetching script file');
 
     // Get script URL from database
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { data: script, error: scriptError } = await supabase
       .from('Script')
       .select('id, fileUrl, projectId')
