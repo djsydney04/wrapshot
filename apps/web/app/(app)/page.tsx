@@ -52,6 +52,15 @@ export default function ProjectsDashboard() {
     loadProjects();
   }, []);
 
+  const reloadProjects = async () => {
+    try {
+      const data = await getProjects();
+      setProjects(data);
+    } catch (err) {
+      console.error("Error reloading projects:", err);
+    }
+  };
+
   const hasProjects = projects.length > 0;
 
   return (
@@ -149,7 +158,7 @@ export default function ProjectsDashboard() {
             hasProjects ? (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {projects.map((project) => (
-                  <ProjectCard key={project.id} project={project} />
+                  <ProjectCard key={project.id} project={project} onDeleted={reloadProjects} />
                 ))}
               </div>
             ) : (
