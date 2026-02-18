@@ -30,20 +30,18 @@ export const metadata: Metadata = {
     siteName: "wrapshoot",
     images: [
       {
-        url: "https://hhmdkkkpaukfcwfmdxyl.supabase.co/storage/v1/object/public/logo/logo.svg",
-        width: 512,
-        height: 512,
-        alt: "wrapshoot logo",
+        url: "https://hhmdkkkpaukfcwfmdxyl.supabase.co/storage/v1/object/public/logo/sharephoto.png",
+        alt: "wrapshoot share preview",
       },
     ],
     locale: "en_US",
     type: "website",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "wrapshoot - Film Production Scheduling",
     description: "Production management for modern filmmakers",
-    images: ["https://hhmdkkkpaukfcwfmdxyl.supabase.co/storage/v1/object/public/logo/logo.svg"],
+    images: ["https://hhmdkkkpaukfcwfmdxyl.supabase.co/storage/v1/object/public/logo/sharephoto.png"],
   },
   manifest: "/manifest.json",
 };
