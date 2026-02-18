@@ -123,7 +123,7 @@ export function TimedSurvey() {
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-lg mx-4 bg-background border border-border rounded-xl shadow-2xl animate-in zoom-in-95 fade-in duration-300">
+      <div className="relative w-full max-w-lg mx-4 bg-background border border-border rounded-lg shadow-soft-lg animate-in zoom-in-95 fade-in duration-300">
         {/* Close button */}
         <button
           onClick={handleDismiss}

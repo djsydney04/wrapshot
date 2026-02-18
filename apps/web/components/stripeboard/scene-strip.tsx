@@ -3,11 +3,13 @@
 import * as React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Trash2, Clock, Users } from "lucide-react";
+import { GripVertical, Trash2, Clock, Users, ChevronDown, ChevronUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Scene } from "@/lib/actions/scenes";
+
+export type SceneStripSize = "compact" | "comfortable" | "expanded";
 
 interface SceneStripProps {
   scene: Scene;
@@ -16,6 +18,9 @@ interface SceneStripProps {
   isSelected?: boolean;
   isDragging?: boolean;
   layout?: "strip" | "list";
+  sceneSize?: SceneStripSize;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
   className?: string;
   style?: React.CSSProperties;
   dragHandleProps?: React.HTMLAttributes<HTMLSpanElement>;
@@ -59,6 +64,9 @@ export const SceneStrip = React.forwardRef<HTMLDivElement, SceneStripProps>(
       isSelected = false,
       isDragging = false,
       layout = "strip",
+      sceneSize = "comfortable",
+      isExpanded = false,
+      onToggleExpand,
       className,
       style,
       dragHandleProps,
@@ -66,11 +74,16 @@ export const SceneStrip = React.forwardRef<HTMLDivElement, SceneStripProps>(
     },
     ref
   ) => {
+    const stripColor = getStripColor(scene.intExt, scene.dayNight);
+    const castCount = scene.cast?.length || 0;
+    const locationName = scene.location?.name || scene.setName || "No location";
+    const hasExpandableContent = Boolean(scene.synopsis || scene.notes);
 
-  const stripColor = getStripColor(scene.intExt, scene.dayNight);
-
-  const castCount = scene.cast?.length || 0;
-  const locationName = scene.location?.name || scene.setName || "No location";
+    const listSizeClasses: Record<SceneStripSize, string> = {
+      compact: "px-3 py-2",
+      comfortable: "px-4 py-3",
+      expanded: "px-4 py-4",
+    };
 
     if (layout === "list") {
       return (
@@ -79,7 +92,8 @@ export const SceneStrip = React.forwardRef<HTMLDivElement, SceneStripProps>(
           style={style}
           {...sortableProps}
           className={cn(
-            "flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all cursor-pointer",
+            "rounded-lg border-2 transition-all cursor-pointer",
+            listSizeClasses[sceneSize],
             stripColor,
             isSelected && "ring-2 ring-primary ring-offset-2",
             isDragging && "opacity-50 shadow-lg",
@@ -87,102 +101,141 @@ export const SceneStrip = React.forwardRef<HTMLDivElement, SceneStripProps>(
           )}
           onClick={onClick}
         >
-          <span
-            {...dragHandleProps}
-            className="h-4 w-4 text-muted-foreground flex-shrink-0 cursor-grab active:cursor-grabbing"
-          >
-            <GripVertical className="h-4 w-4" />
-          </span>
-
-        {/* Scene Number */}
-        <span className="font-mono font-bold text-lg w-12 text-center">
-          {scene.sceneNumber}
-        </span>
-
-        {/* Badges */}
-        <div className="flex items-center gap-1.5">
-          <Badge
-            variant={scene.intExt === "INT" ? "int" : "ext"}
-            className="text-[10px] px-1.5 py-0"
-          >
-            {scene.intExt}
-          </Badge>
-          <Badge
-            variant={
-              ["DAY", "MORNING", "AFTERNOON"].includes(scene.dayNight)
-                ? "day"
-                : "night"
-            }
-            className="text-[10px] px-1.5 py-0"
-          >
-            {scene.dayNight}
-          </Badge>
-        </div>
-
-        {/* Set Name */}
-        <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm truncate">{locationName}</p>
-          {scene.synopsis && (
-            <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-              {scene.synopsis}
-            </p>
-          )}
-        </div>
-
-        {/* Metadata */}
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-          {castCount > 0 && (
-            <span className="flex items-center gap-1">
-              <Users className="h-3.5 w-3.5" />
-              {castCount}
-            </span>
-          )}
-          <span className="flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5" />
-            {scene.pageEighths ? `${scene.pageEighths}/8` : `${scene.pageCount} pg`}
-          </span>
-        </div>
-
-        {/* Status */}
-        <Badge
-          variant={
-            scene.status === "COMPLETED"
-              ? "success"
-              : scene.status === "SCHEDULED"
-              ? "default"
-              : "secondary"
-          }
-          className="text-[10px]"
-        >
-          {scene.status.replace("_", " ")}
-        </Badge>
-
-        {/* Delete */}
-          {onDelete && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-              className="text-red-500 hover:text-red-600 hover:bg-red-50"
+          <div className="flex items-center gap-3">
+            <span
+              {...dragHandleProps}
+              className="h-4 w-4 text-muted-foreground flex-shrink-0 cursor-grab active:cursor-grabbing"
             >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+              <GripVertical className="h-4 w-4" />
+            </span>
+
+            <span className="font-mono font-bold text-lg w-12 text-center">
+              {scene.sceneNumber}
+            </span>
+
+            <div className="flex items-center gap-1.5">
+              <Badge
+                variant={scene.intExt === "INT" ? "int" : "ext"}
+                className="text-[10px] px-1.5 py-0"
+              >
+                {scene.intExt}
+              </Badge>
+              <Badge
+                variant={
+                  ["DAY", "MORNING", "AFTERNOON"].includes(scene.dayNight)
+                    ? "day"
+                    : "night"
+                }
+                className="text-[10px] px-1.5 py-0"
+              >
+                {scene.dayNight}
+              </Badge>
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm truncate">{locationName}</p>
+              {scene.synopsis && (
+                <p
+                  className={cn(
+                    "text-xs text-muted-foreground mt-0.5",
+                    isExpanded ? "whitespace-pre-wrap" : "line-clamp-1"
+                  )}
+                >
+                  {scene.synopsis}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              {castCount > 0 && (
+                <span className="flex items-center gap-1">
+                  <Users className="h-3.5 w-3.5" />
+                  {castCount}
+                </span>
+              )}
+              <span className="flex items-center gap-1">
+                <Clock className="h-3.5 w-3.5" />
+                {scene.pageEighths ? `${scene.pageEighths}/8` : `${scene.pageCount} pg`}
+              </span>
+            </div>
+
+            <Badge
+              variant={
+                scene.status === "COMPLETED"
+                  ? "success"
+                  : scene.status === "SCHEDULED"
+                  ? "default"
+                  : "secondary"
+              }
+              className="text-[10px]"
+            >
+              {scene.status.replace("_", " ")}
+            </Badge>
+
+            {hasExpandableContent && onToggleExpand && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleExpand();
+                }}
+                className="text-muted-foreground"
+              >
+                {isExpanded ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+            )}
+
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                className="text-red-500 hover:text-red-600 hover:bg-red-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+
+          {isExpanded && scene.notes && (
+            <div className="mt-2 rounded-md bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+              {scene.notes}
+            </div>
           )}
+
         </div>
       );
     }
 
-  // Strip layout (compact, for stripeboard)
+    const stripSizeClasses: Record<SceneStripSize, string> = {
+      compact: "px-2 py-1.5",
+      comfortable: "px-2.5 py-2",
+      expanded: "px-3 py-2.5",
+    };
+
+    const stripTextClasses: Record<SceneStripSize, string> = {
+      compact: "text-[11px]",
+      comfortable: "text-xs",
+      expanded: "text-sm",
+    };
+
+    // Strip layout (for stripeboard scheduling)
     return (
       <div
         ref={ref}
         style={style}
         {...sortableProps}
         className={cn(
-          "flex items-center gap-2 px-2 py-1.5 rounded border-2 transition-all cursor-pointer",
+          "flex items-center gap-2 rounded border-2 transition-all cursor-pointer",
+          stripSizeClasses[sceneSize],
           stripColor,
           isSelected && "ring-2 ring-primary ring-offset-1",
           isDragging && "opacity-50 shadow-lg",
@@ -221,10 +274,10 @@ export const SceneStrip = React.forwardRef<HTMLDivElement, SceneStripProps>(
       </Badge>
 
       {/* Set Name */}
-      <span className="flex-1 text-[11px] truncate">{locationName}</span>
+      <span className={cn("flex-1 truncate", stripTextClasses[sceneSize])}>{locationName}</span>
 
       {/* Page Count */}
-      <span className="text-[10px] text-muted-foreground">
+      <span className={cn("text-muted-foreground", sceneSize === "expanded" ? "text-xs" : "text-[10px]")}>
         {scene.pageEighths ? `${scene.pageEighths}/8` : `${scene.pageCount}pg`}
       </span>
       </div>

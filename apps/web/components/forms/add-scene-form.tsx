@@ -37,6 +37,7 @@ const initialFormData = {
   synopsis: "",
   intExt: "INT" as IntExt,
   dayNight: "DAY" as DayNight,
+  setName: "",
   locationId: "",
   pageCount: "1",
   estimatedMinutes: "",
@@ -115,6 +116,7 @@ export function AddSceneForm({
         synopsis: editScene.synopsis || "",
         intExt: editScene.intExt,
         dayNight: editScene.dayNight,
+        setName: editScene.setName || "",
         locationId: editScene.locationId || "",
         pageCount: editScene.pageCount.toString(),
         estimatedMinutes: editScene.estimatedMinutes?.toString() || "",
@@ -142,6 +144,7 @@ export function AddSceneForm({
         synopsis: formData.synopsis || undefined,
         intExt: formData.intExt,
         dayNight: formData.dayNight,
+        setName: formData.setName || undefined,
         locationId: formData.locationId || undefined,
         pageCount: parseFloat(formData.pageCount),
         estimatedMinutes: formData.estimatedMinutes ? parseInt(formData.estimatedMinutes) : undefined,
@@ -235,7 +238,10 @@ export function AddSceneForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent onClose={() => onOpenChange(false)} className="max-w-5xl w-[95vw]">
+      <DialogContent
+        onClose={() => onOpenChange(false)}
+        className="max-w-6xl w-[96vw] max-h-[92vh]"
+      >
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Scene" : "Add Scene"}</DialogTitle>
           <DialogDescription>
@@ -258,7 +264,7 @@ export function AddSceneForm({
 
           <TabsContent value="basic">
             <form onSubmit={handleSubmit}>
-              <DialogBody className="space-y-4 max-h-[70vh] overflow-y-auto">
+              <DialogBody className="space-y-4">
                 <BasicInfoFields
                   formData={formData}
                   setFormData={setFormData}
@@ -283,7 +289,7 @@ export function AddSceneForm({
           </TabsContent>
 
           <TabsContent value="breakdown">
-            <DialogBody className="max-h-[70vh] overflow-y-auto">
+            <DialogBody>
               {isEditing && editScene ? (
                 <SceneBreakdownEditor
                   scene={editScene}
@@ -444,6 +450,22 @@ function BasicInfoFields({ formData, setFormData, locations, error }: BasicInfoF
             placeholder="Runtime"
           />
         </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1.5">
+          Set / Location Name
+        </label>
+        <Input
+          value={formData.setName}
+          onChange={(e) =>
+            setFormData({ ...formData, setName: e.target.value })
+          }
+          placeholder="e.g., JOHN'S APARTMENT - LIVING ROOM"
+        />
+        <p className="mt-1 text-xs text-muted-foreground">
+          If no location is selected, we&apos;ll auto-create one from this name.
+        </p>
       </div>
 
       <div>

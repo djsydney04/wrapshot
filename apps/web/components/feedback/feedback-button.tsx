@@ -11,11 +11,16 @@ import { cn } from "@/lib/utils";
 interface FeedbackButtonProps {
   collapsed?: boolean;
   variant?: "sidebar" | "default" | "header";
+  source?: "sidebar" | "top_bar" | "settings_sidebar" | "settings_header";
 }
 
 type FeedbackType = "feature" | "bug" | "general";
 
-export function FeedbackButton({ collapsed = false, variant = "sidebar" }: FeedbackButtonProps) {
+export function FeedbackButton({
+  collapsed = false,
+  variant = "sidebar",
+  source,
+}: FeedbackButtonProps) {
   const posthog = usePostHog();
   const [isOpen, setIsOpen] = React.useState(false);
   const [feedbackType, setFeedbackType] = React.useState<FeedbackType>("feature");
@@ -24,6 +29,7 @@ export function FeedbackButton({ collapsed = false, variant = "sidebar" }: Feedb
   const [submitted, setSubmitted] = React.useState(false);
 
   const surveyId = process.env.NEXT_PUBLIC_POSTHOG_SURVEY_ID;
+  const feedbackSource = source || (variant === "header" ? "top_bar" : "sidebar");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +45,7 @@ export function FeedbackButton({ collapsed = false, variant = "sidebar" }: Feedb
       ph.capture("feedback_submitted", {
         feedback_type: feedbackType,
         message: message.trim(),
-        source: "feedback_button",
+        source: feedbackSource,
       });
 
       // Also send as survey response if survey ID is configured
@@ -50,6 +56,7 @@ export function FeedbackButton({ collapsed = false, variant = "sidebar" }: Feedb
           $survey_response_1: feedbackType,
           feedback_type: feedbackType,
           message: message.trim(),
+          source: feedbackSource,
         });
       }
 
@@ -80,16 +87,16 @@ export function FeedbackButton({ collapsed = false, variant = "sidebar" }: Feedb
     setIsOpen(true);
     const ph = posthog ?? posthogLib;
     if (ph && typeof ph.capture === "function") {
-      ph.capture("feedback_opened", { source: "feedback_button" });
+      ph.capture("feedback_opened", { source: feedbackSource });
       if (surveyId) {
-        ph.capture("survey shown", { $survey_id: surveyId });
+        ph.capture("survey shown", { $survey_id: surveyId, source: feedbackSource });
       }
     }
   };
 
   // Variant-specific button styles
   const buttonStyles = {
-    sidebar: "w-full justify-start gap-2 font-normal h-8 text-stone-400 hover:text-white hover:bg-stone-800",
+    sidebar: "w-full justify-start gap-2 font-normal h-8 text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover",
     default: "w-full justify-start gap-3 rounded-lg px-3 py-2.5 text-muted-foreground hover:text-foreground hover:bg-muted/50",
     header: "gap-2 text-muted-foreground hover:text-foreground",
   };
@@ -107,7 +114,7 @@ export function FeedbackButton({ collapsed = false, variant = "sidebar" }: Feedb
           variant="ghost"
           size="icon"
           onClick={handleOpen}
-          className="w-full text-stone-400 hover:text-white hover:bg-stone-800"
+          className="w-full text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover"
         >
           <MessageSquarePlus className="h-4 w-4" />
         </Button>
@@ -241,11 +248,11 @@ function FeedbackModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50"
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-md mx-4 bg-background border border-border rounded-lg shadow-2xl">
+      <div className="relative w-full max-w-md mx-4 bg-background border border-border rounded-lg shadow-soft-lg">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-sm font-medium">Send Feedback</h2>
           <Button
@@ -260,8 +267,8 @@ function FeedbackModal({
 
         {submitted ? (
           <div className="p-8 text-center">
-            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-green-500/10 flex items-center justify-center">
-              <CheckCircle className="h-6 w-6 text-green-500" />
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[hsl(var(--feedback-success-bg))] flex items-center justify-center">
+              <CheckCircle className="h-6 w-6 text-[hsl(var(--feedback-success-fg))]" />
             </div>
             <h3 className="text-lg font-medium mb-1">Thank you!</h3>
             <p className="text-sm text-muted-foreground">Your feedback has been submitted.</p>

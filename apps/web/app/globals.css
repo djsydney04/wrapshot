@@ -24,12 +24,12 @@
     --border: 40 12% 90%;
     --input: 40 12% 90%;
     --ring: 220 14% 10%;
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
     /* Layout variables */
     --sidebar-width: 240px;
     --sidebar-collapsed-width: 48px;
-    --header-height: 45px;
+    --header-height: 48px;
 
     /* Premium accent colors - soft, sophisticated pastels */
     --accent-blue: 220 80% 65%;
@@ -45,11 +45,6 @@
     --accent-emerald: 160 60% 45%;
     --accent-emerald-soft: 160 50% 95%;
 
-    /* Gradient colors */
-    --gradient-start: 220 80% 97%;
-    --gradient-mid: 270 60% 97%;
-    --gradient-end: 350 60% 97%;
-
     /* Status colors - refined */
     --status-success: 160 55% 42%;
     --status-warning: 38 92% 50%;
@@ -62,6 +57,56 @@
 
     /* Notion-like hover for sidebar */
     --notion-hover: 40 12% 94%;
+
+    /* Badge colors */
+    --badge-blue: 220 60% 95%;
+    --badge-blue-fg: 220 70% 40%;
+    --badge-yellow: 45 80% 92%;
+    --badge-yellow-fg: 40 80% 35%;
+    --badge-green: 145 50% 92%;
+    --badge-green-fg: 150 60% 30%;
+    --badge-red: 0 70% 94%;
+    --badge-red-fg: 0 65% 42%;
+    --badge-purple: 270 50% 94%;
+    --badge-purple-fg: 270 55% 40%;
+    --badge-orange: 25 80% 93%;
+    --badge-orange-fg: 25 75% 38%;
+    --badge-amber: 38 75% 92%;
+    --badge-amber-fg: 38 80% 35%;
+    --badge-emerald: 160 45% 92%;
+    --badge-emerald-fg: 160 55% 30%;
+    --badge-gray: 220 10% 94%;
+    --badge-gray-fg: 220 10% 40%;
+    --badge-indigo: 230 55% 94%;
+    --badge-indigo-fg: 230 55% 40%;
+    --badge-slate: 215 15% 93%;
+    --badge-slate-fg: 215 15% 38%;
+
+    /* Feedback colors */
+    --feedback-success-bg: 145 50% 95%;
+    --feedback-success-fg: 150 60% 30%;
+    --feedback-success-border: 145 40% 85%;
+    --feedback-warning-bg: 45 80% 94%;
+    --feedback-warning-fg: 40 80% 35%;
+    --feedback-warning-border: 45 60% 82%;
+    --feedback-error-bg: 0 70% 96%;
+    --feedback-error-fg: 0 65% 42%;
+    --feedback-error-border: 0 50% 88%;
+    --feedback-info-bg: 220 60% 96%;
+    --feedback-info-fg: 220 70% 40%;
+    --feedback-info-border: 220 45% 88%;
+
+    /* Sidebar colors */
+    --sidebar-bg: 220 20% 8%;
+    --sidebar-fg: 40 10% 85%;
+    --sidebar-fg-muted: 40 5% 55%;
+    --sidebar-fg-active: 0 0% 100%;
+    --sidebar-border: 220 15% 15%;
+    --sidebar-hover: 220 15% 12%;
+    --sidebar-active: 220 15% 14%;
+    --sidebar-kbd-bg: 220 15% 14%;
+    --sidebar-kbd-border: 220 12% 20%;
+    --sidebar-kbd-fg: 40 5% 55%;
   }
 
   .dark {
@@ -99,11 +144,6 @@
     --accent-emerald: 160 50% 40%;
     --accent-emerald-soft: 160 30% 12%;
 
-    /* Dark gradient colors */
-    --gradient-start: 220 40% 12%;
-    --gradient-mid: 270 30% 12%;
-    --gradient-end: 350 30% 12%;
-
     /* Dark status colors */
     --status-success: 160 50% 40%;
     --status-warning: 38 80% 45%;
@@ -115,6 +155,56 @@
     --hover-strong: 220 15% 14%;
 
     --notion-hover: 220 15% 12%;
+
+    /* Dark badge colors */
+    --badge-blue: 220 40% 18%;
+    --badge-blue-fg: 220 60% 70%;
+    --badge-yellow: 45 50% 16%;
+    --badge-yellow-fg: 45 70% 70%;
+    --badge-green: 145 35% 15%;
+    --badge-green-fg: 150 50% 65%;
+    --badge-red: 0 45% 18%;
+    --badge-red-fg: 0 55% 70%;
+    --badge-purple: 270 35% 18%;
+    --badge-purple-fg: 270 45% 70%;
+    --badge-orange: 25 50% 16%;
+    --badge-orange-fg: 25 65% 68%;
+    --badge-amber: 38 45% 16%;
+    --badge-amber-fg: 38 65% 68%;
+    --badge-emerald: 160 35% 14%;
+    --badge-emerald-fg: 160 45% 65%;
+    --badge-gray: 220 10% 16%;
+    --badge-gray-fg: 220 10% 65%;
+    --badge-indigo: 230 35% 18%;
+    --badge-indigo-fg: 230 45% 70%;
+    --badge-slate: 215 15% 16%;
+    --badge-slate-fg: 215 15% 65%;
+
+    /* Dark feedback colors */
+    --feedback-success-bg: 150 40% 12%;
+    --feedback-success-fg: 150 50% 65%;
+    --feedback-success-border: 150 35% 20%;
+    --feedback-warning-bg: 40 45% 12%;
+    --feedback-warning-fg: 45 70% 65%;
+    --feedback-warning-border: 40 40% 20%;
+    --feedback-error-bg: 0 40% 14%;
+    --feedback-error-fg: 0 55% 70%;
+    --feedback-error-border: 0 35% 22%;
+    --feedback-info-bg: 220 35% 14%;
+    --feedback-info-fg: 220 55% 70%;
+    --feedback-info-border: 220 30% 22%;
+
+    /* Dark sidebar colors */
+    --sidebar-bg: 220 22% 6%;
+    --sidebar-fg: 40 10% 82%;
+    --sidebar-fg-muted: 40 5% 50%;
+    --sidebar-fg-active: 0 0% 100%;
+    --sidebar-border: 220 15% 12%;
+    --sidebar-hover: 220 15% 10%;
+    --sidebar-active: 220 15% 12%;
+    --sidebar-kbd-bg: 220 15% 10%;
+    --sidebar-kbd-border: 220 12% 16%;
+    --sidebar-kbd-fg: 40 5% 50%;
   }
 }
 
@@ -128,135 +218,6 @@
 }
 
 @layer utilities {
-  /* ===========================
-     GRAIN TEXTURES
-     =========================== */
-  .grain {
-    position: relative;
-    overflow: hidden;
-  }
-  .grain::before {
-    content: "";
-    position: absolute;
-    inset: -50%;
-    width: 200%;
-    height: 200%;
-    pointer-events: none;
-    opacity: 0.25;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-    border-radius: inherit;
-    mix-blend-mode: overlay;
-  }
-
-  .grain-subtle::before {
-    opacity: 0.15;
-  }
-
-  .grain-strong::before {
-    opacity: 0.35;
-  }
-
-  /* Page-level grain overlay - hyper pixilated */
-  .grain-page {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 9999;
-    opacity: 0.12;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-    mix-blend-mode: multiply;
-  }
-
-  .dark .grain-page {
-    mix-blend-mode: soft-light;
-    opacity: 0.15;
-  }
-
-  /* ===========================
-     PREMIUM GRADIENTS
-     =========================== */
-
-  /* Ambient background gradients */
-  .gradient-ambient {
-    background: linear-gradient(
-      135deg,
-      hsl(var(--gradient-start)) 0%,
-      hsl(var(--gradient-mid)) 50%,
-      hsl(var(--gradient-end)) 100%
-    );
-  }
-
-  .gradient-ambient-subtle {
-    background: linear-gradient(
-      135deg,
-      hsl(var(--gradient-start) / 0.5) 0%,
-      hsl(var(--gradient-mid) / 0.3) 50%,
-      hsl(var(--gradient-end) / 0.5) 100%
-    );
-  }
-
-  /* Soft radial glow */
-  .gradient-glow {
-    background: radial-gradient(
-      ellipse at top,
-      hsl(var(--accent-blue-soft)) 0%,
-      transparent 50%
-    );
-  }
-
-  .gradient-glow-purple {
-    background: radial-gradient(
-      ellipse at top,
-      hsl(var(--accent-purple-soft)) 0%,
-      transparent 50%
-    );
-  }
-
-  /* Card gradients */
-  .gradient-card {
-    background: linear-gradient(
-      180deg,
-      hsl(var(--card)) 0%,
-      hsl(var(--muted) / 0.5) 100%
-    );
-  }
-
-  /* Mesh gradient effect */
-  .gradient-mesh {
-    background:
-      radial-gradient(at 40% 20%, hsl(var(--accent-blue-soft)) 0px, transparent 50%),
-      radial-gradient(at 80% 0%, hsl(var(--accent-purple-soft)) 0px, transparent 50%),
-      radial-gradient(at 0% 50%, hsl(var(--accent-teal-soft)) 0px, transparent 50%),
-      radial-gradient(at 80% 50%, hsl(var(--accent-rose-soft)) 0px, transparent 50%),
-      radial-gradient(at 0% 100%, hsl(var(--accent-amber-soft)) 0px, transparent 50%),
-      hsl(var(--background));
-  }
-
-  /* Border gradients */
-  .border-gradient {
-    position: relative;
-    background: hsl(var(--card));
-    border: none !important;
-  }
-  .border-gradient::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    padding: 1px;
-    border-radius: inherit;
-    background: linear-gradient(
-      135deg,
-      hsl(var(--border)) 0%,
-      hsl(var(--accent-blue) / 0.2) 50%,
-      hsl(var(--border)) 100%
-    );
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-  }
-
   /* ===========================
      ACCENT COLORS
      =========================== */
@@ -295,19 +256,6 @@
   .bg-info { background-color: hsl(var(--status-info)); }
 
   /* ===========================
-     GLASS EFFECTS
-     =========================== */
-  .glass {
-    @apply bg-white/70 dark:bg-card/70 backdrop-blur-md border-white/20;
-  }
-  .glass-strong {
-    @apply bg-white/90 dark:bg-card/90 backdrop-blur-xl;
-  }
-  .glass-subtle {
-    @apply bg-white/40 dark:bg-card/40 backdrop-blur-sm;
-  }
-
-  /* ===========================
      SHADOWS
      =========================== */
   .shadow-soft {
@@ -329,34 +277,9 @@
       0 24px 48px hsl(var(--foreground) / 0.04);
   }
 
-  /* Colored shadows */
-  .shadow-blue {
-    box-shadow: 0 8px 32px hsl(var(--accent-blue) / 0.15);
-  }
-  .shadow-purple {
-    box-shadow: 0 8px 32px hsl(var(--accent-purple) / 0.15);
-  }
-
   /* Inset shadow */
   .shadow-inset {
     box-shadow: inset 0 1px 2px hsl(var(--foreground) / 0.05);
-  }
-
-  /* ===========================
-     HOVER & INTERACTION
-     =========================== */
-  .hover-lift {
-    @apply transition-all duration-200 ease-out;
-  }
-  .hover-lift:hover {
-    @apply -translate-y-0.5;
-    box-shadow:
-      0 4px 12px hsl(var(--foreground) / 0.05),
-      0 8px 24px hsl(var(--foreground) / 0.03);
-  }
-
-  .hover-glow:hover {
-    box-shadow: 0 0 0 3px hsl(var(--accent-blue) / 0.1);
   }
 
   /* ===========================
@@ -395,33 +318,10 @@
     }
   }
 
-  .animate-float {
-    animation: float 6s ease-in-out infinite;
-  }
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
-  }
-
   /* ===========================
      LAYOUT UTILITIES
      =========================== */
   .divider {
     @apply h-px w-full bg-border/50;
-  }
-
-  /* Premium card style */
-  .card-premium {
-    @apply rounded-2xl bg-card border border-border/50 shadow-soft overflow-hidden;
-  }
-
-  /* Section spacing */
-  .section-spacing {
-    @apply space-y-8;
-  }
-
-  /* Content max width */
-  .content-width {
-    @apply max-w-4xl mx-auto;
   }
 }

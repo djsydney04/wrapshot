@@ -43,6 +43,14 @@ export async function parsePdfScript(buffer: Buffer): Promise<ParsedScriptResult
     );
   }
 
+  // Suppress noisy "font private use area" warnings from pdf-parse's bundled PDF.js
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    const msg = typeof args[0] === "string" ? args[0] : "";
+    if (msg.includes("font private use area")) return;
+    originalWarn.apply(console, args);
+  };
+
   try {
     const data = await parser(buffer, {
       // Options for better screenplay extraction
@@ -61,6 +69,8 @@ export async function parsePdfScript(buffer: Buffer): Promise<ParsedScriptResult
     console.error("Error parsing PDF:", error);
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to parse PDF script: ${detail}`);
+  } finally {
+    console.warn = originalWarn;
   }
 }
 

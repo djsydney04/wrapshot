@@ -20,6 +20,7 @@ export interface SceneInput {
   synopsis?: string;
   intExt?: IntExt;
   dayNight?: DayNight;
+  setName?: string;
   locationId?: string;
   pageCount?: number;
   scriptDay?: string;
@@ -147,6 +148,36 @@ export async function createScene(input: SceneInput) {
 
   const maxSortOrder = existingScenes?.[0]?.sortOrder ?? -1;
 
+  let resolvedLocationId = input.locationId || null;
+  const normalizedSetName = input.setName?.trim();
+
+  // If no explicit location was selected, auto-create a location from set name.
+  if (!resolvedLocationId && normalizedSetName) {
+    const { data: existingLocation } = await supabase
+      .from("Location")
+      .select("id")
+      .eq("projectId", input.projectId)
+      .eq("name", normalizedSetName)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingLocation?.id) {
+      resolvedLocationId = existingLocation.id;
+    } else {
+      const { data: createdLocation } = await supabase
+        .from("Location")
+        .insert({
+          projectId: input.projectId,
+          name: normalizedSetName,
+          interiorExterior: input.intExt || "INT",
+        })
+        .select("id")
+        .single();
+
+      resolvedLocationId = createdLocation?.id || null;
+    }
+  }
+
   // Create the scene
   const { data: scene, error: sceneError } = await supabase
     .from("Scene")
@@ -156,7 +187,8 @@ export async function createScene(input: SceneInput) {
       synopsis: input.synopsis || null,
       intExt: input.intExt || "INT",
       dayNight: input.dayNight || "DAY",
-      locationId: input.locationId || null,
+      setName: normalizedSetName || null,
+      locationId: resolvedLocationId,
       pageCount: input.pageCount || 1,
       scriptDay: input.scriptDay || null,
       estimatedMinutes: input.estimatedMinutes || null,
@@ -205,6 +237,49 @@ export async function updateScene(id: string, updates: Partial<SceneInput>) {
 
   // Extract castIds to handle separately
   const { castIds, projectId, ...sceneUpdates } = updates;
+  const normalizedSetName = sceneUpdates.setName?.trim();
+
+  if (!sceneUpdates.locationId && normalizedSetName) {
+    let resolvedProjectId = projectId;
+    if (!resolvedProjectId) {
+      const { data: existingScene } = await supabase
+        .from("Scene")
+        .select("projectId")
+        .eq("id", id)
+        .single();
+      resolvedProjectId = existingScene?.projectId;
+    }
+
+    if (!resolvedProjectId) {
+      console.error("Unable to resolve projectId while auto-creating location for scene update");
+    } else {
+    const { data: existingLocation } = await supabase
+      .from("Location")
+      .select("id")
+      .eq("projectId", resolvedProjectId)
+      .eq("name", normalizedSetName)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingLocation?.id) {
+      sceneUpdates.locationId = existingLocation.id;
+    } else {
+      const { data: createdLocation } = await supabase
+        .from("Location")
+        .insert({
+          projectId: resolvedProjectId,
+          name: normalizedSetName,
+          interiorExterior: sceneUpdates.intExt || "INT",
+        })
+        .select("id")
+        .single();
+
+      if (createdLocation?.id) {
+        sceneUpdates.locationId = createdLocation.id;
+      }
+    }
+    }
+  }
 
   // Update the scene
   const { data, error } = await supabase

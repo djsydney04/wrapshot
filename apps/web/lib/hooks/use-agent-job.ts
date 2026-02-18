@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { AgentJob, AgentJobStatus, AgentProgressUpdate } from "@/lib/agents/types";
+import type { AgentJob, AgentJobStatus } from "@/lib/agents/types";
 
 interface UseAgentJobOptions {
   jobId?: string;
@@ -45,17 +45,19 @@ export function useAgentJob({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   // Fetch job from API
-  const fetchJob = useCallback(async () => {
+  const fetchJob = useCallback(async (showLoading = true) => {
     if (!jobId && !scriptId) {
       setJob(null);
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    if (showLoading) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -80,7 +82,9 @@ export function useAgentJob({
       console.error('Error fetching agent job:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch job');
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   }, [jobId, scriptId]);
 
@@ -101,7 +105,7 @@ export function useAgentJob({
       }
 
       // Refetch to get updated status
-      await fetchJob();
+      await fetchJob(false);
     } catch (err) {
       console.error('Error cancelling job:', err);
       throw err;
@@ -110,7 +114,7 @@ export function useAgentJob({
 
   // Initial fetch
   useEffect(() => {
-    fetchJob();
+    void fetchJob(true);
   }, [fetchJob]);
 
   // Subscribe to realtime updates
@@ -158,7 +162,7 @@ export function useAgentJob({
     }
 
     const interval = setInterval(() => {
-      fetchJob();
+      void fetchJob(false);
     }, pollInterval);
 
     return () => clearInterval(interval);

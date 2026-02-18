@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { BreakdownPreviewModal } from "./breakdown-preview-modal";
 import { AgentProgressCard } from "@/components/agents/agent-progress-card";
 import { useAgentJob, useStartAgentJob } from "@/lib/hooks/use-agent-job";
+import { useAgentProgressToast } from "@/lib/hooks/use-agent-progress-toast";
 import type { ExtractedScene, BreakdownResult } from "@/lib/actions/script-breakdown";
 import type { AgentJobResult } from "@/lib/agents/types";
 
@@ -36,8 +37,19 @@ export function ScriptBreakdownStep({
   const [activeJobId, setActiveJobId] = React.useState<string | null>(null);
 
   const { startJob, loading: startingJob } = useStartAgentJob();
-  const { job, isComplete: agentComplete, isFailed: agentFailed } = useAgentJob({
+  const {
+    job,
+    isRunning: agentRunning,
+    isComplete: agentComplete,
+    isFailed: agentFailed,
+  } = useAgentJob({
     jobId: activeJobId || undefined,
+  });
+  useAgentProgressToast({
+    job,
+    isRunning: agentRunning,
+    isComplete: agentComplete,
+    isFailed: agentFailed,
   });
 
   // Handle agent completion

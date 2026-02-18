@@ -59,7 +59,7 @@ function DialogContent({
     <div
       className={cn(
         "fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2",
-        "rounded-2xl border border-border/50 bg-background/95 backdrop-blur-xl shadow-2xl shadow-black/10",
+        "rounded-lg border border-border/50 bg-background shadow-soft-lg",
         "animate-in fade-in-0 zoom-in-95",
         "max-h-[85vh] overflow-auto",
         className
@@ -88,7 +88,7 @@ function DialogHeader({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("p-6 pb-4", className)}
+      className={cn("p-5 pb-4", className)}
       {...props}
     >
       {children}
@@ -133,7 +133,7 @@ function DialogBody({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("px-6 py-5", className)}
+      className={cn("px-5 py-4", className)}
       {...props}
     >
       {children}

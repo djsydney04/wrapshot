@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { DEPARTMENT_LABELS } from "@/lib/types";
-import { type CrewMember, type CrewMemberInput } from "@/lib/actions/crew";
+import {
+  type CrewMember,
+  type CrewMemberInput,
+  type DepartmentType,
+} from "@/lib/actions/crew";
 
 interface CrewProfileModalProps {
   member: CrewMember;
@@ -37,6 +42,8 @@ export function CrewProfileModal({
   const [editData, setEditData] = React.useState({
     name: member.name,
     role: member.role,
+    department: member.department,
+    isHead: member.isHead,
     email: member.email || "",
     phone: member.phone || "",
     profilePhotoUrl: member.profilePhotoUrl || null,
@@ -46,6 +53,8 @@ export function CrewProfileModal({
     setEditData({
       name: member.name,
       role: member.role,
+      department: member.department,
+      isHead: member.isHead,
       email: member.email || "",
       phone: member.phone || "",
       profilePhotoUrl: member.profilePhotoUrl || null,
@@ -57,6 +66,8 @@ export function CrewProfileModal({
     await onUpdate(member.id, {
       name: editData.name,
       role: editData.role,
+      department: editData.department,
+      isHead: editData.isHead,
       email: editData.email || undefined,
       phone: editData.phone || undefined,
       profilePhotoUrl: editData.profilePhotoUrl || undefined,
@@ -126,6 +137,33 @@ export function CrewProfileModal({
                   onChange={(e) => setEditData({ ...editData, role: e.target.value })}
                 />
               </div>
+              <div>
+                <label className="text-sm font-medium">Department</label>
+                <Select
+                  value={editData.department}
+                  onChange={(e) =>
+                    setEditData({
+                      ...editData,
+                      department: e.target.value as DepartmentType,
+                    })
+                  }
+                  options={Object.entries(DEPARTMENT_LABELS).map(([value, label]) => ({
+                    value,
+                    label,
+                  }))}
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={editData.isHead}
+                  onChange={(e) =>
+                    setEditData({ ...editData, isHead: e.target.checked })
+                  }
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                Department Head
+              </label>
             </div>
           ) : (
             <div className="text-center">

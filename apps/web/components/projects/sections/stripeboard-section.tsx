@@ -18,10 +18,10 @@ import {
   arrayMove,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Plus, LayoutGrid, Columns3, Clapperboard, PanelLeftClose, PanelLeftOpen, Loader2 } from "lucide-react";
+import { Plus, LayoutGrid, Columns3, Clapperboard, PanelLeftClose, PanelLeftOpen, Loader2, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { SceneStrip } from "@/components/stripeboard/scene-strip";
+import { SceneStrip, type SceneStripSize } from "@/components/stripeboard/scene-strip";
 import { ShootDayContainer } from "@/components/stripeboard/shoot-day-container";
 import { BreakdownPanel } from "@/components/stripeboard/breakdown-panel";
 import { UnscheduledPool } from "@/components/stripeboard/unscheduled-pool";
@@ -80,6 +80,7 @@ export function StripeboardSection({
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const [itemsByContainer, setItemsByContainer] = React.useState<Record<string, string[]>>({});
   const [isSaving, setIsSaving] = React.useState(false);
+  const [expandedSceneIds, setExpandedSceneIds] = React.useState<Set<string>>(new Set());
 
   // Update local scenes when props change
   React.useEffect(() => {
@@ -342,6 +343,29 @@ export function StripeboardSection({
   const scheduledScenes = localScenes.filter(
     (s) => s.status === "SCHEDULED" || assignedSceneIds.has(s.id)
   ).length;
+  const sceneSize: SceneStripSize = "comfortable";
+
+  const toggleExpandedScene = React.useCallback((sceneId: string) => {
+    setExpandedSceneIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sceneId)) {
+        next.delete(sceneId);
+      } else {
+        next.add(sceneId);
+      }
+      return next;
+    });
+  }, []);
+
+  const allExpanded = expandedSceneIds.size > 0 && expandedSceneIds.size >= localScenes.length;
+
+  const toggleExpandAll = React.useCallback(() => {
+    if (allExpanded) {
+      setExpandedSceneIds(new Set());
+    } else {
+      setExpandedSceneIds(new Set(localScenes.map((s) => s.id)));
+    }
+  }, [allExpanded, localScenes]);
 
   return (
     <DndContext
@@ -365,11 +389,6 @@ export function StripeboardSection({
               <span>·</span>
               <span>{completedScenes} completed</span>
             </div>
-            {viewMode === "stripeboard" && (
-              <p className="hidden lg:block text-xs text-muted-foreground">
-                Drag scenes from the right column into shooting days to build your schedule.
-              </p>
-            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -400,6 +419,21 @@ export function StripeboardSection({
                 List
               </button>
             </div>
+            {viewMode === "list" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleExpandAll}
+                className="gap-1.5"
+              >
+                {allExpanded ? (
+                  <ChevronsDownUp className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronsUpDown className="h-3.5 w-3.5" />
+                )}
+                {allExpanded ? "Collapse" : "Expand"}
+              </Button>
+            )}
 
             <Button
               variant="outline"
@@ -422,10 +456,10 @@ export function StripeboardSection({
 
         {/* Content */}
         {localScenes.length > 0 ? (
-          <div className="flex gap-4 min-h-[600px]">
+          <div className="flex gap-4">
             {/* Breakdown Panel (Left) */}
             {showBreakdownPanel && selectedScene && (
-              <div className="w-80 flex-shrink-0">
+              <div className="w-80 flex-shrink-0 sticky top-4 self-start max-h-[calc(100vh-6rem)]">
                 <BreakdownPanel
                   scene={selectedScene}
                   projectId={projectId}
@@ -455,6 +489,7 @@ export function StripeboardSection({
                           selectedSceneId={selectedSceneId}
                           activeId={activeId}
                           isSaving={isSaving}
+                          sceneSize={sceneSize}
                         />
                       </SortableContext>
                     ))
@@ -479,6 +514,9 @@ export function StripeboardSection({
                       isSelected={selectedSceneId === scene.id}
                       onDelete={() => handleDeleteScene(scene.id)}
                       layout="list"
+                      sceneSize={sceneSize}
+                      isExpanded={expandedSceneIds.has(scene.id)}
+                      onToggleExpand={() => toggleExpandedScene(scene.id)}
                     />
                   ))}
                 </div>
@@ -493,6 +531,7 @@ export function StripeboardSection({
                   onSceneClick={setSelectedSceneId}
                   selectedSceneId={selectedSceneId}
                   activeId={activeId}
+                  sceneSize={sceneSize}
                 />
               </div>
             )}
@@ -529,6 +568,7 @@ export function StripeboardSection({
             isSelected={false}
             isDragging
             layout="strip"
+            sceneSize={sceneSize}
             className="shadow-xl rotate-1"
           />
         )}

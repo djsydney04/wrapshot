@@ -21,7 +21,7 @@ const TiersContext = React.createContext<TiersContextType | undefined>(undefined
 export function TiersProvider({ children }: { children: React.ReactNode }) {
   const [tiers, setTiers] = React.useState<PlanTier[]>(getDefaultTiers());
   const [loading, setLoading] = React.useState(true);
-  const supabase = createClient();
+  const supabase = React.useMemo(() => createClient(), []);
 
   const fetchTiers = React.useCallback(async () => {
     try {

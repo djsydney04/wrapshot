@@ -10,8 +10,10 @@ import { CrewProfileModal } from "@/components/crew/crew-profile-modal";
 import { AddCrewForm } from "@/components/forms/add-crew-form";
 import { DEPARTMENT_LABELS, type DepartmentType } from "@/lib/types";
 import {
+  createCrewMember,
   deleteCrewMember,
   updateCrewMember,
+  getCrewMembersWithInviteStatus,
   type CrewMemberWithInviteStatus,
   type CrewMemberInput,
 } from "@/lib/actions/crew";
@@ -26,12 +28,55 @@ interface CrewSectionProps {
   crew: CrewMemberWithInviteStatus[];
 }
 
+type CrewPreset = "small" | "large" | "stunts";
+
+interface CrewPresetRole {
+  role: string;
+  department: DepartmentType;
+  isHead?: boolean;
+}
+
+const CREW_PRESETS: Record<CrewPreset, { label: string; roles: CrewPresetRole[] }> = {
+  small: {
+    label: "Add Small Film Core",
+    roles: [
+      { role: "Director", department: "DIRECTION", isHead: true },
+      { role: "Producer", department: "PRODUCTION", isHead: true },
+      { role: "1st Assistant Director", department: "DIRECTION" },
+      { role: "Director of Photography", department: "CAMERA", isHead: true },
+      { role: "Production Sound Mixer", department: "SOUND", isHead: true },
+      { role: "Gaffer", department: "LIGHTING", isHead: true },
+      { role: "Key Grip", department: "LIGHTING" },
+    ],
+  },
+  large: {
+    label: "Add Large Unit Roles",
+    roles: [
+      { role: "Line Producer", department: "PRODUCTION", isHead: true },
+      { role: "Unit Production Manager", department: "PRODUCTION" },
+      { role: "Production Coordinator", department: "PRODUCTION" },
+      { role: "2nd Assistant Director", department: "DIRECTION" },
+      { role: "Transportation Coordinator", department: "TRANSPORTATION", isHead: true },
+      { role: "Accounting Manager", department: "ACCOUNTING", isHead: true },
+    ],
+  },
+  stunts: {
+    label: "Add Stunt Safety Pack",
+    roles: [
+      { role: "Stunt Coordinator", department: "STUNTS", isHead: true },
+      { role: "Safety Coordinator", department: "PRODUCTION" },
+      { role: "Security Coordinator", department: "PRODUCTION" },
+    ],
+  },
+};
+
 export function CrewSection({ projectId, crew }: CrewSectionProps) {
   const [showAddCrew, setShowAddCrew] = React.useState(false);
   const [selectedMember, setSelectedMember] = React.useState<CrewMemberWithInviteStatus | null>(null);
   const [collapsedDepts, setCollapsedDepts] = React.useState<Set<DepartmentType>>(new Set());
   const [searchQuery, setSearchQuery] = React.useState("");
   const [localCrew, setLocalCrew] = React.useState<CrewMemberWithInviteStatus[]>(crew);
+  const [addingPreset, setAddingPreset] = React.useState<CrewPreset | null>(null);
 
   // Sync local state with props when crew changes
   React.useEffect(() => {
@@ -141,15 +186,49 @@ export function CrewSection({ projectId, crew }: CrewSectionProps) {
     }
   };
 
-  const handleCrewAdded = () => {
-    // The page will revalidate and pass new crew data
-    // This is handled by the server action's revalidatePath
+  const handleCrewAdded = async () => {
+    const { data, error } = await getCrewMembersWithInviteStatus(projectId);
+    if (error || !data) {
+      console.error("Failed to refresh crew after add:", error);
+      return;
+    }
+    setLocalCrew(data);
+  };
+
+  const handleAddCrewPreset = async (preset: CrewPreset) => {
+    setAddingPreset(preset);
+    try {
+      const existing = new Set(
+        localCrew.map((member) => `${member.department}::${member.role.toLowerCase().trim()}`)
+      );
+      const rolesToCreate = CREW_PRESETS[preset].roles.filter(
+        (role) => !existing.has(`${role.department}::${role.role.toLowerCase().trim()}`)
+      );
+
+      for (const role of rolesToCreate) {
+        const { error } = await createCrewMember({
+          projectId,
+          name: `TBD - ${role.role}`,
+          role: role.role,
+          department: role.department,
+          isHead: role.isHead ?? false,
+        });
+
+        if (error) {
+          console.error(`Failed to add preset role ${role.role}:`, error);
+        }
+      }
+
+      await handleCrewAdded();
+    } finally {
+      setAddingPreset(null);
+    }
   };
 
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex-1 max-w-sm">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -161,10 +240,25 @@ export function CrewSection({ projectId, crew }: CrewSectionProps) {
             />
           </div>
         </div>
-        <Button size="sm" onClick={() => setShowAddCrew(true)}>
-          <Plus className="h-4 w-4" />
-          Add Crew Member
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {(Object.keys(CREW_PRESETS) as CrewPreset[]).map((preset) => (
+            <Button
+              key={preset}
+              size="sm"
+              variant="outline"
+              disabled={addingPreset !== null}
+              onClick={() => {
+                void handleAddCrewPreset(preset);
+              }}
+            >
+              {addingPreset === preset ? "Adding..." : CREW_PRESETS[preset].label}
+            </Button>
+          ))}
+          <Button size="sm" onClick={() => setShowAddCrew(true)}>
+            <Plus className="h-4 w-4" />
+            Add Crew Member
+          </Button>
+        </div>
       </div>
 
       {/* Crew by Department */}
@@ -254,7 +348,9 @@ export function CrewSection({ projectId, crew }: CrewSectionProps) {
         projectId={projectId}
         open={showAddCrew}
         onOpenChange={setShowAddCrew}
-        onSuccess={handleCrewAdded}
+        onSuccess={() => {
+          void handleCrewAdded();
+        }}
       />
 
       {/* Crew Profile Modal */}

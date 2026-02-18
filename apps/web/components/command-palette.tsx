@@ -65,7 +65,7 @@ export function CommandPalette() {
       <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]">
         <Command
           className={cn(
-            "w-full max-w-lg rounded-xl border border-border bg-popover text-popover-foreground shadow-2xl animate-in fade-in-0 zoom-in-95",
+            "w-full max-w-lg rounded-lg border border-border bg-popover text-popover-foreground shadow-soft-lg animate-in fade-in-0 zoom-in-95",
             "overflow-hidden"
           )}
           shouldFilter={true}

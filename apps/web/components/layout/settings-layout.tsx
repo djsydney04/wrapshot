@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Header } from "@/components/layout/header";
+import { FeedbackButton } from "@/components/feedback/feedback-button";
 import {
   User,
   Bell,
@@ -11,11 +12,8 @@ import {
   CreditCard,
   Users,
   ChevronRight,
-  MessageSquarePlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { FeedbackButton } from "@/components/feedback/feedback-button";
-import { ShareButton } from "@/components/share/share-button";
 
 const settingsNav = [
   { label: "Profile", href: "/settings", icon: User, description: "Your personal info" },
@@ -47,7 +45,7 @@ export function SettingsLayout({
       <Header breadcrumbs={breadcrumbs} />
 
       <div className="flex-1 overflow-auto relative">
-        <div className="mx-auto max-w-5xl px-6 py-10">
+        <div className="mx-auto max-w-5xl px-6 py-8">
           <div className="flex gap-12">
             {/* Sidebar Nav */}
             <nav className="w-56 shrink-0">
@@ -90,12 +88,9 @@ export function SettingsLayout({
                   );
                 })}
 
-                {/* Divider */}
-                <div className="my-4 border-t border-border" />
-
-                {/* Share & Feedback */}
-                <ShareButton variant="default" />
-                <FeedbackButton variant="default" />
+                <div className="mt-3 border-t border-border pt-3">
+                  <FeedbackButton variant="default" source="settings_sidebar" />
+                </div>
               </div>
             </nav>
 
@@ -104,7 +99,7 @@ export function SettingsLayout({
               {/* Header */}
               <div className="flex items-start justify-between">
                 <div>
-                  <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+                  <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
                   <p className="text-muted-foreground mt-1">{description}</p>
                 </div>
                 {actions}
@@ -127,7 +122,7 @@ interface SettingsCardProps {
 
 export function SettingsCard({ children, className }: SettingsCardProps) {
   return (
-    <div className={cn("rounded-xl border border-border bg-card overflow-hidden", className)}>
+    <div className={cn("rounded-lg border border-border bg-card overflow-hidden", className)}>
       {children}
     </div>
   );
@@ -199,7 +194,7 @@ interface DangerZoneProps {
 
 export function DangerZone({ title, description, action }: DangerZoneProps) {
   return (
-    <div className="rounded-xl border border-destructive/20 bg-destructive/5 overflow-hidden">
+    <div className="rounded-lg border border-destructive/20 bg-destructive/5 overflow-hidden">
       <div className="flex items-center justify-between p-5">
         <div>
           <p className="font-medium text-destructive">{title}</p>

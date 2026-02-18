@@ -54,16 +54,15 @@ export default function SettingsPage() {
 
       {/* Form Fields */}
       <SettingsCard>
-        <SettingsCardBody className="space-y-5">
+        <SettingsCardBody className="space-y-4">
           {/* Name Fields */}
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="firstName" className="text-sm font-medium">First Name</Label>
               <Input
                 id="firstName"
                 placeholder="John"
                 defaultValue=""
-                className="h-10"
               />
             </div>
             <div className="space-y-2">
@@ -72,7 +71,6 @@ export default function SettingsPage() {
                 id="lastName"
                 placeholder="Doe"
                 defaultValue=""
-                className="h-10"
               />
             </div>
           </div>
@@ -85,7 +83,6 @@ export default function SettingsPage() {
               type="email"
               placeholder="john@example.com"
               defaultValue=""
-              className="h-10"
             />
             <p className="text-xs text-muted-foreground">
               This is the email used for notifications and sign-in
@@ -100,7 +97,6 @@ export default function SettingsPage() {
               type="tel"
               placeholder="+1 (555) 000-0000"
               defaultValue=""
-              className="h-10"
             />
           </div>
 
@@ -111,7 +107,6 @@ export default function SettingsPage() {
               id="title"
               placeholder="Production Coordinator"
               defaultValue=""
-              className="h-10"
             />
           </div>
 
@@ -120,7 +115,7 @@ export default function SettingsPage() {
             <Label htmlFor="timezone" className="text-sm font-medium">Timezone</Label>
             <select
               id="timezone"
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               defaultValue="America/Los_Angeles"
             >
               <option value="America/Los_Angeles">Pacific Time (PT)</option>

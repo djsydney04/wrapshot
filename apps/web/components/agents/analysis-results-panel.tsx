@@ -469,8 +469,8 @@ export function AnalysisResultsPanel({
           icon={<Box className="h-4 w-4" />}
           title="Elements"
           count={elements.length}
-          navigateLabel="Open in Scenes"
-          onNavigate={() => onNavigate("scenes")}
+          navigateLabel="Open in Elements"
+          onNavigate={() => onNavigate("gear")}
         >
           <div className="space-y-2">
             {Array.from(elementsByCategory.entries()).map(

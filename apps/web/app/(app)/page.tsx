@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { ProjectCard, ProjectsEmptyState } from "@/components/projects/project-card";
+import { FeedbackButton } from "@/components/feedback/feedback-button";
 import { getProjects } from "@/lib/actions/projects";
 import type { Project } from "@/lib/actions/projects.types";
 import {
@@ -16,7 +17,6 @@ import {
   ChevronDown,
   User,
   CreditCard,
-  MessageSquarePlus,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -26,8 +26,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/components/providers/auth-provider";
-import { FeedbackButton } from "@/components/feedback/feedback-button";
-import { ShareButton } from "@/components/share/share-button";
 
 export default function ProjectsDashboard() {
   const router = useRouter();
@@ -66,16 +64,13 @@ export default function ProjectsDashboard() {
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Header */}
-      <header className="flex h-14 items-center justify-between border-b border-border px-6">
+      <header className="flex h-12 items-center justify-between border-b border-border px-6">
         <div className="flex items-center gap-3">
           <span className="text-lg font-semibold tracking-tight">wrapshoot</span>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Share & Feedback Buttons */}
-          <ShareButton variant="header" />
-          <FeedbackButton variant="header" />
-
+          <FeedbackButton variant="header" source="top_bar" />
           <Button size="sm" asChild>
             <Link href="/projects/new">
               <Plus className="h-4 w-4" />
@@ -129,7 +124,7 @@ export default function ProjectsDashboard() {
         <div className="mx-auto max-w-5xl px-6 py-8">
           {/* Page Header */}
           <div className="mb-8">
-            <h1 className="text-2xl font-semibold text-foreground">Projects</h1>
+            <h1 className="text-xl font-semibold text-foreground">Projects</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {loading
                 ? "Loading projects..."
@@ -148,8 +143,8 @@ export default function ProjectsDashboard() {
 
           {/* Error State */}
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-              <p className="text-sm text-red-800">{error}</p>
+            <div className="rounded-lg border border-[hsl(var(--feedback-error-border))] bg-[hsl(var(--feedback-error-bg))] p-4">
+              <p className="text-sm text-[hsl(var(--feedback-error-fg))]">{error}</p>
             </div>
           )}
 

@@ -18,7 +18,7 @@ const config: Config = {
     },
     extend: {
       fontFamily: {
-        sans: ["system-ui", "sans-serif"],
+        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -53,6 +53,22 @@ const config: Config = {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+        },
+        sidebar: {
+          DEFAULT: "hsl(var(--sidebar-bg))",
+          foreground: {
+            DEFAULT: "hsl(var(--sidebar-fg))",
+            muted: "hsl(var(--sidebar-fg-muted))",
+            active: "hsl(var(--sidebar-fg-active))",
+          },
+          border: "hsl(var(--sidebar-border))",
+          hover: "hsl(var(--sidebar-hover))",
+          active: "hsl(var(--sidebar-active))",
+          kbd: {
+            DEFAULT: "hsl(var(--sidebar-kbd-bg))",
+            border: "hsl(var(--sidebar-kbd-border))",
+            foreground: "hsl(var(--sidebar-kbd-fg))",
+          },
         },
       },
       borderRadius: {

@@ -53,7 +53,7 @@ export function SlidePanel({
         className={cn(
           "fixed top-0 bottom-0 z-50 flex flex-col",
           "w-[380px] max-w-[90vw]",
-          "bg-background border-border shadow-xl",
+          "bg-background border-border shadow-soft-lg",
           "transition-transform duration-300 ease-in-out",
           side === "right" ? "right-0 border-l" : "left-0 border-r",
           side === "right"

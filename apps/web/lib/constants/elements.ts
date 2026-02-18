@@ -31,6 +31,63 @@ export type ElementCategory =
   | "COMMENTS"
   | "MISCELLANEOUS";
 
+export const DB_COMPATIBLE_ELEMENT_CATEGORIES = [
+  "PROP",
+  "WARDROBE",
+  "VEHICLE",
+  "ANIMAL",
+  "SPECIAL_EQUIPMENT",
+  "VFX",
+  "SFX",
+  "STUNT",
+  "MAKEUP",
+  "HAIR",
+  "GREENERY",
+  "ART_DEPARTMENT",
+  "SOUND",
+  "MUSIC",
+  "BACKGROUND",
+  "OTHER",
+] as const;
+
+export type DbElementCategory = (typeof DB_COMPATIBLE_ELEMENT_CATEGORIES)[number];
+
+const EXTENDED_TO_DB_CATEGORY_MAP: Partial<Record<ElementCategory, DbElementCategory>> = {
+  NAME: "OTHER",
+  CAMERA: "SPECIAL_EQUIPMENT",
+  GRIP: "SPECIAL_EQUIPMENT",
+  ELECTRIC: "SPECIAL_EQUIPMENT",
+  SET_DRESSING: "ART_DEPARTMENT",
+  ADDITIONAL_LABOR: "OTHER",
+  ANIMAL_WRANGLER: "ANIMAL",
+  MECHANICAL_EFFECTS: "SFX",
+  VIDEO_PLAYBACK: "SPECIAL_EQUIPMENT",
+  LOCATION_NOTES: "OTHER",
+  SAFETY_NOTES: "OTHER",
+  SECURITY: "OTHER",
+  QUESTIONS: "OTHER",
+  COMMENTS: "OTHER",
+  MISCELLANEOUS: "OTHER",
+};
+
+/**
+ * Some deployments still use a narrower DB enum for Element.category.
+ * Normalize richer AI/UI categories into DB-safe categories on writes.
+ */
+export function normalizeElementCategoryForStorage(
+  category: ElementCategory | string
+): DbElementCategory {
+  const upper = String(category || "").toUpperCase().trim() as ElementCategory;
+
+  if (
+    (DB_COMPATIBLE_ELEMENT_CATEGORIES as readonly string[]).includes(upper)
+  ) {
+    return upper as DbElementCategory;
+  }
+
+  return EXTENDED_TO_DB_CATEGORY_MAP[upper] || "OTHER";
+}
+
 export const ELEMENT_CATEGORY_LABELS: Record<ElementCategory, string> = {
   NAME: "Names",
   PROP: "Props",

@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserId } from "@/lib/permissions/server";
-import type { ElementCategory } from "@/lib/constants/elements";
+import {
+  normalizeElementCategoryForStorage,
+  type ElementCategory,
+} from "@/lib/constants/elements";
 
 export interface ElementInput {
   projectId: string;
@@ -68,11 +71,13 @@ export async function getElementsByCategory(projectId: string, category: Element
     return { data: null, error: "Not authenticated" };
   }
 
+  const normalizedCategory = normalizeElementCategoryForStorage(category);
+
   const { data, error } = await supabase
     .from("Element")
     .select("*")
     .eq("projectId", projectId)
-    .eq("category", category)
+    .eq("category", normalizedCategory)
     .order("name", { ascending: true });
 
   if (error) {
@@ -138,7 +143,7 @@ export async function createElement(input: ElementInput) {
     .from("Element")
     .insert({
       projectId: input.projectId,
-      category: input.category,
+      category: normalizeElementCategoryForStorage(input.category),
       name: input.name,
       description: input.description || null,
       notes: input.notes || null,
@@ -167,11 +172,17 @@ export async function updateElement(id: string, updates: Partial<ElementInput>) 
 
   // Remove projectId from updates if present
   const { projectId, ...elementUpdates } = updates;
+  const normalizedUpdates = {
+    ...elementUpdates,
+    ...(elementUpdates.category
+      ? { category: normalizeElementCategoryForStorage(elementUpdates.category) }
+      : {}),
+  };
 
   const { data, error } = await supabase
     .from("Element")
     .update({
-      ...elementUpdates,
+      ...normalizedUpdates,
       updatedAt: new Date().toISOString(),
     })
     .eq("id", id)
@@ -295,7 +306,7 @@ export async function getSceneElements(sceneId: string) {
   return { data, error: null };
 }
 
-// Get elements with scene counts
+// Get elements with scene counts and scene numbers
 export async function getElementsWithSceneCounts(projectId: string) {
   const supabase = await createClient();
   const userId = await getCurrentUserId();
@@ -317,10 +328,18 @@ export async function getElementsWithSceneCounts(projectId: string) {
     return { data: null, error: elemError.message };
   }
 
-  // Get scene counts per element
+  if (!elements || elements.length === 0) {
+    return { data: [], error: null };
+  }
+
+  // Get scene links with scene numbers
   const { data: sceneLinks, error: sceneError } = await supabase
     .from("SceneElement")
-    .select("elementId")
+    .select(`
+      elementId,
+      quantity,
+      scene:Scene(id, sceneNumber)
+    `)
     .in(
       "elementId",
       elements.map((e) => e.id)
@@ -331,19 +350,31 @@ export async function getElementsWithSceneCounts(projectId: string) {
     return { data: elements as Element[], error: null };
   }
 
-  // Count scenes per element
-  const countMap = new Map<string, number>();
+  // Build scene data per element
+  const scenesMap = new Map<string, { id: string; sceneNumber: string; quantity: number }[]>();
   sceneLinks?.forEach((link) => {
-    countMap.set(link.elementId, (countMap.get(link.elementId) || 0) + 1);
+    const scene = Array.isArray(link.scene) ? link.scene[0] : link.scene;
+    if (!scene) return;
+    const existing = scenesMap.get(link.elementId) || [];
+    existing.push({
+      id: scene.id,
+      sceneNumber: scene.sceneNumber,
+      quantity: link.quantity,
+    });
+    scenesMap.set(link.elementId, existing);
   });
 
-  // Add counts to elements
-  const elementsWithCounts = elements.map((elem) => ({
-    ...elem,
-    sceneCount: countMap.get(elem.id) || 0,
-  }));
+  // Add scene data to elements
+  const elementsWithScenes = elements.map((elem) => {
+    const scenes = scenesMap.get(elem.id) || [];
+    return {
+      ...elem,
+      sceneCount: scenes.length,
+      scenes,
+    };
+  });
 
-  return { data: elementsWithCounts as Element[], error: null };
+  return { data: elementsWithScenes as Element[], error: null };
 }
 
 // Quick create element - lightweight creation for inline breakdown editor
@@ -364,7 +395,7 @@ export async function quickCreateElement(
     .from("Element")
     .insert({
       projectId,
-      category,
+      category: normalizeElementCategoryForStorage(category),
       name,
       description: null,
       notes: notes || null,
@@ -393,7 +424,7 @@ export async function bulkCreateElements(projectId: string, elements: Omit<Eleme
 
   const records = elements.map((elem) => ({
     projectId,
-    category: elem.category,
+    category: normalizeElementCategoryForStorage(elem.category),
     name: elem.name,
     description: elem.description || null,
     notes: elem.notes || null,

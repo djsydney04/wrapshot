@@ -9,15 +9,13 @@ import {
   UserCircle,
   Clapperboard,
   Package,
+  MapPin,
   UserPlus,
   DollarSign,
   Settings,
-  MessageSquarePlus,
   ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { FeedbackButton } from "@/components/feedback/feedback-button";
-import { ShareButton } from "@/components/share/share-button";
 
 export type ProjectSection =
   | "overview"
@@ -26,6 +24,7 @@ export type ProjectSection =
   | "callsheets"
   | "cast"
   | "crew"
+  | "locations"
   | "scenes"
   | "gear"
   | "team"
@@ -48,6 +47,7 @@ interface ProjectSidebarProps {
     crew: number;
     shootingDays: number;
     callSheets?: number;
+    locations?: number;
     gear: number;
     hasScript: boolean;
     team?: number;
@@ -69,8 +69,9 @@ export function ProjectSidebar({
     { id: "callsheets", label: "Call Sheets", icon: ClipboardList, count: counts.callSheets },
     { id: "cast", label: "Cast", icon: Users, count: counts.cast },
     { id: "crew", label: "Crew", icon: UserCircle, count: counts.crew },
+    { id: "locations", label: "Locations", icon: MapPin, count: counts.locations },
     { id: "team", label: "Team Access", icon: UserPlus, count: counts.team },
-    { id: "gear", label: "Gear & Props", icon: Package, count: counts.gear },
+    { id: "gear", label: "Elements & Props", icon: Package, count: counts.gear },
     { id: "budget", label: "Budget", icon: DollarSign, count: counts.budgets },
     { id: "script", label: "Script", icon: FileText },
     { id: "settings", label: "Settings", icon: Settings },
@@ -107,11 +108,6 @@ export function ProjectSidebar({
         })}
       </ul>
 
-      {/* Share & Feedback at bottom */}
-      <div className="mt-auto pt-4 px-2 border-t border-border space-y-1">
-        <ShareButton variant="default" />
-        <FeedbackButton variant="default" />
-      </div>
     </nav>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { ShootingDay } from "@/lib/types";
 
@@ -20,6 +20,10 @@ interface SupabaseShootingDayRow {
   estimatedWrap: string | null;
   notes: string | null;
   scenes?: { sceneId: string; sortOrder: number | null }[] | null;
+}
+
+interface ShootingDaySceneRealtimeRow {
+  shootingDayId?: string;
 }
 
 // Transform database row to match the mock data format
@@ -49,8 +53,8 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
   const [shootingDays, setShootingDays] = useState<ShootingDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const supabase = createClient();
+  const shootingDayIdsRef = useRef<Set<string>>(new Set());
+  const supabase = useMemo(() => createClient(), []);
 
   const fetchShootingDays = useCallback(async () => {
     if (!projectId) {
@@ -78,16 +82,7 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
           notes,
           scenes:ShootingDayScene(
             sceneId,
-            sortOrder,
-            scene:Scene(
-              id,
-              sceneNumber,
-              synopsis,
-              intExt,
-              dayNight,
-              pageCount,
-              location:Location(name)
-            )
+            sortOrder
           )
         `
         )
@@ -116,6 +111,10 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
 
   // Subscribe to realtime updates
   useEffect(() => {
+    shootingDayIdsRef.current = new Set(shootingDays.map((day) => day.id));
+  }, [shootingDays]);
+
+  useEffect(() => {
     if (!projectId) return;
 
     const channel = supabase
@@ -139,8 +138,18 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
           event: "*",
           schema: "public",
           table: "ShootingDayScene",
-        },
-        () => {
+        }, (payload) => {
+          const newRow = payload.new as ShootingDaySceneRealtimeRow | null;
+          const oldRow = payload.old as ShootingDaySceneRealtimeRow | null;
+          const shootingDayId = newRow?.shootingDayId || oldRow?.shootingDayId;
+
+          if (
+            shootingDayId &&
+            !shootingDayIdsRef.current.has(shootingDayId)
+          ) {
+            return;
+          }
+
           fetchShootingDays();
         }
       )
@@ -164,8 +173,7 @@ export function useAllShootingDays() {
   const [shootingDays, setShootingDays] = useState<ShootingDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const fetchAllShootingDays = useCallback(async () => {
     setLoading(true);
@@ -187,16 +195,7 @@ export function useAllShootingDays() {
           notes,
           scenes:ShootingDayScene(
             sceneId,
-            sortOrder,
-            scene:Scene(
-              id,
-              sceneNumber,
-              synopsis,
-              intExt,
-              dayNight,
-              pageCount,
-              location:Location(name)
-            )
+            sortOrder
           )
         `
         )

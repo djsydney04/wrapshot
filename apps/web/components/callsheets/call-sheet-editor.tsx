@@ -11,6 +11,7 @@ import {
   ChevronRight,
   CheckCircle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,7 +41,7 @@ interface CallSheetEditorProps {
 
 type CastCallTimeEdit = {
   castMemberId: string;
-  workStatus: string;
+  workStatus: "W" | "SW" | "WF" | "SWF" | "H" | "R" | "T" | "WD";
   pickupTime: string;
   muHairCall: string;
   onSetCall: string;
@@ -63,6 +64,7 @@ export function CallSheetEditor({
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [publishing, setPublishing] = React.useState(false);
+  const [downloadingPdf, setDownloadingPdf] = React.useState(false);
   const [showDistribute, setShowDistribute] = React.useState(false);
   const [fullData, setFullData] = React.useState<CallSheetFullData | null>(null);
 
@@ -108,7 +110,7 @@ export function CallSheetEditor({
         setCastCallTimes(
           data.castCallTimes.map((ct) => ({
             castMemberId: ct.castMemberId,
-            workStatus: ct.workStatus || "W",
+            workStatus: (ct.workStatus as CastCallTimeEdit["workStatus"]) || "W",
             pickupTime: ct.pickupTime || "",
             muHairCall: ct.muHairCall || "",
             onSetCall: ct.onSetCall || "",
@@ -130,12 +132,34 @@ export function CallSheetEditor({
     load();
   }, [shootingDay.id, projectId]);
 
-  const handleSave = async () => {
-    if (!fullData) return;
-    setSaving(true);
+  const reloadCallSheetData = React.useCallback(async () => {
+    const { data } = await getFullCallSheetData(shootingDay.id, projectId);
+    if (data) {
+      setFullData(data);
+    }
+  }, [shootingDay.id, projectId]);
+
+  const persistCallSheet = React.useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    if (!fullData) {
+      return { success: false, error: "Call sheet data is not loaded yet." };
+    }
+
     try {
+      const invalidDeptCall = deptCallTimes.find(
+        (dt) =>
+          (dt.department.trim().length > 0 && dt.callTime.trim().length === 0) ||
+          (dt.department.trim().length === 0 && dt.callTime.trim().length > 0)
+      );
+
+      if (invalidDeptCall) {
+        return {
+          success: false,
+          error: "Each department call row must include both department and call time.",
+        };
+      }
+
       // Save call sheet notes
-      await updateCallSheet(fullData.callSheet.id, {
+      const callSheetResult = await updateCallSheet(fullData.callSheet.id, {
         nearestHospital: nearestHospital || null,
         safetyNotes: safetyNotes || null,
         parkingNotes: parkingNotes || null,
@@ -143,36 +167,74 @@ export function CallSheetEditor({
         advanceNotes: advanceNotes || null,
       });
 
+      if (callSheetResult.error) {
+        return { success: false, error: callSheetResult.error };
+      }
+
       // Save cast call times
-      if (castCallTimes.length > 0) {
-        await updateCastCallTimes(
-          shootingDay.id,
-          castCallTimes.map((ct) => ({
-            castMemberId: ct.castMemberId,
-            workStatus: ct.workStatus as any,
-            pickupTime: ct.pickupTime || undefined,
-            muHairCall: ct.muHairCall || undefined,
-            onSetCall: ct.onSetCall || undefined,
-            remarks: ct.remarks || undefined,
-          }))
-        );
+      const castResult = await updateCastCallTimes(
+        shootingDay.id,
+        castCallTimes.map((ct) => ({
+          castMemberId: ct.castMemberId,
+          workStatus: ct.workStatus,
+          pickupTime: ct.pickupTime || undefined,
+          muHairCall: ct.muHairCall || undefined,
+          onSetCall: ct.onSetCall || undefined,
+          remarks: ct.remarks || undefined,
+        }))
+      );
+
+      if (!castResult.success) {
+        return { success: false, error: castResult.error || "Failed to save cast call times." };
       }
 
       // Save department call times
-      if (deptCallTimes.length > 0) {
-        await updateDepartmentCallTimes(
-          shootingDay.id,
-          deptCallTimes.map((dt) => ({
-            department: dt.department,
+      const deptResult = await updateDepartmentCallTimes(
+        shootingDay.id,
+        deptCallTimes
+          .filter((dt) => dt.department.trim().length > 0 && dt.callTime.trim().length > 0)
+          .map((dt) => ({
+            department: dt.department.trim(),
             callTime: dt.callTime,
             notes: dt.notes || undefined,
           }))
-        );
+      );
+
+      if (!deptResult.success) {
+        return { success: false, error: deptResult.error || "Failed to save department call times." };
       }
 
-      // Reload data
-      const { data } = await getFullCallSheetData(shootingDay.id, projectId);
-      if (data) setFullData(data);
+      await reloadCallSheetData();
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to save call sheet.",
+      };
+    }
+  }, [
+    advanceNotes,
+    castCallTimes,
+    deptCallTimes,
+    fullData,
+    mealNotes,
+    nearestHospital,
+    parkingNotes,
+    reloadCallSheetData,
+    safetyNotes,
+    shootingDay.id,
+  ]);
+
+  const handleSave = async () => {
+    if (!fullData) return;
+    setSaving(true);
+    try {
+      const result = await persistCallSheet();
+      if (!result.success) {
+        toast.error(result.error || "Failed to save call sheet.");
+        return;
+      }
+      toast.success("Call sheet draft saved.");
     } finally {
       setSaving(false);
     }
@@ -182,18 +244,71 @@ export function CallSheetEditor({
     if (!fullData) return;
     setPublishing(true);
     try {
-      await handleSave();
-      await publishCallSheet(fullData.callSheet.id);
-      // Reload data
-      const { data } = await getFullCallSheetData(shootingDay.id, projectId);
-      if (data) setFullData(data);
+      const saveResult = await persistCallSheet();
+      if (!saveResult.success) {
+        toast.error(saveResult.error || "Failed to save call sheet before publishing.");
+        return;
+      }
+
+      const publishResult = await publishCallSheet(fullData.callSheet.id);
+      if (publishResult.error) {
+        toast.error(publishResult.error);
+        return;
+      }
+
+      await reloadCallSheetData();
+      toast.success("Call sheet published.");
     } finally {
       setPublishing(false);
     }
   };
 
   const handleDownloadPdf = async () => {
-    window.open(`/api/callsheets/${shootingDay.id}/pdf`, "_blank");
+    if (!fullData) return;
+
+    setDownloadingPdf(true);
+    try {
+      const saveResult = await persistCallSheet();
+      if (!saveResult.success) {
+        toast.error(saveResult.error || "Failed to save call sheet before exporting PDF.");
+        return;
+      }
+
+      const response = await fetch(`/api/callsheets/${shootingDay.id}/pdf`);
+      if (!response.ok) {
+        let message = `PDF export failed (${response.status})`;
+        try {
+          const errorData = await response.json();
+          if (errorData?.error) message = errorData.error;
+        } catch {
+          // Keep default message when response body is not JSON.
+        }
+        toast.error(message);
+        return;
+      }
+
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get("Content-Disposition") || "";
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/i);
+      const fallbackName = `${(fullData.project?.name || "Production")
+        .replace(/[^a-zA-Z0-9]/g, "_")}_Day${fullData.shootingDay.dayNumber}_CallSheet.pdf`;
+      const filename = filenameMatch?.[1] || fallbackName;
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename.endsWith(".pdf") ? filename : `${filename}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      toast.success("Call sheet PDF downloaded.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to export PDF.");
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
 
   const updateCastCallTime = (index: number, field: keyof CastCallTimeEdit, value: string) => {
@@ -280,16 +395,35 @@ export function CallSheetEditor({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSave}
+            disabled={saving || publishing || downloadingPdf}
+          >
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
             Save Draft
           </Button>
-          <Button variant="outline" size="sm" onClick={handlePublish} disabled={publishing}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePublish}
+            disabled={publishing || saving || downloadingPdf}
+          >
             {publishing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle className="h-4 w-4 mr-1" />}
             Publish
           </Button>
-          <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
-            <Download className="h-4 w-4 mr-1" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadPdf}
+            disabled={downloadingPdf || saving || publishing}
+          >
+            {downloadingPdf ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+            ) : (
+              <Download className="h-4 w-4 mr-1" />
+            )}
             PDF
           </Button>
           <Button size="sm" onClick={() => setShowDistribute(true)}>

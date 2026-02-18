@@ -46,7 +46,7 @@ export default function SignUpPage() {
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 mb-4">
             <Check className="h-6 w-6 text-emerald-600" />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="text-xl font-semibold tracking-tight">
             Check your email
           </h1>
           <p className="text-sm text-muted-foreground mt-2 max-w-xs">
@@ -80,7 +80,7 @@ export default function SignUpPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="text-xl font-semibold tracking-tight">
           Create an account
         </h1>
         <p className="text-sm text-muted-foreground mt-1">

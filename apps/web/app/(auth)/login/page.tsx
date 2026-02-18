@@ -38,7 +38,7 @@ export default function LoginPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="text-xl font-semibold tracking-tight">
           Welcome back
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -48,7 +48,7 @@ export default function LoginPage() {
 
       {/* Form */}
       <form onSubmit={handleSignIn} className="space-y-4">
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium mb-1.5">
               Email

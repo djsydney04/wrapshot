@@ -22,6 +22,7 @@ import { AddCrewForm } from "@/components/forms/add-crew-form";
 import { AgentProgressCard } from "@/components/agents/agent-progress-card";
 import { useProjectStore } from "@/lib/stores/project-store";
 import { useAgentJob, useStartAgentJob } from "@/lib/hooks/use-agent-job";
+import { useAgentProgressToast } from "@/lib/hooks/use-agent-progress-toast";
 import { cn } from "@/lib/utils";
 import type { Project } from "@/lib/actions/projects.types";
 import type { AgentJobResult } from "@/lib/agents/types";
@@ -31,6 +32,7 @@ interface SetupWizardProps {
   project: Project;
   onComplete: () => void;
   onSkip: () => void;
+  onAnalysisComplete?: () => void | Promise<void>;
 }
 
 type WizardStep = "welcome" | "script" | "schedule" | "cast" | "crew" | "complete";
@@ -52,6 +54,7 @@ export function SetupWizard({
   project,
   onComplete,
   onSkip,
+  onAnalysisComplete,
 }: SetupWizardProps) {
   const [currentStep, setCurrentStep] = React.useState<WizardStep>("welcome");
   const [showAddDay, setShowAddDay] = React.useState(false);
@@ -70,8 +73,19 @@ export function SetupWizard({
 
   // Agent hooks
   const { startJob } = useStartAgentJob();
-  const { job, isComplete: agentComplete, isFailed: agentFailed } = useAgentJob({
+  const {
+    job,
+    isRunning: agentRunning,
+    isComplete: agentComplete,
+    isFailed: agentFailed,
+  } = useAgentJob({
     jobId: activeJobId || undefined,
+  });
+  useAgentProgressToast({
+    job,
+    isRunning: agentRunning,
+    isComplete: agentComplete,
+    isFailed: agentFailed,
   });
 
   const { addScript, getShootingDaysForProject, getCastForProject, getCrewForProject } =
@@ -89,16 +103,18 @@ export function SetupWizard({
       const result = job.result as AgentJobResult;
       setScenesImported(result.scenesCreated);
       setScriptState("complete");
+      void onAnalysisComplete?.();
     }
-  }, [agentComplete, job?.result]);
+  }, [agentComplete, job?.result, onAnalysisComplete]);
 
   // Handle agent failure
   React.useEffect(() => {
     if (agentFailed && job?.errorMessage) {
       setAnalysisError(job.errorMessage);
       setScriptState("error");
+      void onAnalysisComplete?.();
     }
-  }, [agentFailed, job?.errorMessage]);
+  }, [agentFailed, job?.errorMessage, onAnalysisComplete]);
 
   const handleNext = () => {
     const nextIndex = currentStepIndex + 1;

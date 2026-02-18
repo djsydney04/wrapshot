@@ -10,10 +10,109 @@ export const maxDuration = 300;
 
 import { NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { ScriptAnalysisAgent } from '@/lib/agents/script-analysis';
 import { JobManager } from '@/lib/agents/orchestrator/job-manager';
 import { getFireworksApiKey } from '@/lib/ai/config';
 import type { AgentJobType, StartAgentJobRequest, StartAgentJobResponse } from '@/lib/agents/types';
+
+const SCRIPT_SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
+
+type ScriptUrlProbeResult = {
+  ok: boolean;
+  status?: number;
+  method?: 'HEAD' | 'GET_RANGE';
+  error?: string;
+};
+
+async function probeScriptUrl(url: string): Promise<ScriptUrlProbeResult> {
+  try {
+    const headRes = await fetch(url, { method: 'HEAD' });
+    if (headRes.ok) {
+      return { ok: true, status: headRes.status, method: 'HEAD' };
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn('[AgentStart] HEAD probe failed, falling back to range GET:', message);
+  }
+
+  try {
+    const rangeRes = await fetch(url, {
+      method: 'GET',
+      headers: { Range: 'bytes=0-0' },
+    });
+
+    if (rangeRes.ok || rangeRes.status === 206) {
+      return { ok: true, status: rangeRes.status, method: 'GET_RANGE' };
+    }
+
+    return {
+      ok: false,
+      status: rangeRes.status,
+      method: 'GET_RANGE',
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: message, method: 'GET_RANGE' };
+  }
+}
+
+function extractStorageObjectPath(fileUrl: string): { bucket: string; objectPath: string } | null {
+  try {
+    const parsed = new URL(fileUrl);
+    const marker = '/storage/v1/object/';
+    const markerIndex = parsed.pathname.indexOf(marker);
+    if (markerIndex === -1) return null;
+
+    const storagePath = parsed.pathname.slice(markerIndex + marker.length);
+    const segments = storagePath.split('/').filter(Boolean);
+    if (segments.length < 3) return null;
+
+    const [accessType, bucket, ...rest] = segments;
+    if (!['sign', 'public', 'authenticated'].includes(accessType)) {
+      return null;
+    }
+
+    const objectPath = decodeURIComponent(rest.join('/'));
+    if (!bucket || !objectPath) return null;
+
+    return { bucket, objectPath };
+  } catch {
+    return null;
+  }
+}
+
+async function refreshSignedScriptUrl(scriptId: string, currentUrl: string): Promise<string | null> {
+  const storagePath = extractStorageObjectPath(currentUrl);
+  if (!storagePath) return null;
+
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin.storage
+      .from(storagePath.bucket)
+      .createSignedUrl(storagePath.objectPath, SCRIPT_SIGNED_URL_TTL_SECONDS);
+
+    if (error || !data?.signedUrl) {
+      console.error('[AgentStart] Failed to refresh signed script URL:', error);
+      return null;
+    }
+
+    const refreshedUrl = data.signedUrl;
+    const { error: updateError } = await admin
+      .from('Script')
+      .update({ fileUrl: refreshedUrl })
+      .eq('id', scriptId);
+
+    if (updateError) {
+      console.warn('[AgentStart] Refreshed URL but failed to persist to Script.fileUrl:', updateError);
+    }
+
+    return refreshedUrl;
+  } catch (error) {
+    console.error('[AgentStart] Unexpected error refreshing script URL:', error);
+    return null;
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -106,20 +205,27 @@ export async function POST(request: Request) {
       );
     }
 
-    // Pre-flight: verify the script PDF is accessible
-    try {
-      const headRes = await fetch(script.fileUrl, { method: 'HEAD' });
-      if (!headRes.ok) {
-        console.error('[AgentStart] Script file not accessible:', headRes.status, script.fileUrl);
-        return NextResponse.json(
-          { error: `Script file is not accessible (${headRes.status}). The download link may have expired — try re-uploading the script.` },
-          { status: 400 }
-        );
+    // Pre-flight: verify script URL is accessible. If not, attempt to refresh
+    // Supabase signed URLs (they expire and are persisted in Script.fileUrl).
+    let scriptFileUrl = script.fileUrl;
+    let probe = await probeScriptUrl(scriptFileUrl);
+
+    if (!probe.ok) {
+      const refreshedUrl = await refreshSignedScriptUrl(script.id, scriptFileUrl);
+      if (refreshedUrl) {
+        scriptFileUrl = refreshedUrl;
+        probe = await probeScriptUrl(scriptFileUrl);
       }
-    } catch (fetchErr) {
-      console.error('[AgentStart] Failed to reach script file:', fetchErr);
+    }
+
+    if (!probe.ok) {
+      const statusPart = probe.status ? ` (${probe.status})` : '';
+      const detail = probe.error ? `: ${probe.error}` : '';
+      console.error('[AgentStart] Script file not accessible', { status: probe.status, detail, url: scriptFileUrl });
       return NextResponse.json(
-        { error: 'Could not reach the script file. Check your network or re-upload the script.' },
+        {
+          error: `Script file is not accessible${statusPart}. The link may have expired${detail}. Try re-uploading the script.`,
+        },
         { status: 400 }
       );
     }

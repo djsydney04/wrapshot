@@ -19,13 +19,13 @@ export default async function AuthLayout({
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Left Panel - Branding */}
-      <div className="hidden lg:flex flex-col justify-between bg-stone-900 text-white p-12 relative overflow-hidden">
+      <div className="hidden lg:flex flex-col justify-between bg-sidebar text-sidebar-foreground p-12 relative overflow-hidden">
         {/* Subtle gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-stone-900 via-stone-900 to-stone-800" />
+        <div className="absolute inset-0 bg-gradient-to-br from-sidebar via-sidebar to-sidebar-hover" />
 
         {/* Decorative elements */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-stone-800/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-stone-800/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-sidebar-hover/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-sidebar-hover/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
 
         {/* Content */}
         <div className="relative z-10">
@@ -45,16 +45,16 @@ export default async function AuthLayout({
           </div>
 
           {/* Subtle divider */}
-          <div className="w-12 h-px bg-stone-700" />
+          <div className="w-12 h-px bg-sidebar-border" />
 
-          <p className="text-stone-400 text-sm max-w-xs">
+          <p className="text-sidebar-foreground-muted text-sm max-w-xs">
             The production management platform built for modern filmmakers.
           </p>
         </div>
 
         {/* Footer */}
         <div className="relative z-10">
-          <p className="text-stone-600 text-xs">
+          <p className="text-sidebar-foreground-muted text-xs">
             © {new Date().getFullYear()} wrapshoot
           </p>
         </div>

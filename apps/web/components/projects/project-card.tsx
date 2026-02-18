@@ -253,12 +253,12 @@ export function ProjectCard({ project, className, onDeleted }: ProjectCardProps)
 // Empty state component
 export function ProjectsEmptyState() {
   return (
-    <div className="flex items-center justify-center min-h-[500px]">
+    <div className="flex items-center justify-center min-h-[360px]">
       <div className="text-center max-w-md">
-        <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-muted mb-6">
-          <Film className="h-10 w-10 text-muted-foreground" />
+        <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-6">
+          <Film className="h-8 w-8 text-muted-foreground" />
         </div>
-        <h2 className="text-2xl font-semibold mb-2">
+        <h2 className="text-xl font-semibold mb-2">
           No projects yet
         </h2>
         <p className="text-muted-foreground mb-6">

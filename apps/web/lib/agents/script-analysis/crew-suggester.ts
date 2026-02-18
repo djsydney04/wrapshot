@@ -7,11 +7,52 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin';
-import type { AgentContext, AgentStepResult, SuggestedCrewRole, ExtractedElement } from '../types';
+import type { AgentContext, AgentStepResult, SuggestedCrewRole } from '../types';
 import type { ProgressTracker } from '../orchestrator/progress-tracker';
 
+type CrewPriority = 'high' | 'medium' | 'low';
+type CrewDepartment =
+  | 'PRODUCTION'
+  | 'DIRECTION'
+  | 'CAMERA'
+  | 'SOUND'
+  | 'LIGHTING'
+  | 'ART'
+  | 'COSTUME'
+  | 'HAIR_MAKEUP'
+  | 'LOCATIONS'
+  | 'STUNTS'
+  | 'VFX'
+  | 'TRANSPORTATION'
+  | 'CATERING'
+  | 'ACCOUNTING'
+  | 'POST_PRODUCTION';
+
+interface CrewMapping {
+  role: string;
+  department: CrewDepartment;
+  priority: CrewPriority;
+}
+
+const PRIORITY_ORDER: Record<CrewPriority, number> = { high: 0, medium: 1, low: 2 };
+
 // Mapping from element categories to suggested crew roles
-const ELEMENT_TO_CREW_MAP: Record<string, { role: string; department: string; priority: 'high' | 'medium' | 'low' }[]> = {
+const ELEMENT_TO_CREW_MAP: Record<string, CrewMapping[]> = {
+  PROP: [
+    { role: 'Prop Master', department: 'ART', priority: 'high' },
+    { role: 'Set Dresser', department: 'ART', priority: 'medium' },
+  ],
+  CAMERA: [
+    { role: 'Director of Photography', department: 'CAMERA', priority: 'high' },
+    { role: '1st AC', department: 'CAMERA', priority: 'medium' },
+  ],
+  GRIP: [
+    { role: 'Key Grip', department: 'LIGHTING', priority: 'medium' },
+  ],
+  ELECTRIC: [
+    { role: 'Gaffer', department: 'LIGHTING', priority: 'high' },
+    { role: 'Best Boy Electric', department: 'LIGHTING', priority: 'medium' },
+  ],
   STUNT: [
     { role: 'Stunt Coordinator', department: 'STUNTS', priority: 'high' },
     { role: 'Stunt Performer', department: 'STUNTS', priority: 'medium' },
@@ -71,10 +112,44 @@ const ELEMENT_TO_CREW_MAP: Record<string, { role: string; department: string; pr
   SPECIAL_EQUIPMENT: [
     { role: 'Special Equipment Operator', department: 'CAMERA', priority: 'medium' },
   ],
+  LOCATION_NOTES: [
+    { role: 'Location Manager', department: 'LOCATIONS', priority: 'high' },
+  ],
   SECURITY: [
     { role: 'Security Coordinator', department: 'PRODUCTION', priority: 'medium' },
   ],
 };
+
+const SMALL_PRODUCTION_BASELINE: CrewMapping[] = [
+  { role: 'Director', department: 'DIRECTION', priority: 'high' },
+  { role: 'Producer', department: 'PRODUCTION', priority: 'high' },
+  { role: '1st Assistant Director', department: 'DIRECTION', priority: 'high' },
+  { role: 'Director of Photography', department: 'CAMERA', priority: 'high' },
+  { role: 'Production Sound Mixer', department: 'SOUND', priority: 'medium' },
+  { role: 'Production Designer', department: 'ART', priority: 'medium' },
+  { role: 'Gaffer', department: 'LIGHTING', priority: 'medium' },
+  { role: 'Key Grip', department: 'LIGHTING', priority: 'medium' },
+  { role: 'Script Supervisor', department: 'DIRECTION', priority: 'medium' },
+  { role: 'Location Manager', department: 'LOCATIONS', priority: 'medium' },
+  { role: 'Costume Designer', department: 'COSTUME', priority: 'medium' },
+  { role: 'Makeup Department Head', department: 'HAIR_MAKEUP', priority: 'medium' },
+];
+
+const LARGE_PRODUCTION_ADDITIONS: CrewMapping[] = [
+  { role: 'Line Producer', department: 'PRODUCTION', priority: 'high' },
+  { role: 'Unit Production Manager', department: 'PRODUCTION', priority: 'high' },
+  { role: 'Production Coordinator', department: 'PRODUCTION', priority: 'medium' },
+  { role: '2nd Assistant Director', department: 'DIRECTION', priority: 'medium' },
+  { role: 'Transportation Coordinator', department: 'TRANSPORTATION', priority: 'medium' },
+  { role: 'Accounting Manager', department: 'ACCOUNTING', priority: 'low' },
+  { role: 'Catering Coordinator', department: 'CATERING', priority: 'low' },
+];
+
+const STUNT_AND_SAFETY_ADDITIONS: CrewMapping[] = [
+  { role: 'Stunt Coordinator', department: 'STUNTS', priority: 'high' },
+  { role: 'Safety Coordinator', department: 'PRODUCTION', priority: 'high' },
+  { role: 'Security Coordinator', department: 'PRODUCTION', priority: 'high' },
+];
 
 export async function executeCrewSuggester(
   context: AgentContext,
@@ -93,22 +168,58 @@ export async function executeCrewSuggester(
     // Store suggestions in context
     context.suggestedCrewRoles = suggestions;
 
-    await tracker.updateProgress(0, suggestions.length, `Saving ${suggestions.length} crew suggestions...`);
+    await tracker.updateProgress(0, suggestions.length, `Creating ${suggestions.length} crew suggestions...`);
 
-    // Save to database
+    // Save to database + auto-create crew members so suggestions are immediately actionable.
     const supabase = createAdminClient();
-    const records = suggestions.map((s) => ({
-      projectId: context.projectId,
-      jobId: context.jobId,
-      role: s.role,
-      department: s.department,
-      reason: s.reason,
-      priority: s.priority,
-    }));
+    const { data: existingCrew } = await supabase
+      .from('CrewMember')
+      .select('id, role, department')
+      .eq('projectId', context.projectId);
 
-    const { error } = await supabase
-      .from('CrewSuggestion')
-      .insert(records);
+    const crewByRoleDepartment = new Map<string, string>();
+    for (const member of existingCrew || []) {
+      const key = `${member.department}::${member.role.toLowerCase().trim()}`;
+      crewByRoleDepartment.set(key, member.id);
+    }
+
+    const records = [];
+    for (const suggestion of suggestions) {
+      const roleKey = `${suggestion.department}::${suggestion.role.toLowerCase().trim()}`;
+      let crewMemberId = crewByRoleDepartment.get(roleKey) || null;
+
+      if (!crewMemberId) {
+        const { data: newCrewMember, error: crewError } = await supabase
+          .from('CrewMember')
+          .insert({
+            projectId: context.projectId,
+            name: `TBD - ${suggestion.role}`,
+            role: suggestion.role,
+            department: suggestion.department,
+            isHead: false,
+          })
+          .select('id')
+          .single();
+
+        if (!crewError && newCrewMember?.id) {
+          crewMemberId = newCrewMember.id;
+          crewByRoleDepartment.set(roleKey, newCrewMember.id);
+        }
+      }
+
+      records.push({
+        projectId: context.projectId,
+        jobId: context.jobId,
+        role: suggestion.role,
+        department: suggestion.department,
+        reason: suggestion.reason,
+        priority: suggestion.priority,
+        accepted: crewMemberId ? true : null,
+        crewMemberId,
+      });
+    }
+
+    const { error } = await supabase.from('CrewSuggestion').insert(records);
 
     if (error) {
       console.error('[CrewSuggester] Failed to save suggestions:', error);
@@ -116,7 +227,11 @@ export async function executeCrewSuggester(
       return { success: true, shouldContinue: true };
     }
 
-    await tracker.updateProgress(suggestions.length, suggestions.length, `Suggested ${suggestions.length} crew roles`);
+    await tracker.updateProgress(
+      suggestions.length,
+      suggestions.length,
+      `Suggested ${suggestions.length} crew roles`
+    );
 
     return { success: true };
   } catch (error) {
@@ -136,15 +251,15 @@ function generateCrewSuggestions(context: AgentContext): SuggestedCrewRole[] {
     elementCounts.set(element.category, count + 1);
   }
 
+  const productionScope = inferProductionScope(context, elementCounts);
+  addBaselineCrewSuggestions(suggestions, productionScope, elementCounts);
+
   // Generate suggestions based on element categories
   for (const [category, count] of elementCounts) {
     const crewMappings = ELEMENT_TO_CREW_MAP[category];
     if (!crewMappings) continue;
 
     for (const mapping of crewMappings) {
-      const key = `${mapping.department}-${mapping.role}`;
-      if (suggestions.has(key)) continue;
-
       // Build reason from actual elements
       const relevantElements = context.extractedElements
         .filter((e) => e.category === category)
@@ -159,12 +274,16 @@ function generateCrewSuggestions(context: AgentContext): SuggestedCrewRole[] {
       if (count >= 5 && priority === 'medium') priority = 'high';
       if (count >= 10 && priority === 'low') priority = 'medium';
 
-      suggestions.set(key, {
-        role: mapping.role,
-        department: mapping.department,
-        reason,
-        priority,
-      });
+      upsertSuggestion(
+        suggestions,
+        {
+          role: mapping.role,
+          department: mapping.department,
+          reason,
+          priority,
+        },
+        true
+      );
     }
   }
 
@@ -173,20 +292,124 @@ function generateCrewSuggestions(context: AgentContext): SuggestedCrewRole[] {
     (s) => s.intExt === 'EXT' || s.intExt === 'BOTH'
   );
   if (exteriorScenes.length > 5) {
-    const key = 'LOCATIONS-Location Manager';
-    if (!suggestions.has(key)) {
-      suggestions.set(key, {
+    upsertSuggestion(
+      suggestions,
+      {
         role: 'Location Manager',
         department: 'LOCATIONS',
         reason: `Script has ${exteriorScenes.length} exterior scenes requiring location management`,
         priority: 'high',
+      },
+      true
+    );
+  }
+
+  // Sort by priority (high first)
+  return Array.from(suggestions.values()).sort(
+    (a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]
+  );
+}
+
+function normalizeCrewKey(department: string, role: string): string {
+  return `${department}::${role.toLowerCase().trim()}`;
+}
+
+function upsertSuggestion(
+  suggestions: Map<string, SuggestedCrewRole>,
+  suggestion: SuggestedCrewRole,
+  replaceBaseline = false
+): void {
+  const key = normalizeCrewKey(suggestion.department, suggestion.role);
+  const existing = suggestions.get(key);
+
+  if (!existing) {
+    suggestions.set(key, suggestion);
+    return;
+  }
+
+  const higherPriority =
+    PRIORITY_ORDER[suggestion.priority] < PRIORITY_ORDER[existing.priority];
+  const existingIsBaseline = existing.reason.startsWith('Baseline crew');
+
+  if (higherPriority) {
+    suggestions.set(key, suggestion);
+    return;
+  }
+
+  if (replaceBaseline && existingIsBaseline) {
+    suggestions.set(key, {
+      ...suggestion,
+      priority: existing.priority,
+    });
+  }
+}
+
+function inferProductionScope(
+  context: AgentContext,
+  elementCounts: Map<string, number>
+): 'small' | 'large' {
+  const sceneCount = context.extractedScenes.length;
+  const elementCount = context.extractedElements.length;
+  const backgroundCount = elementCounts.get('BACKGROUND') || 0;
+  const locationNotesCount = elementCounts.get('LOCATION_NOTES') || 0;
+  const stuntCount = elementCounts.get('STUNT') || 0;
+
+  if (
+    sceneCount >= 45 ||
+    elementCount >= 180 ||
+    backgroundCount >= 6 ||
+    locationNotesCount >= 8 ||
+    stuntCount >= 3
+  ) {
+    return 'large';
+  }
+
+  return 'small';
+}
+
+function addBaselineCrewSuggestions(
+  suggestions: Map<string, SuggestedCrewRole>,
+  productionScope: 'small' | 'large',
+  elementCounts: Map<string, number>
+): void {
+  const baselineReason =
+    productionScope === 'large'
+      ? 'Baseline crew for a larger production scope inferred from script complexity'
+      : 'Baseline crew for a lean production scope inferred from script complexity';
+
+  for (const template of SMALL_PRODUCTION_BASELINE) {
+    upsertSuggestion(suggestions, {
+      role: template.role,
+      department: template.department,
+      priority: template.priority,
+      reason: baselineReason,
+    });
+  }
+
+  if (productionScope === 'large') {
+    for (const template of LARGE_PRODUCTION_ADDITIONS) {
+      upsertSuggestion(suggestions, {
+        role: template.role,
+        department: template.department,
+        priority: template.priority,
+        reason: 'Script complexity indicates a larger-unit production team',
       });
     }
   }
 
-  // Sort by priority (high first)
-  const priorityOrder = { high: 0, medium: 1, low: 2 };
-  return Array.from(suggestions.values()).sort(
-    (a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]
-  );
+  const hasStuntRisk =
+    (elementCounts.get('STUNT') || 0) > 0 ||
+    (elementCounts.get('SAFETY_NOTES') || 0) > 0 ||
+    (elementCounts.get('SECURITY') || 0) > 0;
+
+  if (hasStuntRisk) {
+    for (const template of STUNT_AND_SAFETY_ADDITIONS) {
+      upsertSuggestion(suggestions, {
+        role: template.role,
+        department: template.department,
+        priority: template.priority,
+        reason: 'Stunt/safety indicators in script require dedicated safety and security coverage',
+      });
+    }
+  }
 }

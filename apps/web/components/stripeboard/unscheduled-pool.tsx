@@ -8,12 +8,14 @@ import { Input } from "@/components/ui/input";
 import { SortableSceneStrip } from "./scene-strip";
 import { cn } from "@/lib/utils";
 import type { Scene } from "@/lib/actions/scenes";
+import type { SceneStripSize } from "./scene-strip";
 
 interface UnscheduledPoolProps {
   scenes: Scene[];
   onSceneClick?: (sceneId: string) => void;
   selectedSceneId?: string | null;
   activeId?: string | null;
+  sceneSize?: SceneStripSize;
 }
 
 export function UnscheduledPool({
@@ -21,6 +23,7 @@ export function UnscheduledPool({
   onSceneClick,
   selectedSceneId,
   activeId,
+  sceneSize = "comfortable",
 }: UnscheduledPoolProps) {
   const [search, setSearch] = React.useState("");
 
@@ -74,13 +77,13 @@ export function UnscheduledPool({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex flex-col h-full border border-border rounded-lg bg-card transition-all duration-200",
+        "sticky top-0 flex flex-col border border-border rounded-lg bg-card transition-all duration-200 max-h-[calc(100vh-10rem)]",
         isOver && "ring-2 ring-primary bg-primary/5 scale-[1.01]",
         isDimmed && "opacity-60"
       )}
     >
       {/* Header */}
-      <div className="px-3 py-2 border-b border-border">
+      <div className="px-3 py-2 border-b border-border flex-shrink-0">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-muted-foreground" />
@@ -103,7 +106,7 @@ export function UnscheduledPool({
 
       {/* Scenes List */}
       <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-        <div className="flex-1 overflow-auto p-2 space-y-1.5">
+        <div className="overflow-auto p-2 space-y-1.5 scrollbar-thin">
           {sortedScenes.length > 0 ? (
             sortedScenes.map((scene) => (
               <SortableSceneStrip
@@ -112,10 +115,11 @@ export function UnscheduledPool({
                 onClick={() => onSceneClick?.(scene.id)}
                 isSelected={selectedSceneId === scene.id}
                 layout="strip"
+                sceneSize={sceneSize}
               />
             ))
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center py-8">
+            <div className="flex flex-col items-center justify-center text-center py-8">
               {search ? (
                 <>
                   <Search className="h-8 w-8 text-muted-foreground/30 mb-2" />
@@ -131,13 +135,6 @@ export function UnscheduledPool({
           )}
         </div>
       </SortableContext>
-
-      {/* Footer */}
-      <div className="px-3 py-2 border-t border-border">
-        <p className="text-[10px] text-muted-foreground text-center">
-          Drag scenes to shooting days
-        </p>
-      </div>
     </div>
   );
 }

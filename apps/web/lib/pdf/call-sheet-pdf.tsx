@@ -1,0 +1,444 @@
+import React from "react";
+import {
+  Document,
+  Page,
+  Text,
+  View,
+  StyleSheet,
+} from "@react-pdf/renderer";
+import type { CallSheetFullData } from "@/lib/actions/call-sheets";
+
+const styles = StyleSheet.create({
+  page: {
+    padding: 30,
+    fontSize: 9,
+    fontFamily: "Helvetica",
+    color: "#1a1a1a",
+  },
+  // Header
+  header: {
+    textAlign: "center",
+    borderBottomWidth: 2,
+    borderBottomColor: "#000",
+    paddingBottom: 8,
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 16,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  subtitle: {
+    fontSize: 12,
+    fontFamily: "Helvetica-Bold",
+    marginTop: 4,
+  },
+  dateText: {
+    fontSize: 10,
+    color: "#555",
+    marginTop: 4,
+  },
+  versionText: {
+    fontSize: 8,
+    color: "#888",
+    marginTop: 2,
+  },
+  // Info grid
+  infoRow: {
+    flexDirection: "row",
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+    paddingBottom: 8,
+  },
+  infoCell: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  infoLabel: {
+    fontSize: 7,
+    color: "#888",
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
+  infoValue: {
+    fontSize: 9,
+    fontFamily: "Helvetica-Bold",
+  },
+  // Section
+  sectionTitle: {
+    fontSize: 10,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+    paddingBottom: 3,
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  // Table
+  table: {
+    marginBottom: 8,
+  },
+  tableHeader: {
+    flexDirection: "row",
+    backgroundColor: "#f0f0f0",
+    borderWidth: 1,
+    borderColor: "#ccc",
+  },
+  tableRow: {
+    flexDirection: "row",
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "#ccc",
+  },
+  tableCell: {
+    padding: 4,
+    fontSize: 8,
+    borderRightWidth: 1,
+    borderRightColor: "#ccc",
+  },
+  tableCellLast: {
+    padding: 4,
+    fontSize: 8,
+  },
+  tableHeaderCell: {
+    padding: 4,
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    borderRightWidth: 1,
+    borderRightColor: "#ccc",
+  },
+  tableHeaderCellLast: {
+    padding: 4,
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+  },
+  bold: {
+    fontFamily: "Helvetica-Bold",
+  },
+  // Notes
+  notesText: {
+    fontSize: 8,
+    lineHeight: 1.4,
+    marginBottom: 4,
+  },
+  // Location block
+  locationBlock: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 4,
+    padding: 6,
+    marginBottom: 4,
+  },
+  // Footer
+  footer: {
+    position: "absolute",
+    bottom: 20,
+    left: 30,
+    right: 30,
+    textAlign: "center",
+    borderTopWidth: 1,
+    borderTopColor: "#000",
+    paddingTop: 6,
+    fontSize: 7,
+    color: "#888",
+  },
+});
+
+function formatDate(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+interface CallSheetPdfProps {
+  data: CallSheetFullData;
+}
+
+export function CallSheetPdf({ data }: CallSheetPdfProps) {
+  const { callSheet, shootingDay, project, scenes, castCallTimes, departmentCalls, locations } = data;
+  const totalPages = scenes.reduce((sum, s) => sum + Number(s.scene.pageCount || 0), 0);
+
+  // Scene table column widths
+  const sceneColWidths = [40, 30, 30, 160, 50, 40, 120];
+  const sceneTotal = sceneColWidths.reduce((s, w) => s + w, 0);
+
+  // Cast table column widths
+  const castColWidths = [30, 80, 80, 35, 50, 50, 50, 95];
+  const castTotal = castColWidths.reduce((s, w) => s + w, 0);
+
+  // Dept table column widths
+  const deptColWidths = [150, 80, 240];
+  const deptTotal = deptColWidths.reduce((s, w) => s + w, 0);
+
+  return (
+    <Document>
+      <Page size="A4" style={styles.page}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>{project?.name || "Production"}</Text>
+          <Text style={styles.subtitle}>
+            CALL SHEET — DAY {shootingDay.dayNumber}
+          </Text>
+          <Text style={styles.dateText}>{formatDate(shootingDay.date)}</Text>
+          {callSheet.publishedAt && (
+            <Text style={styles.versionText}>Version {callSheet.version}</Text>
+          )}
+        </View>
+
+        {/* Production Info */}
+        <View style={styles.infoRow}>
+          <View style={styles.infoCell}>
+            <Text style={styles.infoLabel}>General Call</Text>
+            <Text style={styles.infoValue}>{shootingDay.generalCall || "TBD"}</Text>
+          </View>
+          <View style={styles.infoCell}>
+            <Text style={styles.infoLabel}>Shooting Call</Text>
+            <Text style={styles.infoValue}>{shootingDay.shootingCall || "TBD"}</Text>
+          </View>
+          <View style={styles.infoCell}>
+            <Text style={styles.infoLabel}>Estimated Wrap</Text>
+            <Text style={styles.infoValue}>{shootingDay.estimatedWrap || "TBD"}</Text>
+          </View>
+          {project?.director && (
+            <View style={styles.infoCell}>
+              <Text style={styles.infoLabel}>Director</Text>
+              <Text style={styles.infoValue}>{project.director}</Text>
+            </View>
+          )}
+          {project?.producer && (
+            <View style={styles.infoCell}>
+              <Text style={styles.infoLabel}>Producer</Text>
+              <Text style={styles.infoValue}>{project.producer}</Text>
+            </View>
+          )}
+        </View>
+
+        {callSheet.nearestHospital && (
+          <View style={{ marginBottom: 8 }}>
+            <Text style={styles.infoLabel}>Nearest Hospital</Text>
+            <Text style={styles.infoValue}>{callSheet.nearestHospital}</Text>
+          </View>
+        )}
+
+        {shootingDay.weatherNotes && (
+          <View style={{ marginBottom: 8 }}>
+            <Text style={styles.infoLabel}>Weather</Text>
+            <Text style={{ fontSize: 8 }}>{shootingDay.weatherNotes}</Text>
+          </View>
+        )}
+
+        {/* Scene Schedule */}
+        {scenes.length > 0 && (
+          <View>
+            <Text style={styles.sectionTitle}>Scene Schedule</Text>
+            <View style={styles.table}>
+              {/* Header */}
+              <View style={styles.tableHeader}>
+                {["Scene", "D/N", "I/E", "Synopsis", "Cast", "Pages", "Location"].map((h, i) => (
+                  <Text
+                    key={h}
+                    style={[
+                      i < 6 ? styles.tableHeaderCell : styles.tableHeaderCellLast,
+                      { width: sceneColWidths[i] },
+                    ]}
+                  >
+                    {h}
+                  </Text>
+                ))}
+              </View>
+              {/* Rows */}
+              {scenes.map((s) => (
+                <View key={s.sceneId} style={styles.tableRow}>
+                  <Text style={[styles.tableCell, styles.bold, { width: sceneColWidths[0] }]}>
+                    {s.scene.sceneNumber}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: sceneColWidths[1] }]}>
+                    {s.scene.dayNight}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: sceneColWidths[2] }]}>
+                    {s.scene.intExt}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: sceneColWidths[3] }]}>
+                    {s.scene.synopsis || "—"}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: sceneColWidths[4] }]}>
+                    {s.scene.castMembers?.map((cm) => cm.castMember.castNumber).filter(Boolean).join(", ") || "—"}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: sceneColWidths[5] }]}>
+                    {Number(s.scene.pageCount).toFixed(1)}
+                  </Text>
+                  <Text style={[styles.tableCellLast, { width: sceneColWidths[6] }]}>
+                    {s.scene.setName || s.scene.location?.name || "—"}
+                  </Text>
+                </View>
+              ))}
+              {/* Total */}
+              <View style={[styles.tableRow, { backgroundColor: "#f8f8f8" }]}>
+                <Text style={[styles.tableCell, styles.bold, { width: sceneColWidths[0] + sceneColWidths[1] + sceneColWidths[2] + sceneColWidths[3] + sceneColWidths[4], textAlign: "right" }]}>
+                  Total Pages:
+                </Text>
+                <Text style={[styles.tableCell, styles.bold, { width: sceneColWidths[5] }]}>
+                  {totalPages.toFixed(1)}
+                </Text>
+                <Text style={[styles.tableCellLast, { width: sceneColWidths[6] }]}></Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Cast */}
+        {castCallTimes.length > 0 && (
+          <View>
+            <Text style={styles.sectionTitle}>Cast</Text>
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                {["#", "Character", "Actor", "Status", "Pickup", "MU/Hair", "On Set", "Remarks"].map((h, i) => (
+                  <Text
+                    key={h}
+                    style={[
+                      i < 7 ? styles.tableHeaderCell : styles.tableHeaderCellLast,
+                      { width: castColWidths[i] },
+                    ]}
+                  >
+                    {h}
+                  </Text>
+                ))}
+              </View>
+              {castCallTimes.map((ct) => (
+                <View key={ct.castMemberId} style={styles.tableRow}>
+                  <Text style={[styles.tableCell, { width: castColWidths[0] }]}>
+                    {ct.castMember?.castNumber || "—"}
+                  </Text>
+                  <Text style={[styles.tableCell, styles.bold, { width: castColWidths[1] }]}>
+                    {ct.castMember?.characterName || "—"}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: castColWidths[2] }]}>
+                    {ct.castMember?.actorName || "—"}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: castColWidths[3] }]}>
+                    {ct.workStatus}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: castColWidths[4] }]}>
+                    {ct.pickupTime || "—"}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: castColWidths[5] }]}>
+                    {ct.muHairCall || "—"}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: castColWidths[6] }]}>
+                    {ct.onSetCall || "—"}
+                  </Text>
+                  <Text style={[styles.tableCellLast, { width: castColWidths[7] }]}>
+                    {ct.remarks || ""}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Department Calls */}
+        {departmentCalls.length > 0 && (
+          <View>
+            <Text style={styles.sectionTitle}>Department Calls</Text>
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                {["Department", "Call Time", "Notes"].map((h, i) => (
+                  <Text
+                    key={h}
+                    style={[
+                      i < 2 ? styles.tableHeaderCell : styles.tableHeaderCellLast,
+                      { width: deptColWidths[i] },
+                    ]}
+                  >
+                    {h}
+                  </Text>
+                ))}
+              </View>
+              {departmentCalls.map((dc) => (
+                <View key={dc.id} style={styles.tableRow}>
+                  <Text style={[styles.tableCell, styles.bold, { width: deptColWidths[0] }]}>
+                    {dc.department}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: deptColWidths[1] }]}>
+                    {dc.callTime}
+                  </Text>
+                  <Text style={[styles.tableCellLast, { width: deptColWidths[2] }]}>
+                    {dc.notes || ""}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Location */}
+        {locations.length > 0 && (
+          <View>
+            <Text style={styles.sectionTitle}>Location</Text>
+            {locations.map((loc, idx) => (
+              <View key={idx} style={styles.locationBlock}>
+                <Text style={[styles.bold, { fontSize: 9 }]}>{loc.name}</Text>
+                {loc.address && <Text style={{ fontSize: 8 }}>{loc.address}</Text>}
+                {loc.contactName && (
+                  <Text style={{ fontSize: 8 }}>
+                    Contact: {loc.contactName}
+                    {loc.contactPhone ? ` — ${loc.contactPhone}` : ""}
+                  </Text>
+                )}
+                {loc.parkingNotes && (
+                  <Text style={{ fontSize: 8 }}>Parking: {loc.parkingNotes}</Text>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Notes */}
+        {callSheet.safetyNotes && (
+          <View>
+            <Text style={styles.sectionTitle}>Safety Notes</Text>
+            <Text style={styles.notesText}>{callSheet.safetyNotes}</Text>
+          </View>
+        )}
+        {callSheet.mealNotes && (
+          <View>
+            <Text style={styles.sectionTitle}>Meals</Text>
+            <Text style={styles.notesText}>{callSheet.mealNotes}</Text>
+          </View>
+        )}
+        {callSheet.parkingNotes && (
+          <View>
+            <Text style={styles.sectionTitle}>Parking</Text>
+            <Text style={styles.notesText}>{callSheet.parkingNotes}</Text>
+          </View>
+        )}
+        {callSheet.advanceNotes && (
+          <View>
+            <Text style={styles.sectionTitle}>Advance Schedule</Text>
+            <Text style={styles.notesText}>{callSheet.advanceNotes}</Text>
+          </View>
+        )}
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text>Generated by wrapshoot</Text>
+        </View>
+      </Page>
+    </Document>
+  );
+}

@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [projectRoles, setProjectRoles] = React.useState<Record<string, ProjectRole>>({});
   const [subscription, setSubscription] = React.useState<Subscription | null>(null);
 
-  const supabase = createClient();
+  const supabase = React.useMemo(() => createClient(), []);
 
   const fetchUserData = React.useCallback(async (userId: string) => {
     const setProjects = useProjectStore.getState().setProjects;
