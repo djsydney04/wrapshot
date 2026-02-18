@@ -54,7 +54,7 @@ export function FeedbackButton({ collapsed = false, variant = "sidebar" }: Feedb
       }
 
       // Flush immediately so the event isn't lost on navigation
-      ph.flush?.();
+      (ph as unknown as { flush?: () => void }).flush?.();
     } else {
       console.warn("[Feedback] PostHog not available — feedback not recorded");
     }
