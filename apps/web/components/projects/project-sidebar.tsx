@@ -13,6 +13,7 @@ import {
   DollarSign,
   Settings,
   MessageSquarePlus,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FeedbackButton } from "@/components/feedback/feedback-button";
@@ -22,6 +23,7 @@ export type ProjectSection =
   | "overview"
   | "script"
   | "schedule"
+  | "callsheets"
   | "cast"
   | "crew"
   | "scenes"
@@ -45,6 +47,7 @@ interface ProjectSidebarProps {
     cast: number;
     crew: number;
     shootingDays: number;
+    callSheets?: number;
     gear: number;
     hasScript: boolean;
     team?: number;
@@ -63,6 +66,7 @@ export function ProjectSidebar({
     { id: "overview", label: "Overview", icon: LayoutDashboard },
     { id: "scenes", label: "Scenes", icon: Clapperboard, count: counts.scenes },
     { id: "schedule", label: "Schedule", icon: Calendar, count: counts.shootingDays },
+    { id: "callsheets", label: "Call Sheets", icon: ClipboardList, count: counts.callSheets },
     { id: "cast", label: "Cast", icon: Users, count: counts.cast },
     { id: "crew", label: "Crew", icon: UserCircle, count: counts.crew },
     { id: "team", label: "Team Access", icon: UserPlus, count: counts.team },

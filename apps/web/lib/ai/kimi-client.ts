@@ -75,11 +75,19 @@ export class KimiClient {
         throw new Error(`Kimi API error: ${response.status}`);
       }
 
-      const data: KimiResponse = await response.json();
+      let data: KimiResponse;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error("Kimi API returned invalid JSON response");
+      }
+
       const content = data.choices?.[0]?.message?.content;
 
       if (!content) {
-        throw new Error("No content in Kimi response");
+        throw new Error(
+          `No content in Kimi response (choices: ${data.choices?.length ?? 0})`
+        );
       }
 
       return content;
@@ -97,7 +105,10 @@ export class KimiClient {
    * Streaming completion for real-time UI updates
    */
   async *completeStreaming(options: KimiCompletionOptions): AsyncGenerator<string> {
-    const { messages, maxTokens = 4000, temperature = 0.1 } = options;
+    const { messages, maxTokens = 4000, temperature = 0.1, timeout = 180000 } = options;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     const response = await fetch(this.baseUrl, {
       method: "POST",
@@ -112,9 +123,11 @@ export class KimiClient {
         temperature,
         stream: true,
       }),
+      signal: controller.signal,
     });
 
     if (!response.ok) {
+      clearTimeout(timeoutId);
       const errorText = await response.text();
       console.error("Kimi API error:", response.status, errorText);
       throw new Error(`Kimi API error: ${response.status}`);
@@ -122,6 +135,7 @@ export class KimiClient {
 
     const reader = response.body?.getReader();
     if (!reader) {
+      clearTimeout(timeoutId);
       throw new Error("No response body");
     }
 
@@ -153,7 +167,13 @@ export class KimiClient {
           }
         }
       }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Kimi streaming API timeout after ${timeout}ms`);
+      }
+      throw error;
     } finally {
+      clearTimeout(timeoutId);
       reader.releaseLock();
     }
   }

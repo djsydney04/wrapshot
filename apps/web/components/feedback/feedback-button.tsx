@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { MessageSquarePlus, X, Send, Loader2, CheckCircle } from "lucide-react";
+import posthogLib from "posthog-js";
 import { usePostHog } from "posthog-js/react";
 import { Button } from "@/components/ui/button";
 import { SimpleTooltip } from "@/components/ui/tooltip";
@@ -30,23 +31,33 @@ export function FeedbackButton({ collapsed = false, variant = "sidebar" }: Feedb
 
     setIsSubmitting(true);
 
-    console.log("[Feedback] Submitting...", { posthog: !!posthog, surveyId });
+    // Use the hook client first, fall back to the module-level singleton
+    const ph = posthog ?? posthogLib;
 
-    if (posthog) {
-      // Send survey response to PostHog
-      posthog.capture("survey sent", {
-        $survey_id: surveyId,
-        $survey_response: message.trim(),
-        $survey_response_1: feedbackType,
+    if (ph && typeof ph.capture === "function") {
+      // Primary event — always shows up in PostHog Events
+      ph.capture("feedback_submitted", {
         feedback_type: feedbackType,
         message: message.trim(),
+        source: "feedback_button",
       });
-      console.log("[Feedback] Event captured!");
-    } else {
-      console.warn("[Feedback] PostHog not available!");
-    }
 
-    await new Promise((resolve) => setTimeout(resolve, 500));
+      // Also send as survey response if survey ID is configured
+      if (surveyId) {
+        ph.capture("survey sent", {
+          $survey_id: surveyId,
+          $survey_response: message.trim(),
+          $survey_response_1: feedbackType,
+          feedback_type: feedbackType,
+          message: message.trim(),
+        });
+      }
+
+      // Flush immediately so the event isn't lost on navigation
+      (ph as unknown as { flush?: () => void }).flush?.();
+    } else {
+      console.warn("[Feedback] PostHog not available — feedback not recorded");
+    }
 
     setIsSubmitting(false);
     setSubmitted(true);
@@ -67,11 +78,12 @@ export function FeedbackButton({ collapsed = false, variant = "sidebar" }: Feedb
 
   const handleOpen = () => {
     setIsOpen(true);
-    // Track that survey was shown
-    if (posthog && surveyId) {
-      posthog.capture("survey shown", {
-        $survey_id: surveyId,
-      });
+    const ph = posthog ?? posthogLib;
+    if (ph && typeof ph.capture === "function") {
+      ph.capture("feedback_opened", { source: "feedback_button" });
+      if (surveyId) {
+        ph.capture("survey shown", { $survey_id: surveyId });
+      }
     }
   };
 

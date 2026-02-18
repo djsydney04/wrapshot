@@ -11,6 +11,9 @@ import {
   Clock,
   ChevronRight,
   Plus,
+  Check,
+  X,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
@@ -47,8 +50,31 @@ export function OverviewSection({
 
   const hasContent = scenes.length > 0 || cast.length > 0 || crew.length > 0 || shootingDays.length > 0;
 
-  // Show getting started view for empty projects
-  if (!hasContent) {
+  // Setup checklist state
+  const setupSteps = [
+    { key: "script", label: "Upload script", description: "Auto-generate scenes, cast & elements", icon: FileText, done: scripts.length > 0, section: "script" },
+    { key: "scenes", label: "Add scenes", description: "Break down your script into scenes", icon: Clapperboard, done: scenes.length > 0, section: "scenes" },
+    { key: "cast", label: "Add cast members", description: "Build your cast list", icon: Users, done: cast.length > 0, section: "cast" },
+    { key: "crew", label: "Add crew members", description: "Organize your production team", icon: UserCircle, done: crew.length > 0, section: "crew" },
+    { key: "schedule", label: "Add shooting days", description: "Set up your production schedule", icon: Calendar, done: shootingDays.length > 0, section: "schedule" },
+  ];
+  const completedCount = setupSteps.filter((s) => s.done).length;
+  const allDone = completedCount === setupSteps.length;
+
+  const [checklistDismissed, setChecklistDismissed] = React.useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(`checklist-dismissed-${project.id}`) === "true";
+  });
+
+  const dismissChecklist = () => {
+    setChecklistDismissed(true);
+    localStorage.setItem(`checklist-dismissed-${project.id}`, "true");
+  };
+
+  const showChecklist = !allDone && !checklistDismissed;
+
+  // Show full-page getting started for completely empty projects
+  if (!hasContent && scripts.length === 0) {
     return (
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
@@ -59,36 +85,15 @@ export function OverviewSection({
         </div>
 
         <div className="space-y-3">
-          <QuickStartCard
-            icon={Calendar}
-            title="Add shooting days"
-            description="Set up your production schedule"
-            onClick={() => onNavigate("schedule")}
-          />
-          <QuickStartCard
-            icon={Clapperboard}
-            title="Add scenes"
-            description="Break down your script into scenes"
-            onClick={() => onNavigate("scenes")}
-          />
-          <QuickStartCard
-            icon={Users}
-            title="Add cast members"
-            description="Build your cast list"
-            onClick={() => onNavigate("cast")}
-          />
-          <QuickStartCard
-            icon={UserCircle}
-            title="Add crew members"
-            description="Organize your production team"
-            onClick={() => onNavigate("crew")}
-          />
-          <QuickStartCard
-            icon={FileText}
-            title="Upload script"
-            description="Keep track of script revisions"
-            onClick={() => onNavigate("script")}
-          />
+          {setupSteps.map((step) => (
+            <QuickStartCard
+              key={step.key}
+              icon={step.icon}
+              title={step.label}
+              description={step.description}
+              onClick={() => onNavigate(step.section)}
+            />
+          ))}
         </div>
       </div>
     );
@@ -96,6 +101,67 @@ export function OverviewSection({
 
   return (
     <div className="space-y-8">
+      {/* Setup Checklist — shown until all steps done or dismissed */}
+      {showChecklist && (
+        <section className="rounded-lg border border-border bg-card">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <h3 className="font-medium">Getting Started</h3>
+              <span className="text-xs text-muted-foreground">
+                {completedCount}/{setupSteps.length}
+              </span>
+            </div>
+            <Button variant="ghost" size="icon-sm" onClick={dismissChecklist}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          {/* Progress bar */}
+          <div className="px-4 pt-3">
+            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-500"
+                style={{ width: `${(completedCount / setupSteps.length) * 100}%` }}
+              />
+            </div>
+          </div>
+          <div className="p-2">
+            {setupSteps.map((step) => (
+              <button
+                key={step.key}
+                onClick={() => !step.done && onNavigate(step.section)}
+                className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-left transition-colors ${
+                  step.done
+                    ? "opacity-60"
+                    : "hover:bg-muted/50 cursor-pointer"
+                }`}
+              >
+                <div
+                  className={`flex h-6 w-6 items-center justify-center rounded-full shrink-0 ${
+                    step.done
+                      ? "bg-primary text-primary-foreground"
+                      : "border-2 border-muted-foreground/30"
+                  }`}
+                >
+                  {step.done && <Check className="h-3.5 w-3.5" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium ${step.done ? "line-through text-muted-foreground" : ""}`}>
+                    {step.label}
+                  </p>
+                  {!step.done && (
+                    <p className="text-xs text-muted-foreground">{step.description}</p>
+                  )}
+                </div>
+                {!step.done && (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                )}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Upcoming Shoots - Most Important */}
       {upcomingDays.length > 0 && (
         <section>

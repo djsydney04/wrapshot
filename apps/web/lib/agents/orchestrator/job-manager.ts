@@ -6,6 +6,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { nanoid } from 'nanoid';
+import { sanitizeForJsonb } from '@/lib/scripts/parser';
 import type { AgentJob, AgentJobType, AgentContext, ScriptChunk } from '../types';
 
 export interface CreateJobInput {
@@ -139,6 +140,7 @@ export class JobManager {
       'generating_synopses',
       'estimating_time',
       'creating_records',
+      'suggesting_crew',
     ];
 
     const { data, error } = await supabase
@@ -201,9 +203,16 @@ export class JobManager {
   static async saveChunks(chunks: Omit<ScriptChunk, 'createdAt'>[]): Promise<void> {
     const supabase = await createClient();
 
+    // Sanitize chunk text to remove null bytes that break PostgreSQL JSONB
+    const sanitizedChunks = chunks.map(chunk => ({
+      ...chunk,
+      chunkText: chunk.chunkText.replace(/\u0000/g, ''),
+      result: chunk.result ? sanitizeForJsonb(chunk.result) : chunk.result,
+    }));
+
     const { error } = await supabase
       .from('ScriptChunk')
-      .insert(chunks);
+      .insert(sanitizedChunks);
 
     if (error) {
       console.error('[JobManager] Failed to save chunks:', error);
@@ -259,7 +268,7 @@ export class JobManager {
 
     const { error } = await supabase
       .from('AgentJob')
-      .update({ context })
+      .update({ context: sanitizeForJsonb(context) })
       .eq('id', jobId);
 
     if (error) {

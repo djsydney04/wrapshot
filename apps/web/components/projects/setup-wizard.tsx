@@ -163,7 +163,7 @@ export function SetupWizard({
           setScriptState("error");
         }
       } else {
-        throw new Error("Failed to save script");
+        throw new Error(result.error || "Failed to save script");
       }
     } catch (err) {
       console.error("Error creating script:", err);
@@ -491,6 +491,14 @@ export function SetupWizard({
             </Button>
           </div>
 
+          {/* Background analysis indicator */}
+          {currentStep !== "script" && currentStep !== "welcome" && scriptState === "analyzing" && (
+            <div className="mx-6 mt-4 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+              <span>AI is still analyzing your script in the background{job?.progressPercent ? ` (${job.progressPercent}%)` : ""}...</span>
+            </div>
+          )}
+
           {/* Content */}
           <div className="flex-1 overflow-auto px-6 py-4">{renderStepContent()}</div>
 
@@ -500,7 +508,7 @@ export function SetupWizard({
               <Button
                 variant="ghost"
                 onClick={currentStep === "welcome" ? onSkip : handlePrev}
-                disabled={currentStep === "script" && (scriptState === "uploading" || scriptState === "analyzing")}
+                disabled={currentStep === "script" && scriptState === "uploading"}
               >
                 {currentStep === "welcome" ? (
                   "Skip Setup"
@@ -528,11 +536,20 @@ export function SetupWizard({
                       <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>
                   )}
-                  {/* During analysis, show waiting state */}
+                  {/* During analysis, let user continue while AI works in background */}
                   {(scriptState === "uploading" || scriptState === "analyzing") && (
-                    <Button disabled>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Analyzing...
+                    <Button onClick={handleNext} variant={scriptState === "uploading" ? "ghost" : "default"} disabled={scriptState === "uploading"}>
+                      {scriptState === "uploading" ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          Continue while AI works
+                          <ChevronRight className="h-4 w-4 ml-1" />
+                        </>
+                      )}
                     </Button>
                   )}
                 </div>

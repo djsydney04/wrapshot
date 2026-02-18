@@ -64,7 +64,9 @@ export async function executeCastLinker(
 
   const existingCastMap = new Map<string, ExistingCastMember>();
   for (const member of existingCast || []) {
-    existingCastMap.set(member.characterName.toUpperCase(), member);
+    if (member.characterName) {
+      existingCastMap.set(member.characterName.toUpperCase(), member);
+    }
   }
 
   await tracker.updateProgress(1, 3, 'Creating new cast members');

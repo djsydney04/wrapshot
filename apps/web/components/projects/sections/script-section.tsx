@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, FileText, Download, Eye, Trash2, Upload, Loader2 } from "lucide-react";
+import { FileText, Download, Eye, Trash2, Upload, Loader2, XCircle, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/ui/file-upload";
@@ -19,13 +19,22 @@ import { useProjectStore } from "@/lib/stores/project-store";
 import { SCRIPT_COLORS, type Script } from "@/lib/types";
 import { ScriptChangeBanner } from "@/components/ai/script-change-banner";
 import { ScriptDiffModal } from "@/components/ai/script-diff-modal";
+import { AnalysisResultsPanel } from "@/components/agents/analysis-results-panel";
+import { createScript } from "@/lib/actions/scripts";
+import { useStartAgentJob, useAgentJob } from "@/lib/hooks/use-agent-job";
+import { toast } from "sonner";
+import { STEP_DEFINITIONS } from "@/lib/agents/constants";
+import type { AgentJobStatus } from "@/lib/agents/types";
 
 interface ScriptSectionProps {
   projectId: string;
-  scripts: Script[];
+  scripts: Script[] | any[];
+  onScriptUploaded?: () => void;
+  onAnalysisComplete?: () => void;
+  onNavigate?: (section: string) => void;
 }
 
-export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
+export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysisComplete, onNavigate }: ScriptSectionProps) {
   const [showUpload, setShowUpload] = React.useState(false);
   const [uploadData, setUploadData] = React.useState({
     fileUrl: null as string | null,
@@ -34,6 +43,23 @@ export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
   });
   const [loading, setLoading] = React.useState(false);
   const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
+
+  // Agent job state
+  const [activeScriptId, setActiveScriptId] = React.useState<string | null>(null);
+  const { startJob, loading: startingJob, error: startJobError } = useStartAgentJob();
+  const { job, isRunning, isComplete, isFailed } = useAgentJob({ scriptId: activeScriptId || undefined });
+
+  // Track completion to trigger parent refresh
+  const prevCompleteRef = React.useRef(false);
+  React.useEffect(() => {
+    if (isComplete && !prevCompleteRef.current) {
+      toast.success("Script analysis complete!", {
+        description: `${job?.result?.scenesCreated ?? 0} scenes, ${job?.result?.elementsCreated ?? 0} elements, ${job?.result?.castCreated ?? 0} cast members created`,
+      });
+      onAnalysisComplete?.();
+    }
+    prevCompleteRef.current = isComplete;
+  }, [isComplete, job?.result, onAnalysisComplete]);
 
   // Script change detection state
   const [scriptChanges, setScriptChanges] = React.useState<{
@@ -48,68 +74,126 @@ export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
   const { addScript, deleteScript } = useProjectStore();
 
   const sortedScripts = React.useMemo(() => {
-    return [...scripts].sort((a, b) => b.version - a.version);
+    return [...scripts].sort((a, b) => {
+      const vA = typeof a.version === "string" ? parseInt(a.version, 10) : a.version;
+      const vB = typeof b.version === "string" ? parseInt(b.version, 10) : b.version;
+      return vB - vA;
+    });
   }, [scripts]);
 
-  const nextVersion = scripts.length > 0 ? Math.max(...scripts.map((s) => s.version)) + 1 : 1;
+  const nextVersion = scripts.length > 0
+    ? Math.max(...scripts.map((s) => {
+        const v = typeof s.version === "string" ? parseInt(s.version, 10) : s.version;
+        return isNaN(v) ? 0 : v;
+      })) + 1
+    : 1;
 
   const handleUpload = async () => {
     if (!uploadData.fileUrl || !uploadData.fileName) return;
 
     setLoading(true);
 
-    // Add the new script
-    addScript({
-      projectId,
-      version: nextVersion,
-      color: uploadData.color,
-      fileUrl: uploadData.fileUrl,
-      fileName: uploadData.fileName,
-      uploadedAt: new Date().toISOString(),
-    });
+    try {
+      // Save to database
+      const result = await createScript({
+        projectId,
+        version: String(nextVersion),
+        color: uploadData.color,
+        fileUrl: uploadData.fileUrl,
+        fileName: uploadData.fileName,
+        isActive: true,
+      });
 
-    // If there's a previous version, trigger change detection
-    if (sortedScripts.length > 0) {
-      const previousScript = sortedScripts[0];
-      setAnalyzingChanges(true);
-
-      try {
-        // Fetch script contents (in a real app, you'd parse the PDFs)
-        // For now, we'll simulate with a placeholder
-        const response = await fetch("/api/ai/script-diff", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            projectId,
-            previousScript: `Previous script version ${previousScript.version}`, // Placeholder
-            newScript: `New script version ${nextVersion}`, // Placeholder
-            previousVersion: previousScript.version,
-            newVersion: nextVersion,
-          }),
-        });
-
-        if (response.ok) {
-          const { data } = await response.json();
-          if (data.changes && data.changes.length > 0) {
-            setScriptChanges({
-              changes: data.changes,
-              summary: data.summary,
-              previousVersion: previousScript.version,
-              newVersion: nextVersion,
-            });
-          }
-        }
-      } catch (error) {
-        console.error("Failed to analyze script changes:", error);
-      } finally {
-        setAnalyzingChanges(false);
+      if (result.error || !result.data) {
+        toast.error("Failed to save script", { description: result.error || "Unknown error" });
+        setLoading(false);
+        return;
       }
+
+      const dbScript = result.data;
+
+      // Also add to Zustand store for backward compat
+      addScript({
+        projectId,
+        version: nextVersion,
+        color: uploadData.color,
+        fileUrl: uploadData.fileUrl,
+        fileName: uploadData.fileName,
+        uploadedAt: new Date().toISOString(),
+      });
+
+      // Notify parent to refresh script list
+      onScriptUploaded?.();
+
+      // Start the AI agent pipeline
+      setActiveScriptId(dbScript.id);
+      const jobId = await startJob(projectId, dbScript.id, "script_analysis");
+      if (jobId) {
+        toast.info("Script analysis started", {
+          description: "AI is analyzing your script for scenes, cast, and elements",
+        });
+      } else {
+        toast.error("Failed to start script analysis", {
+          description: startJobError || "Check that the AI service is configured correctly",
+        });
+      }
+
+      // If there's a previous version, trigger change detection
+      if (sortedScripts.length > 0) {
+        const previousScript = sortedScripts[0];
+        setAnalyzingChanges(true);
+
+        try {
+          const response = await fetch("/api/ai/script-diff", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              projectId,
+              previousScript: `Previous script version ${previousScript.version}`,
+              newScript: `New script version ${nextVersion}`,
+              previousVersion: typeof previousScript.version === "string"
+                ? parseInt(previousScript.version, 10)
+                : previousScript.version,
+              newVersion: nextVersion,
+            }),
+          });
+
+          if (response.ok) {
+            const { data } = await response.json();
+            if (data.changes && data.changes.length > 0) {
+              setScriptChanges({
+                changes: data.changes,
+                summary: data.summary,
+                previousVersion: typeof previousScript.version === "string"
+                  ? parseInt(previousScript.version, 10)
+                  : previousScript.version,
+                newVersion: nextVersion,
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Failed to analyze script changes:", error);
+        } finally {
+          setAnalyzingChanges(false);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to upload script:", error);
+      toast.error("Failed to upload script");
     }
 
     setLoading(false);
     setShowUpload(false);
     setUploadData({ fileUrl: null, fileName: "", color: "WHITE" });
     forceUpdate();
+  };
+
+  const handleRetryAnalysis = async () => {
+    if (!activeScriptId) return;
+    const jobId = await startJob(projectId, activeScriptId, "script_analysis");
+    if (jobId) {
+      toast.info("Retrying script analysis...");
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -126,6 +210,26 @@ export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
 
   return (
     <div className="space-y-4">
+      {/* Agent Progress UI — running/failed only */}
+      {(isRunning || isFailed) && job && (
+        <AgentProgressPanel
+          job={job}
+          isRunning={isRunning}
+          isFailed={isFailed}
+          onRetry={handleRetryAnalysis}
+        />
+      )}
+
+      {/* Analysis Results Dashboard — shown after completion */}
+      {isComplete && job?.result && (
+        <AnalysisResultsPanel
+          projectId={projectId}
+          jobResult={job.result}
+          onNavigate={(onNavigate as any) ?? (() => {})}
+          onDataRefresh={onAnalysisComplete ?? (() => {})}
+        />
+      )}
+
       {/* Script Change Detection Banner */}
       {scriptChanges && (
         <ScriptChangeBanner
@@ -150,7 +254,7 @@ export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
         <div className="text-sm text-muted-foreground">
           {scripts.length} version{scripts.length !== 1 ? "s" : ""} uploaded
         </div>
-        <Button size="sm" onClick={() => setShowUpload(true)}>
+        <Button size="sm" onClick={() => setShowUpload(true)} disabled={isRunning}>
           <Upload className="h-4 w-4 mr-1" />
           Upload New Version
         </Button>
@@ -160,8 +264,11 @@ export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
       {sortedScripts.length > 0 ? (
         <div className="space-y-3">
           {sortedScripts.map((script) => {
-            const colorInfo = SCRIPT_COLORS[script.color];
-            const isLatest = script.version === sortedScripts[0]?.version;
+            const colorKey = (script.color || "WHITE") as keyof typeof SCRIPT_COLORS;
+            const colorInfo = SCRIPT_COLORS[colorKey] || SCRIPT_COLORS.WHITE;
+            const isLatest = sortedScripts.indexOf(script) === 0;
+            const displayVersion = typeof script.version === "string" ? script.version : String(script.version);
+            const displayName = script.fileName || `Script v${displayVersion}`;
 
             return (
               <div
@@ -182,13 +289,13 @@ export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium truncate">{script.fileName}</p>
+                    <p className="font-medium truncate">{displayName}</p>
                     {isLatest && (
                       <Badge variant="default" className="text-[10px]">CURRENT</Badge>
                     )}
                   </div>
                   <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
-                    <span>Version {script.version}</span>
+                    <span>Version {displayVersion}</span>
                     <span>·</span>
                     <span
                       className="flex items-center gap-1"
@@ -213,16 +320,20 @@ export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon-sm" asChild>
-                    <a href={script.fileUrl} target="_blank" rel="noopener noreferrer">
-                      <Eye className="h-4 w-4" />
-                    </a>
-                  </Button>
-                  <Button variant="ghost" size="icon-sm" asChild>
-                    <a href={script.fileUrl} download>
-                      <Download className="h-4 w-4" />
-                    </a>
-                  </Button>
+                  {script.fileUrl && (
+                    <>
+                      <Button variant="ghost" size="icon-sm" asChild>
+                        <a href={script.fileUrl} target="_blank" rel="noopener noreferrer">
+                          <Eye className="h-4 w-4" />
+                        </a>
+                      </Button>
+                      <Button variant="ghost" size="icon-sm" asChild>
+                        <a href={script.fileUrl} download>
+                          <Download className="h-4 w-4" />
+                        </a>
+                      </Button>
+                    </>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon-sm"
@@ -241,7 +352,7 @@ export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
           <FileText className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
           <h3 className="font-medium mb-1">No script uploaded</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Upload your script to keep track of revisions
+            Upload your script to auto-generate scenes, cast, and elements
           </p>
           <Button onClick={() => setShowUpload(true)}>
             <Upload className="h-4 w-4 mr-1" />
@@ -307,9 +418,9 @@ export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
             </Button>
             <Button
               onClick={handleUpload}
-              disabled={!uploadData.fileUrl || loading}
+              disabled={!uploadData.fileUrl || loading || startingJob}
             >
-              {loading ? "Uploading..." : "Upload Script"}
+              {loading ? "Uploading..." : "Upload & Analyze Script"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -326,11 +437,79 @@ export function ScriptSection({ projectId, scripts }: ScriptSectionProps) {
           newVersion={scriptChanges.newVersion}
           onApplyChanges={(selectedActions) => {
             console.log("Applying actions:", selectedActions);
-            // In a real implementation, this would update the breakdowns
             setScriptChanges(null);
           }}
         />
       )}
+    </div>
+  );
+}
+
+// Progress panel subcomponent
+function AgentProgressPanel({
+  job,
+  isRunning,
+  isFailed,
+  onRetry,
+}: {
+  job: any;
+  isRunning: boolean;
+  isFailed: boolean;
+  onRetry: () => void;
+}) {
+  const stepInfo = STEP_DEFINITIONS[job.status as AgentJobStatus];
+  const progress = job.progressPercent || 0;
+
+  if (isFailed) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30 p-4">
+        <div className="flex items-start gap-3">
+          <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="font-medium text-red-900 dark:text-red-100">Analysis Failed</h3>
+            <p className="text-sm text-red-800 dark:text-red-200 mt-1">
+              {job.errorMessage || "An unexpected error occurred during script analysis."}
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-2"
+              onClick={onRetry}
+            >
+              <RotateCcw className="h-3.5 w-3.5 mr-1" />
+              Retry Analysis
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Running state
+  return (
+    <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30 p-4">
+      <div className="flex items-start gap-3">
+        <Loader2 className="h-5 w-5 text-blue-600 dark:text-blue-400 animate-spin shrink-0 mt-0.5" />
+        <div className="flex-1">
+          <h3 className="font-medium text-blue-900 dark:text-blue-100">Analyzing Script</h3>
+          <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
+            {job.stepDescription || stepInfo?.description || "Processing..."}
+          </p>
+          {/* Progress bar */}
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-xs text-blue-700 dark:text-blue-300 mb-1">
+              <span>Step {job.currentStep} of {job.totalSteps}</span>
+              <span>{progress}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-blue-200 dark:bg-blue-800 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-blue-600 dark:bg-blue-400 transition-all duration-500 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

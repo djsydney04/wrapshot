@@ -15,6 +15,7 @@ export type AgentJobStatus =
   | 'generating_synopses'
   | 'estimating_time'
   | 'creating_records'
+  | 'suggesting_crew'
   | 'completed'
   | 'failed'
   | 'cancelled';
@@ -102,6 +103,9 @@ export interface AgentContext {
   createdSceneIds: string[];
   createdElementIds: string[];
   createdCastIds: string[];
+
+  // Crew suggestions
+  suggestedCrewRoles: SuggestedCrewRole[];
 }
 
 // Reference types for cross-chunk consistency
@@ -185,6 +189,14 @@ export type ElementCategory =
   | 'QUESTIONS'
   | 'COMMENTS'
   | 'MISCELLANEOUS';
+
+// Suggested crew role from script analysis
+export interface SuggestedCrewRole {
+  role: string;
+  department: string;
+  reason: string;
+  priority: 'high' | 'medium' | 'low';
+}
 
 // Linked cast member result
 export interface LinkedCastMember {
