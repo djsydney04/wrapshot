@@ -21,10 +21,26 @@ export interface UpdateBudgetCategoryInput {
   allocatedBudget?: number;
 }
 
+function isMissingFinancialHeadColumnError(
+  error: {
+    code?: string;
+    message?: string;
+    details?: string;
+    hint?: string;
+  } | null,
+): boolean {
+  if (!error) return false;
+  if (error.code === "42703") return true;
+
+  const message =
+    `${error.message ?? ""} ${error.details ?? ""} ${error.hint ?? ""}`.toLowerCase();
+  return message.includes("financialheaduserid");
+}
+
 // Create a new budget category
 export async function createBudgetCategory(
   budgetId: string,
-  data: CreateBudgetCategoryInput
+  data: CreateBudgetCategoryInput,
 ): Promise<BudgetCategory> {
   const supabase = await createClient();
   const userId = await getCurrentUserId();
@@ -90,7 +106,7 @@ export async function createBudgetCategory(
 // Update a budget category
 export async function updateBudgetCategory(
   categoryId: string,
-  data: UpdateBudgetCategoryInput
+  data: UpdateBudgetCategoryInput,
 ): Promise<BudgetCategory> {
   const supabase = await createClient();
   const userId = await getCurrentUserId();
@@ -131,8 +147,10 @@ export async function updateBudgetCategory(
 
   if (data.code !== undefined) updateData.code = data.code;
   if (data.name !== undefined) updateData.name = data.name;
-  if (data.parentCategoryId !== undefined) updateData.parentCategoryId = data.parentCategoryId;
-  if (data.allocatedBudget !== undefined) updateData.allocatedBudget = data.allocatedBudget;
+  if (data.parentCategoryId !== undefined)
+    updateData.parentCategoryId = data.parentCategoryId;
+  if (data.allocatedBudget !== undefined)
+    updateData.allocatedBudget = data.allocatedBudget;
 
   const { data: category, error } = await supabase
     .from("BudgetCategory")
@@ -202,7 +220,7 @@ export async function deleteBudgetCategory(categoryId: string): Promise<void> {
 // Reorder budget categories
 export async function reorderBudgetCategories(
   budgetId: string,
-  orderedIds: string[]
+  orderedIds: string[],
 ): Promise<void> {
   const supabase = await createClient();
   const userId = await getCurrentUserId();
@@ -232,7 +250,7 @@ export async function reorderBudgetCategories(
       .from("BudgetCategory")
       .update({ sortOrder: index, updatedAt: new Date().toISOString() })
       .eq("id", id)
-      .eq("budgetId", budgetId)
+      .eq("budgetId", budgetId),
   );
 
   await Promise.all(updates);
@@ -244,7 +262,7 @@ export async function reorderBudgetCategories(
 
 async function getTopLevelCategoryWithBudget(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  categoryId: string
+  categoryId: string,
 ) {
   const { data: category, error } = await supabase
     .from("BudgetCategory")
@@ -277,36 +295,50 @@ async function getTopLevelCategoryWithBudget(
 async function checkFinanceManager(
   supabase: Awaited<ReturnType<typeof createClient>>,
   projectId: string,
-  userId: string
+  userId: string,
 ): Promise<boolean> {
-  const [{ data: membership }, { data: project }] = await Promise.all([
-    supabase
-      .from("ProjectMember")
-      .select("role")
-      .eq("projectId", projectId)
-      .eq("userId", userId)
-      .single(),
-    supabase
-      .from("Project")
-      .select("financialHeadUserId")
-      .eq("id", projectId)
-      .single(),
-  ]);
+  const [{ data: membership }, { data: project, error: projectError }] =
+    await Promise.all([
+      supabase
+        .from("ProjectMember")
+        .select("role")
+        .eq("projectId", projectId)
+        .eq("userId", userId)
+        .single(),
+      supabase
+        .from("Project")
+        .select("financialHeadUserId")
+        .eq("id", projectId)
+        .maybeSingle(),
+    ]);
 
   if (!membership) return false;
 
+  let financialHeadUserId: string | null = null;
+  if (isMissingFinancialHeadColumnError(projectError)) {
+    const { data: existingProject } = await supabase
+      .from("Project")
+      .select("id")
+      .eq("id", projectId)
+      .maybeSingle();
+
+    if (!existingProject) return false;
+  } else if (projectError || !project) {
+    return false;
+  } else {
+    financialHeadUserId = project.financialHeadUserId ?? null;
+  }
+
   const role = membership.role as string;
   return (
-    role === "ADMIN" ||
-    role === "COORDINATOR" ||
-    project?.financialHeadUserId === userId
+    role === "ADMIN" || role === "COORDINATOR" || financialHeadUserId === userId
   );
 }
 
 // Assign a project member as department head for a top-level category
 export async function assignDepartmentHead(
   categoryId: string,
-  userId: string | null
+  userId: string | null,
 ): Promise<BudgetCategory> {
   const supabase = await createClient();
   const currentUserId = await getCurrentUserId();
@@ -315,9 +347,16 @@ export async function assignDepartmentHead(
     throw new Error("Not authenticated");
   }
 
-  const { category, budget } = await getTopLevelCategoryWithBudget(supabase, categoryId);
+  const { category, budget } = await getTopLevelCategoryWithBudget(
+    supabase,
+    categoryId,
+  );
 
-  const isManager = await checkFinanceManager(supabase, budget.projectId, currentUserId);
+  const isManager = await checkFinanceManager(
+    supabase,
+    budget.projectId,
+    currentUserId,
+  );
   if (!isManager) {
     throw new Error("Only finance managers can assign department heads");
   }
@@ -367,7 +406,7 @@ export async function assignDepartmentHead(
 
 // Department head (or finance manager) submits a department budget for review
 export async function submitDepartmentBudget(
-  categoryId: string
+  categoryId: string,
 ): Promise<BudgetCategory> {
   const supabase = await createClient();
   const currentUserId = await getCurrentUserId();
@@ -376,13 +415,22 @@ export async function submitDepartmentBudget(
     throw new Error("Not authenticated");
   }
 
-  const { category, budget } = await getTopLevelCategoryWithBudget(supabase, categoryId);
+  const { category, budget } = await getTopLevelCategoryWithBudget(
+    supabase,
+    categoryId,
+  );
 
-  const isManager = await checkFinanceManager(supabase, budget.projectId, currentUserId);
+  const isManager = await checkFinanceManager(
+    supabase,
+    budget.projectId,
+    currentUserId,
+  );
   const isAssigned = category.assignedUserId === currentUserId;
 
   if (!isManager && !isAssigned) {
-    throw new Error("Only the assigned department head or finance managers can submit");
+    throw new Error(
+      "Only the assigned department head or finance managers can submit",
+    );
   }
 
   const submittableStatuses: DepartmentBudgetStatus[] = [
@@ -391,7 +439,9 @@ export async function submitDepartmentBudget(
     "REVISION_REQUESTED",
   ];
   if (!submittableStatuses.includes(category.departmentStatus)) {
-    throw new Error(`Cannot submit a department with status "${category.departmentStatus}"`);
+    throw new Error(
+      `Cannot submit a department with status "${category.departmentStatus}"`,
+    );
   }
 
   const { data: updated, error } = await supabase
@@ -418,7 +468,7 @@ export async function submitDepartmentBudget(
 export async function reviewDepartmentBudget(
   categoryId: string,
   action: "APPROVE" | "REQUEST_REVISION",
-  reviewNotes?: string
+  reviewNotes?: string,
 ): Promise<BudgetCategory> {
   const supabase = await createClient();
   const currentUserId = await getCurrentUserId();
@@ -427,9 +477,16 @@ export async function reviewDepartmentBudget(
     throw new Error("Not authenticated");
   }
 
-  const { category, budget } = await getTopLevelCategoryWithBudget(supabase, categoryId);
+  const { category, budget } = await getTopLevelCategoryWithBudget(
+    supabase,
+    categoryId,
+  );
 
-  const isManager = await checkFinanceManager(supabase, budget.projectId, currentUserId);
+  const isManager = await checkFinanceManager(
+    supabase,
+    budget.projectId,
+    currentUserId,
+  );
   if (!isManager) {
     throw new Error("Only finance managers can review department budgets");
   }
@@ -447,7 +504,8 @@ export async function reviewDepartmentBudget(
       departmentStatus: newStatus,
       reviewedBy: currentUserId,
       reviewedAt: new Date().toISOString(),
-      reviewNotes: action === "REQUEST_REVISION" ? (reviewNotes?.trim() || null) : null,
+      reviewNotes:
+        action === "REQUEST_REVISION" ? reviewNotes?.trim() || null : null,
       updatedAt: new Date().toISOString(),
     })
     .eq("id", categoryId)
@@ -464,7 +522,7 @@ export async function reviewDepartmentBudget(
 
 // Finance manager reopens an approved department for further edits
 export async function reopenDepartmentBudget(
-  categoryId: string
+  categoryId: string,
 ): Promise<BudgetCategory> {
   const supabase = await createClient();
   const currentUserId = await getCurrentUserId();
@@ -473,9 +531,16 @@ export async function reopenDepartmentBudget(
     throw new Error("Not authenticated");
   }
 
-  const { category, budget } = await getTopLevelCategoryWithBudget(supabase, categoryId);
+  const { category, budget } = await getTopLevelCategoryWithBudget(
+    supabase,
+    categoryId,
+  );
 
-  const isManager = await checkFinanceManager(supabase, budget.projectId, currentUserId);
+  const isManager = await checkFinanceManager(
+    supabase,
+    budget.projectId,
+    currentUserId,
+  );
   if (!isManager) {
     throw new Error("Only finance managers can reopen department budgets");
   }

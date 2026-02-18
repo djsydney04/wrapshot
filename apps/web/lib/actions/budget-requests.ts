@@ -3,9 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCurrentUserId, requireProjectPermission } from "@/lib/permissions/server";
+import {
+  getCurrentUserId,
+  requireProjectPermission,
+} from "@/lib/permissions/server";
 
-type ProjectRole = "ADMIN" | "COORDINATOR" | "DEPARTMENT_HEAD" | "CREW" | "CAST" | "VIEWER";
+type ProjectRole =
+  | "ADMIN"
+  | "COORDINATOR"
+  | "DEPARTMENT_HEAD"
+  | "CREW"
+  | "CAST"
+  | "VIEWER";
 
 export type DepartmentBudgetRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
 
@@ -46,7 +55,25 @@ export interface BudgetRequestPermissions {
   assignedDepartmentCategoryIds: string[];
 }
 
-async function getPermissionContext(projectId: string): Promise<BudgetRequestPermissions> {
+function isMissingFinancialHeadColumnError(
+  error: {
+    code?: string;
+    message?: string;
+    details?: string;
+    hint?: string;
+  } | null,
+): boolean {
+  if (!error) return false;
+  if (error.code === "42703") return true;
+
+  const message =
+    `${error.message ?? ""} ${error.details ?? ""} ${error.hint ?? ""}`.toLowerCase();
+  return message.includes("financialheaduserid");
+}
+
+async function getPermissionContext(
+  projectId: string,
+): Promise<BudgetRequestPermissions> {
   const supabase = await createClient();
   const userId = await getCurrentUserId();
 
@@ -54,32 +81,52 @@ async function getPermissionContext(projectId: string): Promise<BudgetRequestPer
     throw new Error("Not authenticated");
   }
 
-  const [{ data: membership, error: membershipError }, { data: project, error: projectError }] =
-    await Promise.all([
-      supabase
-        .from("ProjectMember")
-        .select("role")
-        .eq("projectId", projectId)
-        .eq("userId", userId)
-        .single(),
-      supabase
-        .from("Project")
-        .select("financialHeadUserId")
-        .eq("id", projectId)
-        .single(),
-    ]);
+  const { data: membership, error: membershipError } = await supabase
+    .from("ProjectMember")
+    .select("role")
+    .eq("projectId", projectId)
+    .eq("userId", userId)
+    .single();
 
   if (membershipError || !membership) {
     throw new Error("Unauthorized: Not a member of this project");
   }
 
-  if (projectError || !project) {
+  let project: { financialHeadUserId: string | null } | null = null;
+  const { data: projectWithHead, error: projectError } = await supabase
+    .from("Project")
+    .select("financialHeadUserId")
+    .eq("id", projectId)
+    .maybeSingle();
+
+  if (isMissingFinancialHeadColumnError(projectError)) {
+    const { data: existingProject, error: existingProjectError } =
+      await supabase
+        .from("Project")
+        .select("id")
+        .eq("id", projectId)
+        .maybeSingle();
+
+    if (existingProjectError || !existingProject) {
+      throw new Error("Project not found");
+    }
+
+    project = { financialHeadUserId: null };
+  } else if (projectError || !projectWithHead) {
     throw new Error("Project not found");
+  } else {
+    project = {
+      financialHeadUserId: projectWithHead.financialHeadUserId ?? null,
+    };
   }
 
   const role = membership.role as ProjectRole;
   const isFinancialHead = project.financialHeadUserId === userId;
-  const canSubmitRequests = ["ADMIN", "COORDINATOR", "DEPARTMENT_HEAD"].includes(role);
+  const canSubmitRequests = [
+    "ADMIN",
+    "COORDINATOR",
+    "DEPARTMENT_HEAD",
+  ].includes(role);
   const canManageRequests =
     role === "ADMIN" || role === "COORDINATOR" || isFinancialHead;
 
@@ -103,13 +150,13 @@ async function getPermissionContext(projectId: string): Promise<BudgetRequestPer
 }
 
 export async function getBudgetRequestPermissions(
-  projectId: string
+  projectId: string,
 ): Promise<BudgetRequestPermissions> {
   return getPermissionContext(projectId);
 }
 
 export async function getDepartmentBudgetRequests(
-  budgetId: string
+  budgetId: string,
 ): Promise<DepartmentBudgetRequest[]> {
   const supabase = await createClient();
   const userId = await getCurrentUserId();
@@ -143,13 +190,15 @@ export async function getDepartmentBudgetRequests(
 }
 
 export async function createDepartmentBudgetRequest(
-  input: CreateDepartmentBudgetRequestInput
+  input: CreateDepartmentBudgetRequestInput,
 ): Promise<DepartmentBudgetRequest> {
   const supabase = await createClient();
   const permissions = await getPermissionContext(input.projectId);
 
   if (!permissions.canSubmitRequests) {
-    throw new Error("Unauthorized: You do not have permission to submit budget requests");
+    throw new Error(
+      "Unauthorized: You do not have permission to submit budget requests",
+    );
   }
 
   const requestedAmount = Number(input.requestedAmount);
@@ -222,7 +271,7 @@ export async function createDepartmentBudgetRequest(
 export async function reviewDepartmentBudgetRequest(
   requestId: string,
   status: "APPROVED" | "REJECTED",
-  reviewNotes?: string
+  reviewNotes?: string,
 ): Promise<DepartmentBudgetRequest> {
   const supabase = await createClient();
   const userId = await getCurrentUserId();
@@ -243,7 +292,9 @@ export async function reviewDepartmentBudgetRequest(
 
   const permissions = await getPermissionContext(request.projectId);
   if (!permissions.canManageRequests) {
-    throw new Error("Unauthorized: You do not have permission to review budget requests");
+    throw new Error(
+      "Unauthorized: You do not have permission to review budget requests",
+    );
   }
 
   if (request.status !== "PENDING") {
@@ -274,7 +325,10 @@ export async function reviewDepartmentBudgetRequest(
       .eq("id", category.id);
 
     if (categoryUpdateError) {
-      console.error("Error applying approved amount to category allocation:", categoryUpdateError);
+      console.error(
+        "Error applying approved amount to category allocation:",
+        categoryUpdateError,
+      );
       throw new Error("Failed to apply approved amount to category allocation");
     }
   }
@@ -303,7 +357,7 @@ export async function reviewDepartmentBudgetRequest(
 
 export async function setProjectFinancialHead(
   projectId: string,
-  financialHeadUserId: string | null
+  financialHeadUserId: string | null,
 ): Promise<void> {
   const supabase = await createClient();
   const adminClient = createAdminClient();

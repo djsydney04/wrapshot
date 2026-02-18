@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   updateBudgetLineItem,
   deleteBudgetLineItem,
@@ -84,9 +85,12 @@ export function BudgetLineItemRow({
     units: lineItem.units,
     fringePercent: lineItem.fringePercent.toString(),
   });
-  const [isSaving, setIsSaving] = React.useState(false);
+  const [saveState, setSaveState] = React.useState<"idle" | "saving" | "saved">("idle");
   const [showActions, setShowActions] = React.useState(false);
   const saveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const refreshDebounceRef = React.useRef<NodeJS.Timeout | null>(null);
+  const statusResetRef = React.useRef<NodeJS.Timeout | null>(null);
+  const lastSavedToastAtRef = React.useRef(0);
 
   // Calculate estimated total
   const estimatedTotal = React.useMemo(() => {
@@ -106,7 +110,7 @@ export function BudgetLineItemRow({
       }
 
       saveTimeoutRef.current = setTimeout(async () => {
-        setIsSaving(true);
+        setSaveState("saving");
         try {
           const updates: Record<string, unknown> = {};
 
@@ -123,11 +127,30 @@ export function BudgetLineItemRow({
           }
 
           await updateBudgetLineItem(lineItem.id, updates);
-          onUpdate?.();
+          setSaveState("saved");
+          if (statusResetRef.current) {
+            clearTimeout(statusResetRef.current);
+          }
+          statusResetRef.current = setTimeout(() => {
+            setSaveState("idle");
+          }, 1200);
+
+          if (refreshDebounceRef.current) {
+            clearTimeout(refreshDebounceRef.current);
+          }
+          refreshDebounceRef.current = setTimeout(() => {
+            onUpdate?.();
+          }, 700);
+
+          const now = Date.now();
+          if (now - lastSavedToastAtRef.current > 2500) {
+            toast.success("Line item saved");
+            lastSavedToastAtRef.current = now;
+          }
         } catch (error) {
           console.error("Error saving line item:", error);
-        } finally {
-          setIsSaving(false);
+          toast.error("Failed to save line item");
+          setSaveState("idle");
         }
       }, 300);
     },
@@ -139,6 +162,12 @@ export function BudgetLineItemRow({
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
+      }
+      if (refreshDebounceRef.current) {
+        clearTimeout(refreshDebounceRef.current);
+      }
+      if (statusResetRef.current) {
+        clearTimeout(statusResetRef.current);
       }
     };
   }, []);
@@ -163,11 +192,14 @@ export function BudgetLineItemRow({
 
   const handleDelete = async () => {
     if (!canEdit) return;
+    if (!confirm(`Delete line item "${lineItem.description}"?`)) return;
     try {
       await deleteBudgetLineItem(lineItem.id);
+      toast.success("Line item deleted");
       onDelete?.();
     } catch (error) {
       console.error("Error deleting line item:", error);
+      toast.error("Failed to delete line item");
     }
   };
 
@@ -299,9 +331,20 @@ export function BudgetLineItemRow({
 
       {/* Total */}
       <div className="w-24 flex-shrink-0 text-right">
-        <span className={cn("text-sm font-medium", isSaving && "text-muted-foreground")}>
+        <span
+          className={cn(
+            "text-sm font-medium",
+            saveState === "saving" && "text-muted-foreground"
+          )}
+        >
           {formatCurrency(estimatedTotal)}
         </span>
+        {saveState === "saving" && (
+          <p className="text-[10px] text-muted-foreground">Saving...</p>
+        )}
+        {saveState === "saved" && (
+          <p className="text-[10px] text-emerald-600">Saved</p>
+        )}
       </div>
 
       {/* Actions */}

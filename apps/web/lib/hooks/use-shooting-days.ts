@@ -8,6 +8,10 @@ interface UseShootingDaysOptions {
   projectId?: string;
 }
 
+interface FetchShootingDaysOptions {
+  silent?: boolean;
+}
+
 // Type for Supabase response row
 interface SupabaseShootingDayRow {
   id: string;
@@ -54,16 +58,29 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const shootingDayIdsRef = useRef<Set<string>>(new Set());
+  const isFetchingRef = useRef(false);
+  const pendingSilentFetchRef = useRef(false);
+  const realtimeRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supabase = useMemo(() => createClient(), []);
 
-  const fetchShootingDays = useCallback(async () => {
+  const fetchShootingDays = useCallback(async ({ silent = false }: FetchShootingDaysOptions = {}) => {
     if (!projectId) {
       setShootingDays([]);
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    if (isFetchingRef.current) {
+      if (silent) {
+        pendingSilentFetchRef.current = true;
+      }
+      return;
+    }
+
+    isFetchingRef.current = true;
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -100,14 +117,39 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
       console.error("Error fetching shooting days:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch shooting days");
     } finally {
-      setLoading(false);
+      isFetchingRef.current = false;
+      if (!silent) {
+        setLoading(false);
+      }
+
+      if (pendingSilentFetchRef.current) {
+        pendingSilentFetchRef.current = false;
+        void fetchShootingDays({ silent: true });
+      }
     }
   }, [projectId, supabase]);
 
+  const queueRealtimeRefresh = useCallback(() => {
+    if (realtimeRefreshTimeoutRef.current) {
+      clearTimeout(realtimeRefreshTimeoutRef.current);
+    }
+    realtimeRefreshTimeoutRef.current = setTimeout(() => {
+      void fetchShootingDays({ silent: true });
+    }, 250);
+  }, [fetchShootingDays]);
+
   // Initial fetch
   useEffect(() => {
-    fetchShootingDays();
+    void fetchShootingDays();
   }, [fetchShootingDays]);
+
+  useEffect(() => {
+    return () => {
+      if (realtimeRefreshTimeoutRef.current) {
+        clearTimeout(realtimeRefreshTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Subscribe to realtime updates
   useEffect(() => {
@@ -128,8 +170,7 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
           filter: `projectId=eq.${projectId}`,
         },
         () => {
-          // Refetch on any change
-          fetchShootingDays();
+          queueRealtimeRefresh();
         }
       )
       .on(
@@ -150,7 +191,7 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
             return;
           }
 
-          fetchShootingDays();
+          queueRealtimeRefresh();
         }
       )
       .subscribe();
@@ -158,13 +199,13 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [projectId, supabase, fetchShootingDays]);
+  }, [projectId, queueRealtimeRefresh, supabase]);
 
   return {
     shootingDays,
     loading,
     error,
-    refetch: fetchShootingDays,
+    refetch: () => fetchShootingDays(),
   };
 }
 

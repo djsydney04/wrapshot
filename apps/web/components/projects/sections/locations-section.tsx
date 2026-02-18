@@ -16,6 +16,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { AddLocationForm } from "@/components/forms/add-location-form";
+import { LocationIntelligencePanel } from "@/components/projects/sections/location-intelligence-panel";
+import { cn } from "@/lib/utils";
 import {
   deleteLocation,
   updateLocation,
@@ -27,6 +29,7 @@ import {
 
 interface LocationsSectionProps {
   projectId: string;
+  projectName?: string;
   locations: Location[];
   onRefresh?: () => void;
 }
@@ -35,6 +38,7 @@ interface LocationEditState {
   id: string;
   name: string;
   address: string;
+  immediateArea: string;
   locationType: LocationType;
   interiorExterior: IntExt;
   permitStatus: PermitStatus;
@@ -52,6 +56,7 @@ function toDateInput(value: string | null): string {
 
 export function LocationsSection({
   projectId,
+  projectName,
   locations,
   onRefresh,
 }: LocationsSectionProps) {
@@ -60,10 +65,29 @@ export function LocationsSection({
   const [saving, setSaving] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
   const [localLocations, setLocalLocations] = React.useState<Location[]>(locations);
+  const [selectedLocationId, setSelectedLocationId] = React.useState<string | null>(
+    locations[0]?.id ?? null
+  );
 
   React.useEffect(() => {
     setLocalLocations(locations);
   }, [locations]);
+
+  React.useEffect(() => {
+    if (localLocations.length === 0) {
+      setSelectedLocationId(null);
+      return;
+    }
+
+    if (!selectedLocationId || !localLocations.some((location) => location.id === selectedLocationId)) {
+      setSelectedLocationId(localLocations[0].id);
+    }
+  }, [localLocations, selectedLocationId]);
+
+  const selectedLocation = React.useMemo(
+    () => localLocations.find((location) => location.id === selectedLocationId) || null,
+    [localLocations, selectedLocationId]
+  );
 
   const handleDelete = async (locationId: string) => {
     if (!confirm("Delete this location?")) return;
@@ -81,6 +105,7 @@ export function LocationsSection({
       id: location.id,
       name: location.name,
       address: location.address || "",
+      immediateArea: location.immediateArea || "",
       locationType: location.locationType,
       interiorExterior: location.interiorExterior,
       permitStatus: location.permitStatus,
@@ -98,6 +123,7 @@ export function LocationsSection({
     const { data, error } = await updateLocation(editing.id, {
       name: editing.name,
       address: editing.address || undefined,
+      immediateArea: editing.immediateArea || undefined,
       locationType: editing.locationType,
       interiorExterior: editing.interiorExterior,
       permitStatus: editing.permitStatus,
@@ -143,13 +169,32 @@ export function LocationsSection({
             </thead>
             <tbody className="divide-y divide-border">
               {localLocations.map((location) => (
-                <tr key={location.id} className="hover:bg-muted/30 transition-colors">
+                <tr
+                  key={location.id}
+                  className={cn(
+                    "cursor-pointer transition-colors hover:bg-muted/30",
+                    selectedLocationId === location.id && "bg-primary/5"
+                  )}
+                  onClick={() => setSelectedLocationId(location.id)}
+                >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <p className="text-sm font-medium">{location.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium">{location.name}</p>
+                          {selectedLocationId === location.id && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              Selected
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground">{location.address || "No address"}</p>
+                        {location.immediateArea && (
+                          <p className="text-xs text-muted-foreground">
+                            Area: {location.immediateArea}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -162,14 +207,24 @@ export function LocationsSection({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="icon-sm" onClick={() => openEditor(location)}>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openEditor(location);
+                        }}
+                      >
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon-sm"
                         className="text-muted-foreground hover:text-destructive"
-                        onClick={() => handleDelete(location.id)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleDelete(location.id);
+                        }}
                         disabled={deletingId === location.id}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -193,6 +248,14 @@ export function LocationsSection({
             Add First Location
           </Button>
         </div>
+      )}
+
+      {localLocations.length > 0 && (
+        <LocationIntelligencePanel
+          projectId={projectId}
+          projectName={projectName}
+          location={selectedLocation}
+        />
       )}
 
       <AddLocationForm
@@ -226,6 +289,18 @@ export function LocationsSection({
                     onChange={(event) =>
                       setEditing((prev) => (prev ? { ...prev, address: event.target.value } : prev))
                     }
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Immediate Filming Area</label>
+                  <Input
+                    value={editing.immediateArea}
+                    onChange={(event) =>
+                      setEditing((prev) =>
+                        prev ? { ...prev, immediateArea: event.target.value } : prev
+                      )
+                    }
+                    placeholder="e.g., 3-block radius around Main & 6th"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">

@@ -3,7 +3,7 @@ import { Resend } from "resend";
 import { renderToBuffer } from "@react-pdf/renderer";
 import React from "react";
 import { createClient } from "@/lib/supabase/server";
-import { getFullCallSheetData } from "@/lib/actions/call-sheets";
+import { getFullCallSheetDataForProject } from "@/lib/data/call-sheets";
 import { CallSheetPdf } from "@/lib/pdf/call-sheet-pdf";
 
 export const runtime = "nodejs";
@@ -22,7 +22,7 @@ function getResend(): Resend {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ shootingDayId: string }> }
+  { params }: { params: Promise<{ shootingDayId: string }> },
 ) {
   try {
     const { shootingDayId } = await params;
@@ -41,16 +41,23 @@ export async function POST(
     const { recipients } = body;
 
     if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
-      return NextResponse.json({ error: "Recipients are required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Recipients are required" },
+        { status: 400 },
+      );
     }
 
     // Validate emails
     const validRecipients = recipients.filter(
-      (r: { name: string; email: string }) => r.email && typeof r.email === "string"
+      (r: { name: string; email: string }) =>
+        r.email && typeof r.email === "string",
     );
 
     if (validRecipients.length === 0) {
-      return NextResponse.json({ error: "No valid email addresses" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No valid email addresses" },
+        { status: 400 },
+      );
     }
 
     // Get shooting day to find projectId
@@ -61,19 +68,28 @@ export async function POST(
       .single();
 
     if (sdError || !shootingDay) {
-      return NextResponse.json({ error: "Shooting day not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Shooting day not found" },
+        { status: 404 },
+      );
     }
 
     // Get full call sheet data
-    const { data, error: dataError } = await getFullCallSheetData(shootingDayId, shootingDay.projectId);
+    const { data, error: dataError } = await getFullCallSheetDataForProject(
+      shootingDayId,
+      shootingDay.projectId,
+    );
 
     if (dataError || !data) {
-      return NextResponse.json({ error: dataError || "Failed to load data" }, { status: 500 });
+      return NextResponse.json(
+        { error: dataError || "Failed to load data" },
+        { status: 500 },
+      );
     }
 
     // Generate PDF
     const pdfBuffer = await renderToBuffer(
-      React.createElement(CallSheetPdf, { data }) as any
+      React.createElement(CallSheetPdf, { data }) as any,
     );
 
     const projectName = data.project?.name || "Production";
@@ -100,7 +116,11 @@ export async function POST(
     let dateStr = "";
     try {
       const d = new Date(data.shootingDay.date);
-      dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      dateStr = d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
     } catch {
       dateStr = data.shootingDay.date;
     }
@@ -130,14 +150,17 @@ export async function POST(
             },
           ],
           replyTo: user.email || undefined,
-        })
+        }),
     );
 
     const results = await Promise.allSettled(emailPromises);
     const failures = results.filter((r) => r.status === "rejected");
 
     if (failures.length === results.length) {
-      return NextResponse.json({ error: "Failed to send all emails" }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to send all emails" },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({
@@ -147,6 +170,9 @@ export async function POST(
     });
   } catch (error) {
     console.error("Distribute API error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

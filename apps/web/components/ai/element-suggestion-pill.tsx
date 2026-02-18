@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles, Plus, X, Loader2 } from "lucide-react";
+import { Lightbulb, Plus, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ElementSuggestion } from "@/lib/stores/ai-store";
 import {
@@ -53,7 +53,7 @@ export function ElementSuggestionPill({
           isAccepting && "bg-primary/10 border-primary/50"
         )}
       >
-        <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
+        <Lightbulb className="h-3.5 w-3.5 text-primary shrink-0" />
 
         <Tooltip>
           <TooltipTrigger asChild>
@@ -149,7 +149,7 @@ export function GhostElementItem({
           isDismissing && "opacity-0 scale-95 h-0 pb-0 mb-0 overflow-hidden"
         )}
       >
-        <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
+        <Lightbulb className="h-3.5 w-3.5 text-primary shrink-0" />
 
         <Tooltip>
           <TooltipTrigger asChild>

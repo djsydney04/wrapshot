@@ -12,6 +12,7 @@ export interface LocationInput {
   projectId: string;
   name: string;
   address?: string;
+  immediateArea?: string;
   latitude?: number;
   longitude?: number;
   locationType?: LocationType;
@@ -35,6 +36,7 @@ export interface Location {
   projectId: string;
   name: string;
   address: string | null;
+  immediateArea: string | null;
   latitude: number | null;
   longitude: number | null;
   locationType: LocationType;
@@ -125,6 +127,7 @@ export async function createLocation(input: LocationInput) {
       projectId: input.projectId,
       name: input.name,
       address: input.address || null,
+      immediateArea: input.immediateArea || null,
       latitude: input.latitude || null,
       longitude: input.longitude || null,
       locationType: input.locationType || "PRACTICAL",

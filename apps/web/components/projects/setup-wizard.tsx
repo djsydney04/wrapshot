@@ -11,7 +11,7 @@ import {
   Users,
   UserCircle,
   Clapperboard,
-  Sparkles,
+  Lightbulb,
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -170,12 +170,12 @@ export function SetupWizard({
 
         // Auto-start the agent analysis
         setScriptState("analyzing");
-        const jobId = await startJob(projectId, newScriptId, "script_analysis");
+        const { jobId, error: jobError } = await startJob(projectId, newScriptId, "script_analysis");
 
         if (jobId) {
           setActiveJobId(jobId);
         } else {
-          setAnalysisError("Failed to start script analysis");
+          setAnalysisError(jobError || "Failed to start script analysis");
           setScriptState("error");
         }
       } else {
@@ -194,11 +194,11 @@ export function SetupWizard({
     setScriptState("analyzing");
     setAnalysisError(null);
 
-    const jobId = await startJob(projectId, uploadedScriptId, "script_analysis");
+    const { jobId, error: jobError } = await startJob(projectId, uploadedScriptId, "script_analysis");
     if (jobId) {
       setActiveJobId(jobId);
     } else {
-      setAnalysisError("Failed to start script analysis");
+      setAnalysisError(jobError || "Failed to start script analysis");
       setScriptState("error");
     }
   };
@@ -224,7 +224,7 @@ export function SetupWizard({
         );
 
       case "script":
-        // Combined script upload + AI analysis step
+        // Combined script upload + Smart analysis step
         return (
           <div className="py-4">
             {/* Initial upload state */}
@@ -232,7 +232,7 @@ export function SetupWizard({
               <>
                 <div className="text-center mb-6">
                   <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                    <Sparkles className="h-8 w-8 text-primary" />
+                    <Lightbulb className="h-8 w-8 text-primary" />
                   </div>
                   <h2 className="text-xl font-semibold mb-2">Upload Your Script</h2>
                   <p className="text-muted-foreground max-w-sm mx-auto">
@@ -511,7 +511,7 @@ export function SetupWizard({
           {currentStep !== "script" && currentStep !== "welcome" && scriptState === "analyzing" && (
             <div className="mx-6 mt-4 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin text-primary" />
-              <span>AI is still analyzing your script in the background{job?.progressPercent ? ` (${job.progressPercent}%)` : ""}...</span>
+              <span>Smart is still analyzing your script in the background{job?.progressPercent ? ` (${job.progressPercent}%)` : ""}...</span>
             </div>
           )}
 
@@ -552,7 +552,7 @@ export function SetupWizard({
                       <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>
                   )}
-                  {/* During analysis, let user continue while AI works in background */}
+                  {/* During analysis, let user continue while Smart works in background */}
                   {(scriptState === "uploading" || scriptState === "analyzing") && (
                     <Button onClick={handleNext} variant={scriptState === "uploading" ? "ghost" : "default"} disabled={scriptState === "uploading"}>
                       {scriptState === "uploading" ? (
@@ -562,7 +562,7 @@ export function SetupWizard({
                         </>
                       ) : (
                         <>
-                          Continue while AI works
+                          Continue while Smart works
                           <ChevronRight className="h-4 w-4 ml-1" />
                         </>
                       )}

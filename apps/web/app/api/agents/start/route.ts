@@ -1,7 +1,7 @@
 /**
  * POST /api/agents/start
  *
- * Initiates an AI agent job for script analysis or schedule planning.
+ * Initiates a Smart agent job for script analysis or schedule planning.
  * Returns immediately with jobId - processing continues via next/server after().
  */
 
@@ -200,7 +200,7 @@ export async function POST(request: Request) {
     if (!fireworksKey) {
       console.error('[AgentStart] FIREWORKS_SECRET_KEY is not set in environment');
       return NextResponse.json(
-        { error: 'AI service is not configured. Set FIREWORKS_SECRET_KEY in your environment.' },
+        { error: 'Smart service is not configured. Set FIREWORKS_SECRET_KEY in your environment.' },
         { status: 503 }
       );
     }

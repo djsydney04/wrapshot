@@ -19,6 +19,7 @@ import {
   updateBudgetLineItem,
   type LineItemUnits,
 } from "@/lib/actions/budget-line-items";
+import { toast } from "sonner";
 import type { BudgetLineItem } from "@/lib/actions/budgets";
 
 interface AddLineItemFormProps {
@@ -185,10 +186,13 @@ export function AddLineItemForm({
         });
       }
 
+      toast.success(isEditMode ? "Line item updated" : "Line item added");
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save line item");
+      const message = err instanceof Error ? err.message : "Failed to save line item";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }

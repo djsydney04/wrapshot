@@ -62,6 +62,7 @@ export function CallSheetEditor({
   onBack,
 }: CallSheetEditorProps) {
   const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [publishing, setPublishing] = React.useState(false);
   const [downloadingPdf, setDownloadingPdf] = React.useState(false);
@@ -97,7 +98,8 @@ export function CallSheetEditor({
   React.useEffect(() => {
     async function load() {
       setLoading(true);
-      const { data } = await getFullCallSheetData(shootingDay.id, projectId);
+      setLoadError(null);
+      const { data, error } = await getFullCallSheetData(shootingDay.id, projectId);
       if (data) {
         setFullData(data);
         setNearestHospital(data.callSheet.nearestHospital || "");
@@ -126,6 +128,8 @@ export function CallSheetEditor({
             notes: dc.notes || "",
           }))
         );
+      } else {
+        setLoadError(error || "Failed to load call sheet data.");
       }
       setLoading(false);
     }
@@ -133,9 +137,12 @@ export function CallSheetEditor({
   }, [shootingDay.id, projectId]);
 
   const reloadCallSheetData = React.useCallback(async () => {
-    const { data } = await getFullCallSheetData(shootingDay.id, projectId);
+    const { data, error } = await getFullCallSheetData(shootingDay.id, projectId);
     if (data) {
+      setLoadError(null);
       setFullData(data);
+    } else if (error) {
+      setLoadError(error);
     }
   }, [shootingDay.id, projectId]);
 
@@ -356,7 +363,7 @@ export function CallSheetEditor({
   if (!fullData) {
     return (
       <div className="text-center py-12 text-muted-foreground">
-        Failed to load call sheet data.
+        {loadError || "Failed to load call sheet data."}
       </div>
     );
   }

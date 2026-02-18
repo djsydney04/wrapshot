@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { KimiClient } from "@/lib/ai/kimi-client";
+import { buildAiCacheKey, getAiCachedResponse, setAiCachedResponse } from "@/lib/ai/cache";
 import {
   SCRIPT_DIFF_PROMPT,
   SCRIPT_DIFF_USER_TEMPLATE,
@@ -28,6 +29,16 @@ interface DiffResponse {
   summary: DiffSummary;
 }
 
+interface ScriptDiffResult {
+  changes: SceneChange[];
+  summary: DiffSummary;
+  previousVersion?: number;
+  newVersion?: number;
+  analyzedAt: string;
+}
+
+const SCRIPT_DIFF_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30;
+
 export async function POST(request: Request) {
   const startTime = Date.now();
 
@@ -43,14 +54,56 @@ export async function POST(request: Request) {
     }
 
     // 2. Parse input
-    const body = await request.json();
+    const body = (await request.json()) as {
+      projectId?: string;
+      previousScript?: string;
+      newScript?: string;
+      previousVersion?: number;
+      newVersion?: number;
+      forceRefresh?: boolean;
+    };
     const { projectId, previousScript, newScript, previousVersion, newVersion } = body;
+    const forceRefresh = Boolean(body.forceRefresh);
 
     if (!previousScript || !newScript) {
       return NextResponse.json(
         { error: "Both previousScript and newScript are required" },
         { status: 400 }
       );
+    }
+
+    const cacheKey = buildAiCacheKey({
+      scope: projectId || user.id,
+      previousScript,
+      newScript,
+      previousVersion: previousVersion || null,
+      newVersion: newVersion || null,
+    });
+
+    if (!forceRefresh) {
+      const cached = await getAiCachedResponse<ScriptDiffResult>(supabase, {
+        endpoint: "/api/ai/script-diff",
+        cacheKey,
+      });
+
+      if (cached) {
+        const processingTime = Date.now() - startTime;
+        await supabase.from("AIProcessingLog").insert({
+          projectId,
+          userId: user.id,
+          endpoint: "/api/ai/script-diff",
+          processingTimeMs: processingTime,
+          success: true,
+          metadata: {
+            changesCount: cached.changes.length,
+            previousVersion,
+            newVersion,
+            cacheHit: true,
+          },
+        });
+
+        return NextResponse.json({ data: cached, meta: { cached: true } });
+      }
     }
 
     // 3. Build the user message
@@ -74,7 +127,7 @@ export async function POST(request: Request) {
     const parsed = KimiClient.extractJson<DiffResponse>(response);
 
     // Validate and structure the response
-    const result = {
+    const result: ScriptDiffResult = {
       changes: (parsed.changes || []).map((change) => ({
         sceneNumber: change.sceneNumber || "Unknown",
         changeType: change.changeType || "modified",
@@ -94,6 +147,15 @@ export async function POST(request: Request) {
       analyzedAt: new Date().toISOString(),
     };
 
+    await setAiCachedResponse(supabase, {
+      endpoint: "/api/ai/script-diff",
+      cacheKey,
+      projectId: projectId || undefined,
+      userId: user.id,
+      response: result,
+      ttlSeconds: SCRIPT_DIFF_CACHE_TTL_SECONDS,
+    });
+
     // 6. Log the processing
     const processingTime = Date.now() - startTime;
     await supabase.from("AIProcessingLog").insert({
@@ -106,6 +168,7 @@ export async function POST(request: Request) {
         changesCount: result.changes.length,
         previousVersion,
         newVersion,
+        cacheHit: false,
       },
     });
 
@@ -122,7 +185,7 @@ export async function POST(request: Request) {
       await supabase.from("AISuggestion").insert(suggestionRecords);
     }
 
-    return NextResponse.json({ data: result });
+    return NextResponse.json({ data: result, meta: { cached: false } });
   } catch (error) {
     console.error("Script diff error:", error);
 

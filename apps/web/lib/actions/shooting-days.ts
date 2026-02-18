@@ -379,10 +379,9 @@ export async function updateDepartmentCallTimes(
     .from("CallSheet")
     .select("id")
     .eq("shootingDayId", shootingDayId)
-    .single();
+    .maybeSingle();
 
-  if (fetchError && fetchError.code !== "PGRST116") {
-    // PGRST116 = no rows returned
+  if (fetchError) {
     console.error("Error fetching call sheet:", fetchError);
     return { success: false, error: fetchError.message };
   }
@@ -491,13 +490,9 @@ export async function getShootingDayDepartments(shootingDayId: string) {
     `
     )
     .eq("shootingDayId", shootingDayId)
-    .single();
+    .maybeSingle();
 
   if (fetchError) {
-    if (fetchError.code === "PGRST116") {
-      // No call sheet exists yet
-      return { data: [], error: null };
-    }
     console.error("Error fetching department calls:", fetchError);
     return { data: null, error: fetchError.message };
   }

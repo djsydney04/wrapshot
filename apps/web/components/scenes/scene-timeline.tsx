@@ -18,7 +18,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronLeft, ChevronRight, FileText, Users, Image as ImageIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, Users, Image as ImageIcon, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -236,6 +236,7 @@ function TimelineCard({
   };
 
   const sceneCastCount = scene.cast?.length || 0;
+  const sceneElementCount = scene.elementDetails?.length || 0;
 
   return (
     <div
@@ -287,6 +288,12 @@ function TimelineCard({
               <span className="flex items-center gap-0.5">
                 <Users className="h-2.5 w-2.5" />
                 {sceneCastCount}
+              </span>
+            )}
+            {sceneElementCount > 0 && (
+              <span className="flex items-center gap-0.5">
+                <Package className="h-2.5 w-2.5" />
+                {sceneElementCount}
               </span>
             )}
           </div>

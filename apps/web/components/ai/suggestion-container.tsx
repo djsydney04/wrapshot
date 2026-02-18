@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles, RefreshCw, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { Lightbulb, RefreshCw, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useElementSuggestions } from "@/lib/hooks/use-element-suggestions";
@@ -71,7 +71,7 @@ export function SuggestionContainer({
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-primary/10 transition-colors"
       >
-        <Sparkles className="h-4 w-4 text-primary" />
+        <Lightbulb className="h-4 w-4 text-primary" />
         <span className="flex-1 text-primary">
           Wrapshot Intelligence Suggestions
           {pendingSuggestions.length > 0 && (

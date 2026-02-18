@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { InviteStatusBadge } from "@/components/ui/invite-status-badge";
 import { cn } from "@/lib/utils";
 import { type CrewMemberWithInviteStatus } from "@/lib/actions/crew";
+import { PROJECT_ROLE_LABELS, PROJECT_ROLE_COLORS } from "@/lib/permissions";
 
 interface CrewCardProps {
   member: CrewMemberWithInviteStatus;
@@ -39,6 +40,11 @@ export function CrewCard({
           <p className="text-xs text-muted-foreground truncate">{member.role}</p>
         </div>
         <div className="flex items-center gap-2">
+          {member.projectRole && (
+            <Badge variant="outline" className={cn("text-[10px] flex-shrink-0", PROJECT_ROLE_COLORS[member.projectRole])}>
+              {PROJECT_ROLE_LABELS[member.projectRole]}
+            </Badge>
+          )}
           {member.inviteStatus && (
             <InviteStatusBadge
               status={member.inviteStatus}
@@ -79,6 +85,11 @@ export function CrewCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="font-medium">{member.name}</p>
+          {member.projectRole && (
+            <Badge variant="outline" className={cn("text-[10px]", PROJECT_ROLE_COLORS[member.projectRole])}>
+              {PROJECT_ROLE_LABELS[member.projectRole]}
+            </Badge>
+          )}
           {member.inviteStatus && (
             <InviteStatusBadge
               status={member.inviteStatus}

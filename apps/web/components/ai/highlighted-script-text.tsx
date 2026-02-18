@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Lightbulb, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ElementHoverCard } from "./element-hover-card";
 
@@ -132,7 +132,7 @@ export function HighlightedScriptText({
           onClick={analyzeText}
           className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
         >
-          <Sparkles className="h-3.5 w-3.5" />
+          <Lightbulb className="h-3.5 w-3.5" />
           Analyze script for elements
         </button>
       )}

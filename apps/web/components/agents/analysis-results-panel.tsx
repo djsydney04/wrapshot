@@ -352,7 +352,7 @@ export function AnalysisResultsPanel({
         <div>
           <h3 className="font-semibold text-base">Script Analysis Results</h3>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Here&apos;s what the AI found. Review below, then edit in each
+            Here&apos;s what smart analysis found. Review below, then edit in each
             section.
           </p>
         </div>

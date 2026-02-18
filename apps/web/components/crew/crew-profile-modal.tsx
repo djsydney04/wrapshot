@@ -18,25 +18,30 @@ import {
 } from "@/components/ui/dialog";
 import { DEPARTMENT_LABELS } from "@/lib/types";
 import {
-  type CrewMember,
+  type CrewMemberWithInviteStatus,
   type CrewMemberInput,
   type DepartmentType,
 } from "@/lib/actions/crew";
+import { CrewAccessPanel } from "@/components/crew/crew-access-panel";
 
 interface CrewProfileModalProps {
-  member: CrewMember;
+  member: CrewMemberWithInviteStatus;
+  projectId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDelete: (id: string) => void | Promise<void>;
   onUpdate: (id: string, updates: Partial<CrewMemberInput>) => void | Promise<void>;
+  onAccessChanged?: () => void;
 }
 
 export function CrewProfileModal({
   member,
+  projectId,
   open,
   onOpenChange,
   onDelete,
   onUpdate,
+  onAccessChanged,
 }: CrewProfileModalProps) {
   const [isEditing, setIsEditing] = React.useState(false);
   const [editData, setEditData] = React.useState({
@@ -83,7 +88,7 @@ export function CrewProfileModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent onClose={() => onOpenChange(false)} className="max-w-md">
+      <DialogContent onClose={() => onOpenChange(false)} className="max-w-lg">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Edit Profile" : "Crew Profile"}
@@ -238,6 +243,15 @@ export function CrewProfileModal({
               </>
             )}
           </div>
+
+          {/* Access & Permissions Panel (view mode only) */}
+          {!isEditing && (
+            <CrewAccessPanel
+              member={member}
+              projectId={projectId}
+              onAccessChanged={onAccessChanged}
+            />
+          )}
         </DialogBody>
 
         <DialogFooter>

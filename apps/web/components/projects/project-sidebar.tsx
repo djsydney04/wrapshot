@@ -10,10 +10,10 @@ import {
   Clapperboard,
   Package,
   MapPin,
-  UserPlus,
   DollarSign,
   Settings,
   ClipboardList,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,12 +22,12 @@ export type ProjectSection =
   | "script"
   | "schedule"
   | "callsheets"
+  | "assistant"
   | "cast"
   | "crew"
   | "locations"
   | "scenes"
   | "gear"
-  | "team"
   | "budget"
   | "settings";
 
@@ -50,7 +50,6 @@ interface ProjectSidebarProps {
     locations?: number;
     gear: number;
     hasScript: boolean;
-    team?: number;
     budgets?: number;
   };
   className?: string;
@@ -64,13 +63,13 @@ export function ProjectSidebar({
 }: ProjectSidebarProps) {
   const sections: SectionItem[] = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
+    { id: "assistant", label: "Smart Assistant", icon: MessageSquare },
     { id: "scenes", label: "Scenes", icon: Clapperboard, count: counts.scenes },
     { id: "schedule", label: "Schedule", icon: Calendar, count: counts.shootingDays },
     { id: "callsheets", label: "Call Sheets", icon: ClipboardList, count: counts.callSheets },
     { id: "cast", label: "Cast", icon: Users, count: counts.cast },
     { id: "crew", label: "Crew", icon: UserCircle, count: counts.crew },
     { id: "locations", label: "Locations", icon: MapPin, count: counts.locations },
-    { id: "team", label: "Team Access", icon: UserPlus, count: counts.team },
     { id: "gear", label: "Elements & Props", icon: Package, count: counts.gear },
     { id: "budget", label: "Budget", icon: DollarSign, count: counts.budgets },
     { id: "script", label: "Script", icon: FileText },

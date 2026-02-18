@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Trash2, Clock, Users, ChevronDown, ChevronUp } from "lucide-react";
+import { GripVertical, Trash2, Clock, Users, ChevronDown, ChevronUp, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -76,6 +76,7 @@ export const SceneStrip = React.forwardRef<HTMLDivElement, SceneStripProps>(
   ) => {
     const stripColor = getStripColor(scene.intExt, scene.dayNight);
     const castCount = scene.cast?.length || 0;
+    const sceneElements = scene.elementDetails || [];
     const locationName = scene.location?.name || scene.setName || "No location";
     const hasExpandableContent = Boolean(scene.synopsis || scene.notes);
 
@@ -153,6 +154,12 @@ export const SceneStrip = React.forwardRef<HTMLDivElement, SceneStripProps>(
                   {castCount}
                 </span>
               )}
+              {sceneElements.length > 0 && (
+                <span className="flex items-center gap-1">
+                  <Package className="h-3.5 w-3.5" />
+                  {sceneElements.length}
+                </span>
+              )}
               <span className="flex items-center gap-1">
                 <Clock className="h-3.5 w-3.5" />
                 {scene.pageEighths ? `${scene.pageEighths}/8` : `${scene.pageCount} pg`}
@@ -208,6 +215,18 @@ export const SceneStrip = React.forwardRef<HTMLDivElement, SceneStripProps>(
           {isExpanded && scene.notes && (
             <div className="mt-2 rounded-md bg-background/60 px-3 py-2 text-xs text-muted-foreground">
               {scene.notes}
+            </div>
+          )}
+
+          {isExpanded && sceneElements.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1 px-0.5">
+              {sceneElements.map((element) => (
+                <Badge key={element.id} variant="secondary" className="text-[10px]">
+                  {element.name}
+                  {element.taskType ? ` • ${element.taskType.replace("_", " ")}` : ""}
+                  {element.assignedCrew?.name ? ` • ${element.assignedCrew.name}` : ""}
+                </Badge>
+              ))}
             </div>
           )}
 
@@ -277,6 +296,17 @@ export const SceneStrip = React.forwardRef<HTMLDivElement, SceneStripProps>(
       <span className={cn("flex-1 truncate", stripTextClasses[sceneSize])}>{locationName}</span>
 
       {/* Page Count */}
+      {sceneElements.length > 0 && (
+        <span
+          className={cn(
+            "flex items-center gap-0.5 text-muted-foreground",
+            sceneSize === "expanded" ? "text-xs" : "text-[10px]"
+          )}
+        >
+          <Package className="h-3 w-3" />
+          {sceneElements.length}
+        </span>
+      )}
       <span className={cn("text-muted-foreground", sceneSize === "expanded" ? "text-xs" : "text-[10px]")}>
         {scene.pageEighths ? `${scene.pageEighths}/8` : `${scene.pageCount}pg`}
       </span>

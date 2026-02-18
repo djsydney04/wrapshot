@@ -19,7 +19,6 @@ import {
   Wrench,
   HardHat,
   Dog,
-  Sparkles,
   Cog,
   Monitor,
   MapPin,
@@ -76,7 +75,7 @@ const BREAKDOWN_CATEGORIES: {
   { category: "SOUND", label: "Sound", icon: <Volume2 className="h-4 w-4" />, color: "bg-cyan-500/10 text-cyan-700", column: "left" },
   { category: "MUSIC", label: "Music", icon: <Music className="h-4 w-4" />, color: "bg-violet-500/10 text-violet-700", column: "left" },
   { category: "STUNT", label: "Stunts", icon: <Zap className="h-4 w-4" />, color: "bg-red-500/10 text-red-700", column: "left" },
-  { category: "SFX", label: "Special Effects", icon: <Sparkles className="h-4 w-4" />, color: "bg-orange-500/10 text-orange-700", column: "left" },
+  { category: "SFX", label: "Special Effects", icon: <Lightbulb className="h-4 w-4" />, color: "bg-orange-500/10 text-orange-700", column: "left" },
   { category: "ART_DEPARTMENT", label: "Art Department", icon: <Paintbrush className="h-4 w-4" />, color: "bg-teal-500/10 text-teal-700", column: "left" },
   // Right column
   { category: "SET_DRESSING", label: "Set Dressing", icon: <Sofa className="h-4 w-4" />, color: "bg-emerald-500/10 text-emerald-700", column: "right" },
@@ -85,7 +84,7 @@ const BREAKDOWN_CATEGORIES: {
   { category: "ADDITIONAL_LABOR", label: "Additional Labor", icon: <HardHat className="h-4 w-4" />, color: "bg-amber-500/10 text-amber-700", column: "right" },
   { category: "ANIMAL", label: "Animals", icon: <Dog className="h-4 w-4" />, color: "bg-lime-500/10 text-lime-700", column: "right" },
   { category: "ANIMAL_WRANGLER", label: "Animal Wrangler", icon: <Dog className="h-4 w-4" />, color: "bg-lime-600/10 text-lime-800", column: "right" },
-  { category: "VFX", label: "Visual Effects", icon: <Sparkles className="h-4 w-4" />, color: "bg-purple-500/10 text-purple-700", column: "right" },
+  { category: "VFX", label: "Visual Effects", icon: <Lightbulb className="h-4 w-4" />, color: "bg-purple-500/10 text-purple-700", column: "right" },
   { category: "MECHANICAL_EFFECTS", label: "Mechanical Effects", icon: <Cog className="h-4 w-4" />, color: "bg-stone-500/10 text-stone-700", column: "right" },
   { category: "VIDEO_PLAYBACK", label: "Video Playback", icon: <Monitor className="h-4 w-4" />, color: "bg-sky-500/10 text-sky-700", column: "right" },
   { category: "LOCATION_NOTES", label: "Location Notes", icon: <MapPin className="h-4 w-4" />, color: "bg-emerald-600/10 text-emerald-800", column: "right" },
@@ -124,7 +123,7 @@ export function SceneBreakdownEditor({
   const [saving, setSaving] = React.useState(false);
   const [hasChanges, setHasChanges] = React.useState(false);
 
-  // AI element suggestions
+  // Smart element suggestions
   const {
     getSuggestionsForCategory,
     acceptSuggestion,
@@ -140,7 +139,7 @@ export function SceneBreakdownEditor({
     autoFetch: true,
   });
 
-  // Handle accepting an AI suggestion
+  // Handle accepting a Smart suggestion
   const handleAcceptSuggestion = async (suggestion: ElementSuggestion) => {
     // Create the element if it doesn't exist
     const newElement = await handleCreateElement(suggestion.category, suggestion.name);

@@ -1,9 +1,13 @@
 /**
  * Kimi K2.5 API client for script analysis
- * Uses Fireworks AI as the inference provider
+ * Uses Fireworks AI as the inference provider, instrumented with PostHog LLM analytics
  */
-import { getFireworksApiKey } from "@/lib/ai/config";
+import { getFireworksClient } from "@/lib/ai/fireworks";
 import { JsonParser } from "@/lib/agents/utils/json-parser";
+import type { OpenAI } from "@posthog/ai";
+import type { ChatCompletion } from "openai/resources/chat/completions";
+import type { Stream } from "openai/streaming";
+import type { ChatCompletionChunk } from "openai/resources/chat/completions";
 
 interface KimiMessage {
   role: "system" | "user" | "assistant";
@@ -15,166 +19,94 @@ interface KimiCompletionOptions {
   maxTokens?: number;
   temperature?: number;
   timeout?: number;
-}
-
-interface KimiResponse {
-  choices: {
-    message: {
-      content: string;
-    };
-  }[];
+  /** PostHog distinct ID for user attribution */
+  posthogDistinctId?: string;
+  /** PostHog trace ID for grouping related calls */
+  posthogTraceId?: string;
+  /** Extra PostHog properties */
+  posthogProperties?: Record<string, unknown>;
 }
 
 export class KimiClient {
-  private apiKey: string;
-  private baseUrl = "https://api.fireworks.ai/inference/v1/chat/completions";
+  private client: OpenAI;
   private model = "accounts/fireworks/models/kimi-k2p5";
 
   constructor(apiKey?: string) {
-    this.apiKey = getFireworksApiKey(apiKey);
-    if (!this.apiKey) {
-      throw new Error(
-        "Fireworks API key missing. Set FIREWORKS_SECRET_KEY (or FIREWORKS_API_KEY) in apps/web/.env.local."
-      );
-    }
+    this.client = getFireworksClient(apiKey);
   }
 
   async complete(options: KimiCompletionOptions): Promise<string> {
-    const { messages, maxTokens = 4000, temperature = 0.1, timeout = 120000 } = options;
+    const {
+      messages,
+      maxTokens = 4000,
+      temperature = 0.1,
+      timeout = 120000,
+      posthogDistinctId,
+      posthogTraceId,
+      posthogProperties,
+    } = options;
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    const response = (await this.client.chat.completions.create(
+      {
+        model: this.model,
+        messages,
+        max_tokens: maxTokens,
+        temperature,
+        posthogDistinctId,
+        posthogTraceId,
+        posthogProperties,
+        posthogCaptureImmediate: true,
+      } as Parameters<typeof this.client.chat.completions.create>[0],
+      { timeout },
+    )) as ChatCompletion;
 
-    try {
-      const response = await fetch(this.baseUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: this.model,
-          messages,
-          max_tokens: maxTokens,
-          temperature,
-        }),
-        signal: controller.signal,
-      });
+    const content = response.choices?.[0]?.message?.content;
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Kimi API error:", response.status, errorText);
-
-        // Provide more specific error messages
-        if (response.status === 429) {
-          throw new Error(`Kimi API rate limit exceeded (429)`);
-        }
-        if (response.status >= 500) {
-          throw new Error(`Kimi API server error (${response.status})`);
-        }
-        throw new Error(`Kimi API error: ${response.status}`);
-      }
-
-      let data: KimiResponse;
-      try {
-        data = await response.json();
-      } catch {
-        throw new Error("Kimi API returned invalid JSON response");
-      }
-
-      const content = data.choices?.[0]?.message?.content;
-
-      if (!content) {
-        throw new Error(
-          `No content in Kimi response (choices: ${data.choices?.length ?? 0})`
-        );
-      }
-
-      return content;
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error(`Kimi API timeout after ${timeout}ms`);
-      }
-      throw error;
-    } finally {
-      clearTimeout(timeoutId);
+    if (!content) {
+      throw new Error(
+        `No content in Kimi response (choices: ${response.choices?.length ?? 0})`,
+      );
     }
+
+    return content;
   }
 
   /**
    * Streaming completion for real-time UI updates
    */
-  async *completeStreaming(options: KimiCompletionOptions): AsyncGenerator<string> {
-    const { messages, maxTokens = 4000, temperature = 0.1, timeout = 180000 } = options;
+  async *completeStreaming(
+    options: KimiCompletionOptions,
+  ): AsyncGenerator<string> {
+    const {
+      messages,
+      maxTokens = 4000,
+      temperature = 0.1,
+      timeout = 180000,
+      posthogDistinctId,
+      posthogTraceId,
+      posthogProperties,
+    } = options;
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-    const response = await fetch(this.baseUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
+    const stream = (await this.client.chat.completions.create(
+      {
         model: this.model,
         messages,
         max_tokens: maxTokens,
         temperature,
         stream: true,
-      }),
-      signal: controller.signal,
-    });
+        posthogDistinctId,
+        posthogTraceId,
+        posthogProperties,
+        posthogCaptureImmediate: true,
+      } as Parameters<typeof this.client.chat.completions.create>[0],
+      { timeout },
+    )) as Stream<ChatCompletionChunk>;
 
-    if (!response.ok) {
-      clearTimeout(timeoutId);
-      const errorText = await response.text();
-      console.error("Kimi API error:", response.status, errorText);
-      throw new Error(`Kimi API error: ${response.status}`);
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      clearTimeout(timeoutId);
-      throw new Error("No response body");
-    }
-
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed === "data: [DONE]") continue;
-          if (!trimmed.startsWith("data: ")) continue;
-
-          try {
-            const json = JSON.parse(trimmed.slice(6));
-            const content = json.choices?.[0]?.delta?.content;
-            if (content) {
-              yield content;
-            }
-          } catch {
-            // Skip malformed JSON chunks
-          }
-        }
+    for await (const chunk of stream) {
+      const content = chunk.choices?.[0]?.delta?.content;
+      if (content) {
+        yield content;
       }
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error(`Kimi streaming API timeout after ${timeout}ms`);
-      }
-      throw error;
-    } finally {
-      clearTimeout(timeoutId);
-      reader.releaseLock();
     }
   }
 

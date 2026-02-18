@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
+import { DailyFilmSchedule } from "./daily-film-schedule";
 import {
   SlidePanel,
   SlidePanelHeader,
@@ -144,6 +145,13 @@ export function ShootingDayDetailPanel({
   const location = shootingDay.locationId
     ? locations.find((l) => l.id === shootingDay.locationId)
     : null;
+  const schedulePreviewDay: Partial<ShootingDay> = {
+    ...shootingDay,
+    generalCall: isEditing ? editedValues.generalCall : shootingDay.generalCall,
+    wrapTime: isEditing ? editedValues.wrapTime : shootingDay.wrapTime,
+    crewCall: isEditing ? editedValues.crewCall : shootingDay.crewCall,
+    talentCall: isEditing ? editedValues.talentCall : shootingDay.talentCall,
+  };
 
   const handleDelete = async () => {
     if (confirm("Are you sure you want to delete this shooting day?")) {
@@ -339,6 +347,14 @@ export function ShootingDayDetailPanel({
                   )}
                 </div>
               </div>
+            </SlidePanelSection>
+
+            <SlidePanelSection title="Daily Film Schedule">
+              <DailyFilmSchedule
+                shootingDay={schedulePreviewDay}
+                sceneCount={dayScenes.length}
+                description="Auto-built from this day's call times and film day pacing."
+              />
             </SlidePanelSection>
 
             {/* Location */}

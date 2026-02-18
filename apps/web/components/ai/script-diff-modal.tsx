@@ -12,7 +12,7 @@ import {
   ChevronRight,
   Check,
   X,
-  Sparkles,
+  Lightbulb,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -139,7 +139,7 @@ export function ScriptDiffModal({
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col" onClose={onClose}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
+            <Lightbulb className="h-5 w-5 text-primary" />
             Script Changes Detected
           </DialogTitle>
           <DialogDescription>

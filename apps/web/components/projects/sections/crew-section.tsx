@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, ChevronDown, ChevronRight, Users, Search } from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, Users, Search, BookUser } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ import {
   inviteCrewMember,
   resendCastCrewInvite,
 } from "@/lib/actions/cast-crew-invites";
+import { CrewDirectoryDialog } from "@/components/crew/crew-directory-dialog";
 import type { InviteStatus } from "@/components/ui/invite-status-badge";
 
 interface CrewSectionProps {
@@ -72,6 +73,7 @@ const CREW_PRESETS: Record<CrewPreset, { label: string; roles: CrewPresetRole[] 
 
 export function CrewSection({ projectId, crew }: CrewSectionProps) {
   const [showAddCrew, setShowAddCrew] = React.useState(false);
+  const [showDirectory, setShowDirectory] = React.useState(false);
   const [selectedMember, setSelectedMember] = React.useState<CrewMemberWithInviteStatus | null>(null);
   const [collapsedDepts, setCollapsedDepts] = React.useState<Set<DepartmentType>>(new Set());
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -254,6 +256,10 @@ export function CrewSection({ projectId, crew }: CrewSectionProps) {
               {addingPreset === preset ? "Adding..." : CREW_PRESETS[preset].label}
             </Button>
           ))}
+          <Button size="sm" variant="outline" onClick={() => setShowDirectory(true)}>
+            <BookUser className="h-4 w-4" />
+            Crew Directory
+          </Button>
           <Button size="sm" onClick={() => setShowAddCrew(true)}>
             <Plus className="h-4 w-4" />
             Add Crew Member
@@ -353,14 +359,24 @@ export function CrewSection({ projectId, crew }: CrewSectionProps) {
         }}
       />
 
+      {/* Crew Directory Dialog */}
+      <CrewDirectoryDialog
+        projectId={projectId}
+        open={showDirectory}
+        onOpenChange={setShowDirectory}
+        onCrewAdded={handleCrewAdded}
+      />
+
       {/* Crew Profile Modal */}
       {selectedMember && (
         <CrewProfileModal
           member={selectedMember}
+          projectId={projectId}
           open={!!selectedMember}
           onOpenChange={(open) => !open && setSelectedMember(null)}
           onDelete={handleDelete}
           onUpdate={handleUpdate}
+          onAccessChanged={handleCrewAdded}
         />
       )}
     </div>

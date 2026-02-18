@@ -14,6 +14,17 @@ export interface ElementInput {
   name: string;
   description?: string;
   notes?: string;
+  taskType?: ElementTaskType | null;
+  assignedToCrewId?: string | null;
+}
+
+export type ElementTaskType = "FIND" | "PICK_UP" | "SOURCE" | "PREP" | "OTHER";
+
+export interface ElementAssignee {
+  id: string;
+  name: string;
+  role: string;
+  department: string;
 }
 
 export interface Element {
@@ -23,6 +34,9 @@ export interface Element {
   name: string;
   description: string | null;
   notes: string | null;
+  taskType: ElementTaskType | null;
+  assignedToCrewId: string | null;
+  assignedCrew?: ElementAssignee | null;
   createdAt: string;
   updatedAt: string;
   // Joined data
@@ -49,7 +63,10 @@ export async function getElements(projectId: string) {
 
   const { data, error } = await supabase
     .from("Element")
-    .select("*")
+    .select(`
+      *,
+      assignedCrew:CrewMember(id, name, role, department)
+    `)
     .eq("projectId", projectId)
     .order("category", { ascending: true })
     .order("name", { ascending: true });
@@ -75,7 +92,10 @@ export async function getElementsByCategory(projectId: string, category: Element
 
   const { data, error } = await supabase
     .from("Element")
-    .select("*")
+    .select(`
+      *,
+      assignedCrew:CrewMember(id, name, role, department)
+    `)
     .eq("projectId", projectId)
     .eq("category", normalizedCategory)
     .order("name", { ascending: true });
@@ -101,6 +121,7 @@ export async function getElement(elementId: string) {
     .from("Element")
     .select(`
       *,
+      assignedCrew:CrewMember(id, name, role, department),
       sceneElements:SceneElement(
         id,
         quantity,
@@ -147,6 +168,8 @@ export async function createElement(input: ElementInput) {
       name: input.name,
       description: input.description || null,
       notes: input.notes || null,
+      taskType: input.taskType || null,
+      assignedToCrewId: input.assignedToCrewId || null,
     })
     .select()
     .single();
@@ -177,6 +200,12 @@ export async function updateElement(id: string, updates: Partial<ElementInput>) 
     ...(elementUpdates.category
       ? { category: normalizeElementCategoryForStorage(elementUpdates.category) }
       : {}),
+    ...(elementUpdates.taskType === undefined
+      ? {}
+      : { taskType: elementUpdates.taskType || null }),
+    ...(elementUpdates.assignedToCrewId === undefined
+      ? {}
+      : { assignedToCrewId: elementUpdates.assignedToCrewId || null }),
   };
 
   const { data, error } = await supabase
@@ -318,7 +347,10 @@ export async function getElementsWithSceneCounts(projectId: string) {
   // Get elements
   const { data: elements, error: elemError } = await supabase
     .from("Element")
-    .select("*")
+    .select(`
+      *,
+      assignedCrew:CrewMember(id, name, role, department)
+    `)
     .eq("projectId", projectId)
     .order("category", { ascending: true })
     .order("name", { ascending: true });

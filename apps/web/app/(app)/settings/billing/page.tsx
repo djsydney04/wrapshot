@@ -9,7 +9,7 @@ import {
   CreditCard,
   Download,
   Zap,
-  Sparkles,
+  Lightbulb,
   Crown,
   Loader2,
   AlertCircle,
@@ -35,7 +35,7 @@ const tierConfig: Record<string, {
   popular?: boolean;
 }> = {
   FREE: { icon: Zap, color: "text-muted-foreground", bg: "bg-muted" },
-  PRO: { icon: Sparkles, color: "text-[hsl(var(--badge-blue-fg))]", bg: "bg-[hsl(var(--badge-blue))]", popular: true },
+  PRO: { icon: Lightbulb, color: "text-[hsl(var(--badge-blue-fg))]", bg: "bg-[hsl(var(--badge-blue))]", popular: true },
   STUDIO: { icon: Crown, color: "text-[hsl(var(--badge-amber-fg))]", bg: "bg-[hsl(var(--badge-amber))]" },
 };
 
@@ -203,7 +203,7 @@ function BillingContent() {
                 {currentPlan === "STUDIO" ? (
                   <Crown className="h-5 w-5 text-[hsl(var(--badge-amber-fg))]" />
                 ) : currentPlan === "PRO" ? (
-                  <Sparkles className="h-5 w-5 text-[hsl(var(--badge-blue-fg))]" />
+                  <Lightbulb className="h-5 w-5 text-[hsl(var(--badge-blue-fg))]" />
                 ) : (
                   <Zap className="h-5 w-5 text-muted-foreground" />
                 )}

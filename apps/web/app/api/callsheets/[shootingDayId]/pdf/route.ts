@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import React from "react";
 import { createClient } from "@/lib/supabase/server";
-import { getFullCallSheetData } from "@/lib/actions/call-sheets";
+import { getFullCallSheetDataForProject } from "@/lib/data/call-sheets";
 import { CallSheetPdf } from "@/lib/pdf/call-sheet-pdf";
 
 export const runtime = "nodejs";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ shootingDayId: string }> }
+  { params }: { params: Promise<{ shootingDayId: string }> },
 ) {
   try {
     const { shootingDayId } = await params;
@@ -33,19 +33,28 @@ export async function GET(
       .single();
 
     if (sdError || !shootingDay) {
-      return NextResponse.json({ error: "Shooting day not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Shooting day not found" },
+        { status: 404 },
+      );
     }
 
     // Get full call sheet data
-    const { data, error } = await getFullCallSheetData(shootingDayId, shootingDay.projectId);
+    const { data, error } = await getFullCallSheetDataForProject(
+      shootingDayId,
+      shootingDay.projectId,
+    );
 
     if (error || !data) {
-      return NextResponse.json({ error: error || "Failed to load data" }, { status: 500 });
+      return NextResponse.json(
+        { error: error || "Failed to load data" },
+        { status: 500 },
+      );
     }
 
     // Render PDF
     const buffer = await renderToBuffer(
-      React.createElement(CallSheetPdf, { data }) as any
+      React.createElement(CallSheetPdf, { data }) as any,
     );
 
     const projectName = data.project?.name || "Production";
@@ -61,6 +70,9 @@ export async function GET(
     });
   } catch (error) {
     console.error("PDF generation error:", error);
-    return NextResponse.json({ error: "Failed to generate PDF" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to generate PDF" },
+      { status: 500 },
+    );
   }
 }

@@ -140,16 +140,16 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
       // Notify parent to refresh script list
       onScriptUploaded?.();
 
-      // Start the AI agent pipeline
+      // Start the Smart agent pipeline
       setActiveScriptId(dbScript.id);
-      const jobId = await startJob(projectId, dbScript.id, "script_analysis");
+      const { jobId, error: jobError } = await startJob(projectId, dbScript.id, "script_analysis");
       if (jobId) {
         toast.info("Script analysis started", {
-          description: "AI is analyzing your script for scenes, cast, and elements",
+          description: "Smart is analyzing your script for scenes, cast, and elements",
         });
       } else {
         toast.error("Failed to start script analysis", {
-          description: startJobError || "Check that the AI service is configured correctly",
+          description: jobError || "Check that the Smart service is configured correctly",
         });
       }
 
@@ -205,9 +205,13 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
 
   const handleRetryAnalysis = async () => {
     if (!activeScriptId) return;
-    const jobId = await startJob(projectId, activeScriptId, "script_analysis");
+    const { jobId, error: jobError } = await startJob(projectId, activeScriptId, "script_analysis");
     if (jobId) {
       toast.info("Retrying script analysis...");
+    } else {
+      toast.error("Failed to start script analysis", {
+        description: jobError || "Check that the Smart service is configured correctly",
+      });
     }
   };
 
@@ -382,7 +386,7 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
           <DialogHeader>
             <DialogTitle>Upload Script</DialogTitle>
             <DialogDescription>
-              Upload a new PDF version of your script for AI analysis
+              Upload a new PDF version of your script for Smart analysis
             </DialogDescription>
           </DialogHeader>
 

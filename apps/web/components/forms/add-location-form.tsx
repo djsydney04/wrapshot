@@ -25,6 +25,7 @@ interface AddLocationFormProps {
 const initialFormData = {
   name: "",
   address: "",
+  immediateArea: "",
   locationType: "PRACTICAL" as LocationType,
   interiorExterior: "BOTH" as IntExt,
   permitStatus: "NOT_STARTED" as PermitStatus,
@@ -58,6 +59,7 @@ export function AddLocationForm({
         projectId,
         name: formData.name,
         address: formData.address || undefined,
+        immediateArea: formData.immediateArea || undefined,
         locationType: formData.locationType,
         interiorExterior: formData.interiorExterior,
         permitStatus: formData.permitStatus,
@@ -111,6 +113,19 @@ export function AddLocationForm({
                   setFormData({ ...formData, address: e.target.value })
                 }
                 placeholder="Full street address"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1.5">
+                Immediate Filming Area
+              </label>
+              <Input
+                value={formData.immediateArea}
+                onChange={(e) =>
+                  setFormData({ ...formData, immediateArea: e.target.value })
+                }
+                placeholder="e.g., 3-block radius around Main & 6th"
               />
             </div>
 

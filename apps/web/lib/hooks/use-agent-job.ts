@@ -195,7 +195,7 @@ export function useStartAgentJob() {
     projectId: string,
     scriptId: string,
     jobType: 'script_analysis' | 'schedule_planning' = 'script_analysis'
-  ): Promise<string | null> => {
+  ): Promise<{ jobId: string | null; error: string | null }> => {
     setLoading(true);
     setError(null);
 
@@ -212,12 +212,12 @@ export function useStartAgentJob() {
         throw new Error(data.error || 'Failed to start agent job');
       }
 
-      return data.jobId;
+      return { jobId: data.jobId, error: null };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start job';
       console.error('Error starting agent job:', message);
       setError(message);
-      return null;
+      return { jobId: null, error: message };
     } finally {
       setLoading(false);
     }

@@ -6,12 +6,14 @@ import { useParams, useRouter } from "next/navigation";
 import {
   Film,
   Loader2,
+  AlertCircle,
   ChevronLeft,
   Settings,
   LogOut,
   ChevronDown,
   User,
   CreditCard,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,10 +36,10 @@ import { ScheduleSection } from "@/components/projects/sections/schedule-section
 import { ElementsSection } from "@/components/projects/sections/elements-section";
 import { LocationsSection } from "@/components/projects/sections/locations-section";
 import { ScriptSection } from "@/components/projects/sections/script-section";
-import { TeamSection } from "@/components/projects/sections/team-section";
 import { BudgetSection } from "@/components/projects/sections/budget-section";
 import { CallSheetsSection } from "@/components/projects/sections/callsheets-section";
 import { SettingsSection } from "@/components/projects/sections/settings-section";
+import { AssistantSection } from "@/components/projects/sections/assistant-section";
 import { SetupWizard } from "@/components/projects/setup-wizard";
 import { useProjectStore } from "@/lib/stores/project-store";
 import { getProject } from "@/lib/actions/projects";
@@ -75,17 +77,26 @@ type DataKey = "scenes" | "scripts" | "cast" | "crew" | "locations" | "elements"
 
 const SECTION_DATA_KEYS: Record<ProjectSection, DataKey[]> = {
   overview: ["scenes", "scripts", "cast", "crew"],
+  assistant: [],
   script: ["scripts"],
-  schedule: ["scenes", "locations"],
+  schedule: ["scenes", "locations", "cast"],
   callsheets: ["scenes", "cast", "crew"],
   cast: ["cast"],
   crew: ["crew"],
   locations: ["locations"],
-  scenes: ["scenes", "cast", "scripts"],
+  scenes: ["scenes", "cast"],
   gear: ["elements"],
-  team: [],
   budget: [],
   settings: [],
+};
+
+const DATA_KEY_LABEL: Record<DataKey, string> = {
+  scenes: "scenes",
+  scripts: "scripts",
+  cast: "cast",
+  crew: "crew",
+  locations: "locations",
+  elements: "elements",
 };
 
 export default function ProjectDetailPage() {
@@ -115,6 +126,14 @@ export default function ProjectDetailPage() {
     locations: false,
     elements: false,
   });
+  const [loadErrors, setLoadErrors] = React.useState<Record<DataKey, string | null>>({
+    scenes: null,
+    scripts: null,
+    cast: null,
+    crew: null,
+    locations: null,
+    elements: null,
+  });
   const loadedDataRef = React.useRef<Record<DataKey, boolean>>({
     scenes: false,
     scripts: false,
@@ -123,6 +142,7 @@ export default function ProjectDetailPage() {
     locations: false,
     elements: false,
   });
+  const inFlightLoadsRef = React.useRef<Partial<Record<DataKey, Promise<void>>>>({});
   const trackedProjectRef = React.useRef<string | null>(null);
 
   // Still using store for other data (not yet migrated to DB)
@@ -196,38 +216,60 @@ export default function ProjectDetailPage() {
   const loadDataKey = React.useCallback(
     async (key: DataKey, force = false) => {
       if (!force && loadedDataRef.current[key]) return;
-
-      try {
-        switch (key) {
-          case "scenes":
-            await loadScenesData();
-            break;
-          case "scripts":
-            await loadScriptsData();
-            break;
-          case "cast":
-            await loadCastData();
-            break;
-          case "crew":
-            await loadCrewData();
-            break;
-          case "locations":
-            await loadLocationsData();
-            break;
-          case "elements":
-            await loadElementsData();
-            break;
-          default:
-            break;
-        }
-
-        loadedDataRef.current[key] = true;
-        setLoadedData((previous) =>
-          previous[key] ? previous : { ...previous, [key]: true }
-        );
-      } catch (error) {
-        console.error(`Error loading ${key}:`, error);
+      if (inFlightLoadsRef.current[key]) {
+        await inFlightLoadsRef.current[key];
+        if (!force || loadedDataRef.current[key]) return;
       }
+
+      const loadPromise = (async () => {
+        setLoadErrors((previous) =>
+          previous[key] === null ? previous : { ...previous, [key]: null }
+        );
+
+        try {
+          switch (key) {
+            case "scenes":
+              await loadScenesData();
+              break;
+            case "scripts":
+              await loadScriptsData();
+              break;
+            case "cast":
+              await loadCastData();
+              break;
+            case "crew":
+              await loadCrewData();
+              break;
+            case "locations":
+              await loadLocationsData();
+              break;
+            case "elements":
+              await loadElementsData();
+              break;
+            default:
+              break;
+          }
+
+          loadedDataRef.current[key] = true;
+          setLoadedData((previous) =>
+            previous[key] ? previous : { ...previous, [key]: true }
+          );
+          setLoadErrors((previous) =>
+            previous[key] === null ? previous : { ...previous, [key]: null }
+          );
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : `Failed to load ${key}`;
+          console.error(`Error loading ${key}:`, error);
+          loadedDataRef.current[key] = false;
+          setLoadErrors((previous) => ({ ...previous, [key]: errorMessage }));
+        } finally {
+          delete inFlightLoadsRef.current[key];
+        }
+      })();
+
+      inFlightLoadsRef.current[key] = loadPromise;
+      await loadPromise;
     },
     [
       loadCastData,
@@ -267,6 +309,15 @@ export default function ProjectDetailPage() {
         locations: false,
         elements: false,
       });
+      setLoadErrors({
+        scenes: null,
+        scripts: null,
+        cast: null,
+        crew: null,
+        locations: null,
+        elements: null,
+      });
+      inFlightLoadsRef.current = {};
       trackedProjectRef.current = null;
       setDbScenes([]);
       setDbScripts([]);
@@ -299,6 +350,11 @@ export default function ProjectDetailPage() {
     void loadSectionData(activeSection);
   }, [activeSection, loadSectionData, loading]);
 
+  React.useEffect(() => {
+    if (loading || loadedData.scripts) return;
+    void loadDataKey("scripts");
+  }, [loadDataKey, loadedData.scripts, loading]);
+
   // Callback to refresh loaded data after analysis completes
   const refreshData = React.useCallback(async () => {
     const loadedKeys = (Object.keys(loadedDataRef.current) as DataKey[]).filter(
@@ -320,13 +376,13 @@ export default function ProjectDetailPage() {
   const storeCast = getCastForProject(projectId);
   const storeLocations = getLocationsForProject(projectId);
   const storeShootingDays = getShootingDaysForProject(projectId);
-  const { shootingDays: dbShootingDays } = useShootingDays({ projectId });
+  const { shootingDays: dbShootingDays, loading: shootingDaysLoading } = useShootingDays({ projectId });
   const gear = getGearForProject(projectId);
   const storeScripts = getScriptsForProject(projectId);
   const scripts = loadedData.scripts ? dbScripts : storeScripts;
   const scheduleLocations = loadedData.locations
     ? (dbLocations as any[])
-    : storeLocations;
+    : [];
   const elements = loadedData.elements ? dbElements : [];
 
   const monitoredScriptId = React.useMemo(() => {
@@ -456,9 +512,8 @@ export default function ProjectDetailPage() {
   const handleSectionChange = React.useCallback(
     (section: ProjectSection) => {
       setActiveSection(section);
-      void loadSectionData(section);
     },
-    [loadSectionData]
+    []
   );
 
   if (loading) {
@@ -490,7 +545,44 @@ export default function ProjectDetailPage() {
       : project.shootingDaysCount;
   const sidebarElementsCount = loadedData.elements ? elements.length : 0;
 
+  const activeSectionDataKeys = SECTION_DATA_KEYS[activeSection];
+  const activeSectionErrorKeys = activeSectionDataKeys.filter(
+    (key) => Boolean(loadErrors[key])
+  );
+  const activeSectionLoading =
+    activeSectionDataKeys.length > 0 &&
+    activeSectionDataKeys.some((key) => !loadedData[key]) &&
+    activeSectionErrorKeys.length === 0;
+
   const renderSection = () => {
+    if (activeSectionErrorKeys.length > 0) {
+      const labels = activeSectionErrorKeys.map((key) => DATA_KEY_LABEL[key]).join(", ");
+      return (
+        <div className="flex h-40 flex-col items-center justify-center gap-3 rounded-lg border border-border px-4 text-center">
+          <div className="flex items-center gap-2 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4" />
+            <span>Couldn&apos;t load {labels}.</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void loadSectionData(activeSection, true)}
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Retry
+          </Button>
+        </div>
+      );
+    }
+
+    if (activeSectionLoading) {
+      return (
+        <div className="flex h-40 items-center justify-center rounded-lg border border-border">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      );
+    }
+
     switch (activeSection) {
       case "overview":
         return (
@@ -515,13 +607,25 @@ export default function ProjectDetailPage() {
             onNavigate={(section) => handleSectionChange(section as ProjectSection)}
           />
         );
+      case "assistant":
+        return <AssistantSection projectId={projectId} />;
       case "schedule":
+        if (!loadedData.scenes || !loadedData.cast || shootingDaysLoading) {
+          return (
+            <div className="flex h-40 items-center justify-center rounded-lg border border-border">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          );
+        }
+
         return (
           <ScheduleSection
             projectId={projectId}
-            shootingDays={shootingDays}
+            shootingDays={dbShootingDays}
             scenes={scheduleScenes}
             locations={scheduleLocations as any}
+            stripeboardScenes={dbScenes}
+            stripeboardCast={cast}
             useMockData={false}
           />
         );
@@ -543,6 +647,7 @@ export default function ProjectDetailPage() {
         return (
           <LocationsSection
             projectId={projectId}
+            projectName={project.name}
             locations={dbLocations}
             onRefresh={refreshData}
           />
@@ -564,8 +669,6 @@ export default function ProjectDetailPage() {
             onRefresh={refreshData}
           />
         );
-      case "team":
-        return <TeamSection projectId={projectId} />;
       case "budget":
         return <BudgetSection projectId={projectId} />;
       case "settings":
@@ -670,7 +773,7 @@ export default function ProjectDetailPage() {
           {/* Mobile Section Tabs (hidden on desktop) */}
           <div className="md:hidden border-b border-border px-4 py-2 overflow-x-auto">
             <div className="flex gap-2">
-              {(["overview", "scenes", "cast", "crew", "locations", "team", "schedule", "callsheets", "gear", "budget", "script", "settings"] as ProjectSection[]).map(
+              {(["overview", "assistant", "scenes", "cast", "crew", "locations", "schedule", "callsheets", "gear", "budget", "script", "settings"] as ProjectSection[]).map(
                 (section) => (
                   <button
                     key={section}
@@ -681,7 +784,7 @@ export default function ProjectDetailPage() {
                         : "text-muted-foreground hover:bg-muted"
                     }`}
                   >
-                    {section === "team" ? "Team Access" : section === "callsheets" ? "Call Sheets" : section.charAt(0).toUpperCase() + section.slice(1)}
+                    {section === "callsheets" ? "Call Sheets" : section.charAt(0).toUpperCase() + section.slice(1)}
                   </button>
                 )
               )}

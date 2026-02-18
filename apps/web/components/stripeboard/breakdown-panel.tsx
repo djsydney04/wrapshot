@@ -173,7 +173,7 @@ export function BreakdownPanel({
           </div>
         </div>
 
-        {/* AI Time Estimation Widget */}
+        {/* Smart Time Estimation Widget */}
         <TimeEstimationWidget
           sceneId={scene.id}
           projectId={projectId}
@@ -191,7 +191,7 @@ export function BreakdownPanel({
           onEstimateChange={(hours) => handleChange("estimatedHours", hours)}
         />
 
-        {/* Synopsis with AI generation */}
+        {/* Synopsis with Smart generation */}
         <SmartSynopsisField
           sceneId={scene.id}
           projectId={projectId}

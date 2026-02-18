@@ -9,7 +9,7 @@ import {
   Search,
   Loader2,
   Package,
-  Sparkles,
+  Lightbulb,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,7 @@ interface BreakdownCategoryProps {
   onCreateNew: (name: string, notes?: string) => Promise<Element | null>;
   onUpdateQuantity?: (elementId: string, quantity: number) => void;
   defaultExpanded?: boolean;
-  // AI suggestion props
+  // Smart suggestion props
   suggestions?: ElementSuggestion[];
   onAcceptSuggestion?: (suggestion: ElementSuggestion) => Promise<void>;
   onDismissSuggestion?: (suggestionId: string) => void;
@@ -214,7 +214,7 @@ export function BreakdownCategory({
         <span className="ml-auto flex items-center gap-1.5">
           {pendingSuggestions.length > 0 && (
             <span className="text-xs text-primary bg-primary/10 px-1.5 py-0.5 rounded flex items-center gap-1">
-              <Sparkles className="h-3 w-3" />
+              <Lightbulb className="h-3 w-3" />
               {pendingSuggestions.length}
             </span>
           )}
@@ -230,7 +230,7 @@ export function BreakdownCategory({
       {isExpanded && (
         <TooltipProvider delayDuration={300}>
           <div className="px-3 py-2 space-y-2 bg-background">
-            {/* AI Suggested items (ghost items) */}
+            {/* Smart Suggested items (ghost items) */}
             {pendingSuggestions.length > 0 && (
               <div className="space-y-1 pb-2 mb-2 border-b border-dashed border-primary/20">
                 {pendingSuggestions.map((suggestion) => (
@@ -244,12 +244,12 @@ export function BreakdownCategory({
                       dismissingIds.has(suggestion.id) && "opacity-0 scale-95 h-0 py-0 overflow-hidden"
                     )}
                   >
-                    <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <Lightbulb className="h-3.5 w-3.5 text-primary shrink-0" />
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="flex-1 truncate text-muted-foreground">
                           {suggestion.name}
-                          <span className="ml-1.5 text-xs text-primary/60">(AI)</span>
+                          <span className="ml-1.5 text-xs text-primary/60">(Smart)</span>
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">

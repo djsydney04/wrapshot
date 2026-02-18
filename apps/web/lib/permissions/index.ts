@@ -127,6 +127,16 @@ export const PROJECT_ROLE_LABELS: Record<ProjectRole, string> = {
   VIEWER: "Viewer",
 };
 
+// Role badge colors (for UI display)
+export const PROJECT_ROLE_COLORS: Record<ProjectRole, string> = {
+  ADMIN: "bg-purple-500/10 text-purple-600 border-purple-500/20",
+  COORDINATOR: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+  DEPARTMENT_HEAD: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+  CREW: "bg-orange-500/10 text-orange-600 border-orange-500/20",
+  CAST: "bg-pink-500/10 text-pink-600 border-pink-500/20",
+  VIEWER: "bg-gray-500/10 text-gray-600 border-gray-500/20",
+};
+
 // Role descriptions
 export const PROJECT_ROLE_DESCRIPTIONS: Record<ProjectRole, string> = {
   ADMIN: "Full access to all project features and settings",

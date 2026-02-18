@@ -17,6 +17,7 @@ import {
   createBudgetCategory,
   updateBudgetCategory,
 } from "@/lib/actions/budget-categories";
+import { toast } from "sonner";
 import type { BudgetCategory } from "@/lib/actions/budgets";
 
 interface AddCategoryFormProps {
@@ -127,10 +128,13 @@ export function AddCategoryForm({
         });
       }
 
+      toast.success(isEditMode ? "Category updated" : "Category created");
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save category");
+      const message = err instanceof Error ? err.message : "Failed to save category";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }

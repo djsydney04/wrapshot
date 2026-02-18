@@ -96,6 +96,7 @@ Return ONLY the JSON object, no other text.`;
         temperature: 0.1,
         posthogDistinctId: user.id,
         posthogProperties: { feature: "receipt_parsing" },
+        posthogCaptureImmediate: true,
       } as Parameters<typeof client.chat.completions.create>[0],
     );
 
