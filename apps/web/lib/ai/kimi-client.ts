@@ -1,7 +1,9 @@
 /**
- * Kimi K2.5 API client for script analysis
- * Uses Fireworks AI as the inference provider, instrumented with PostHog LLM analytics
+ * Script analysis LLM client.
+ * Prefers Cerebras GLM 4.7 and falls back to Fireworks Kimi when needed.
  */
+import { getCerebrasClient } from "@/lib/ai/cerebras";
+import { getCerebrasApiKey } from "@/lib/ai/config";
 import { getFireworksClient } from "@/lib/ai/fireworks";
 import { JsonParser } from "@/lib/agents/utils/json-parser";
 import type { OpenAI } from "@posthog/ai";
@@ -29,10 +31,19 @@ interface KimiCompletionOptions {
 
 export class KimiClient {
   private client: OpenAI;
-  private model = "accounts/fireworks/models/kimi-k2p5";
+  private model: string;
 
   constructor(apiKey?: string) {
+    const cerebrasKey = getCerebrasApiKey();
+    if (cerebrasKey) {
+      this.client = getCerebrasClient(cerebrasKey);
+      this.model = process.env.CEREBRAS_MODEL || "zai-glm-4.7";
+      return;
+    }
+
     this.client = getFireworksClient(apiKey);
+    this.model =
+      process.env.FIREWORKS_MODEL || "accounts/fireworks/models/kimi-k2p5";
   }
 
   async complete(options: KimiCompletionOptions): Promise<string> {

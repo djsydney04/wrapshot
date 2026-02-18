@@ -5,7 +5,7 @@
  */
 
 import { KimiClient } from '@/lib/ai/kimi-client';
-import { getFireworksApiKey } from '@/lib/ai/config';
+import { getScriptAnalysisApiKey } from '@/lib/ai/config';
 import { JsonParser } from '../utils/json-parser';
 import { RetryHandler } from '../utils/retry-handler';
 import { LLM_CONFIG } from '../constants';
@@ -63,7 +63,7 @@ export async function executeSynopsisGenerator(
     };
   }
 
-  const apiKey = getFireworksApiKey();
+  const apiKey = getScriptAnalysisApiKey();
   if (!apiKey) {
     console.log('[SynopsisGenerator] No API key, skipping synopsis generation');
     return {

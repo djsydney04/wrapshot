@@ -13,7 +13,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { ScriptAnalysisAgent } from '@/lib/agents/script-analysis';
 import { JobManager } from '@/lib/agents/orchestrator/job-manager';
-import { getFireworksApiKey } from '@/lib/ai/config';
+import { getScriptAnalysisApiKey } from '@/lib/ai/config';
 import type { AgentJobType, StartAgentJobRequest, StartAgentJobResponse } from '@/lib/agents/types';
 
 const SCRIPT_SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
@@ -195,12 +195,15 @@ export async function POST(request: Request) {
       );
     }
 
-    // Pre-flight: verify Fireworks API key is configured
-    const fireworksKey = getFireworksApiKey();
-    if (!fireworksKey) {
-      console.error('[AgentStart] FIREWORKS_SECRET_KEY is not set in environment');
+    // Pre-flight: verify an LLM API key is configured
+    const llmApiKey = getScriptAnalysisApiKey();
+    if (!llmApiKey) {
+      console.error('[AgentStart] No script analysis LLM API key is configured');
       return NextResponse.json(
-        { error: 'Smart service is not configured. Set FIREWORKS_SECRET_KEY in your environment.' },
+        {
+          error:
+            'Smart service is not configured. Set CEREBRAS_API_KEY (recommended) or FIREWORKS_SECRET_KEY in your environment.',
+        },
         { status: 503 }
       );
     }

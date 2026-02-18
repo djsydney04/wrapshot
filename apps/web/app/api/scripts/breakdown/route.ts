@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { KimiClient, SCENE_EXTRACTION_PROMPT, KimiClient as KC } from "@/lib/ai/kimi-client";
 import { parsePdfScript, normalizeScriptText } from "@/lib/scripts/parser";
-import { getFireworksApiKey } from "@/lib/ai/config";
+import { getScriptAnalysisApiKey } from "@/lib/ai/config";
 
 export interface ExtractedScene {
   scene_number: string;
@@ -41,9 +41,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const fireworksKey = getFireworksApiKey();
-    if (!fireworksKey) {
-      console.error("Fireworks key not configured");
+    const llmApiKey = getScriptAnalysisApiKey();
+    if (!llmApiKey) {
+      console.error("No script analysis LLM key configured");
       return NextResponse.json(
         { error: "Wrapshot Intelligence breakdown is not configured" },
         { status: 500 }
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
     }
 
     // Use Kimi to extract scenes
-    const kimi = new KimiClient(fireworksKey);
+    const kimi = new KimiClient(llmApiKey);
     let breakdownResult: BreakdownResult;
 
     try {

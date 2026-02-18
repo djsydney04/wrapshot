@@ -35,7 +35,7 @@ Smart film production scheduling and management platform designed to help modern
 - **Email**: Resend (transactional emails)
 - **Job Queue**: Inngest (background jobs)
 - **Analytics**: PostHog + Sentry (error tracking)
-- **Smart Features**: Fireworks AI (LLM-powered script analysis)
+- **Smart Features**: Cerebras GLM (LLM-powered script analysis) + Fireworks (receipt OCR fallback)
 
 ### Build Tools
 - **Monorepo**: Turbo 2.8 + npm workspaces

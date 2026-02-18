@@ -5,7 +5,7 @@
  */
 
 import { KimiClient } from '@/lib/ai/kimi-client';
-import { getFireworksApiKey } from '@/lib/ai/config';
+import { getScriptAnalysisApiKey } from '@/lib/ai/config';
 import { JsonParser } from '../utils/json-parser';
 import { RetryHandler } from '../utils/retry-handler';
 import { LLM_CONFIG } from '../constants';
@@ -91,11 +91,11 @@ export async function executeElementExtractor(
   context: AgentContext,
   tracker: ProgressTracker
 ): Promise<AgentStepResult> {
-  const apiKey = getFireworksApiKey();
+  const apiKey = getScriptAnalysisApiKey();
   if (!apiKey) {
     return {
       success: false,
-      error: 'Fireworks API key not configured',
+      error: 'No script analysis LLM API key configured',
     };
   }
 

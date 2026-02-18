@@ -1,6 +1,6 @@
 /**
  * Centralized AI prompts for script analysis features
- * All prompts are tuned for Kimi K2.5 via Fireworks API
+ * Prompts are tuned for the script-analysis LLM pipeline (Cerebras GLM by default)
  */
 
 // ============================================
