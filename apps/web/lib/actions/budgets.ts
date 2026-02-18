@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserId } from "@/lib/permissions/server";
+import { BUDGET_CHART_OF_ACCOUNTS } from "@/lib/types";
 
 export type BudgetStatus = "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "LOCKED";
 
@@ -202,24 +203,48 @@ export async function createBudget(data: CreateBudgetData): Promise<Budget> {
       }
     }
   } else {
-    // Create default categories for "Start from Scratch"
-    const defaultCategories = [
-      { code: "1000", name: "Above-the-Line", sortOrder: 0 },
-      { code: "2000", name: "Production", sortOrder: 1 },
-      { code: "3000", name: "Post-Production", sortOrder: 2 },
-      { code: "4000", name: "Other", sortOrder: 3 },
-    ];
-
-    const categories = defaultCategories.map((cat) => ({
+    // Create default categories using industry-standard chart of accounts
+    const chartEntries = Object.entries(BUDGET_CHART_OF_ACCOUNTS);
+    const topCategories = chartEntries.map(([code, { name }], index) => ({
       budgetId: budget.id,
-      ...cat,
+      code,
+      name,
       parentCategoryId: null,
+      sortOrder: index * 1000,
       allocatedBudget: 0,
       subtotalEstimated: 0,
       subtotalActual: 0,
     }));
 
-    await supabase.from("BudgetCategory").insert(categories);
+    const { data: insertedTop, error: topError } = await supabase
+      .from("BudgetCategory")
+      .insert(topCategories)
+      .select("id, code");
+
+    if (!topError && insertedTop) {
+      const topIdByCode = new Map(insertedTop.map((c) => [c.code, c.id]));
+
+      const subcategoryRows = chartEntries.flatMap(
+        ([parentCode, { subcategories }], parentIndex) => {
+          const parentId = topIdByCode.get(parentCode);
+          if (!parentId) return [];
+          return Object.entries(subcategories).map(([subCode, subName], subIndex) => ({
+            budgetId: budget.id,
+            code: subCode,
+            name: subName,
+            parentCategoryId: parentId,
+            sortOrder: parentIndex * 1000 + subIndex + 1,
+            allocatedBudget: 0,
+            subtotalEstimated: 0,
+            subtotalActual: 0,
+          }));
+        }
+      );
+
+      if (subcategoryRows.length > 0) {
+        await supabase.from("BudgetCategory").insert(subcategoryRows);
+      }
+    }
   }
 
   revalidatePath("/finance");
@@ -393,6 +418,13 @@ export interface BudgetCategory {
   subtotalEstimated: number;
   subtotalActual: number;
   sortOrder: number;
+  departmentStatus: "NOT_STARTED" | "IN_PROGRESS" | "SUBMITTED" | "REVISION_REQUESTED" | "APPROVED";
+  assignedUserId: string | null;
+  reviewNotes: string | null;
+  submittedAt: string | null;
+  submittedBy: string | null;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
   createdAt: string;
   updatedAt: string;
 }
