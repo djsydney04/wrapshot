@@ -34,7 +34,14 @@ export interface ParsedScriptResult {
  * Parse a PDF file and extract text content
  */
 export async function parsePdfScript(buffer: Buffer): Promise<ParsedScriptResult> {
-  const parser = await getPdfParser();
+  let parser: PdfParser;
+  try {
+    parser = await getPdfParser();
+  } catch (error) {
+    throw new Error(
+      `PDF parser module not available: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 
   try {
     const data = await parser(buffer, {
@@ -43,8 +50,8 @@ export async function parsePdfScript(buffer: Buffer): Promise<ParsedScriptResult
     });
 
     return {
-      text: data.text,
-      pageCount: data.numpages,
+      text: data.text || "",
+      pageCount: data.numpages || 0,
       metadata: {
         title: data.info?.Title,
         author: data.info?.Author,
@@ -52,7 +59,8 @@ export async function parsePdfScript(buffer: Buffer): Promise<ParsedScriptResult
     };
   } catch (error) {
     console.error("Error parsing PDF:", error);
-    throw new Error("Failed to parse PDF script");
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to parse PDF script: ${detail}`);
   }
 }
 
@@ -107,6 +115,9 @@ export async function parseScript(
  */
 export function normalizeScriptText(text: string): string {
   return text
+    // Remove null bytes and problematic control characters (breaks PostgreSQL JSONB)
+    .replace(/\u0000/g, "")
+    .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F]/g, "")
     // Normalize line endings
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
@@ -117,6 +128,25 @@ export function normalizeScriptText(text: string): string {
     .map((line) => line.trimEnd())
     .join("\n")
     .trim();
+}
+
+/**
+ * Sanitize any value for safe JSONB storage in PostgreSQL.
+ * Removes \u0000 null bytes which PostgreSQL rejects.
+ */
+export function sanitizeForJsonb<T>(value: T): T {
+  if (typeof value === "string") {
+    return value.replace(/\u0000/g, "") as T;
+  }
+  if (typeof value === "object" && value !== null) {
+    if (Array.isArray(value)) {
+      return value.map(sanitizeForJsonb) as T;
+    }
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, sanitizeForJsonb(v)])
+    ) as T;
+  }
+  return value;
 }
 
 /**

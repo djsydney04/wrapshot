@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ScriptAnalysisAgent } from '@/lib/agents/script-analysis';
+import { getFireworksApiKey } from '@/lib/ai/config';
 import type { AgentJobType, StartAgentJobRequest, StartAgentJobResponse } from '@/lib/agents/types';
 
 export async function POST(request: Request) {
@@ -87,6 +88,34 @@ export async function POST(request: Request) {
     if (!script.fileUrl) {
       return NextResponse.json(
         { error: 'Script file URL is missing' },
+        { status: 400 }
+      );
+    }
+
+    // Pre-flight: verify Fireworks API key is configured
+    const fireworksKey = getFireworksApiKey();
+    if (!fireworksKey) {
+      console.error('[AgentStart] FIREWORKS_SECRET_KEY is not set in environment');
+      return NextResponse.json(
+        { error: 'AI service is not configured. Set FIREWORKS_SECRET_KEY in your environment.' },
+        { status: 503 }
+      );
+    }
+
+    // Pre-flight: verify the script PDF is accessible
+    try {
+      const headRes = await fetch(script.fileUrl, { method: 'HEAD' });
+      if (!headRes.ok) {
+        console.error('[AgentStart] Script file not accessible:', headRes.status, script.fileUrl);
+        return NextResponse.json(
+          { error: `Script file is not accessible (${headRes.status}). The download link may have expired — try re-uploading the script.` },
+          { status: 400 }
+        );
+      }
+    } catch (fetchErr) {
+      console.error('[AgentStart] Failed to reach script file:', fetchErr);
+      return NextResponse.json(
+        { error: 'Could not reach the script file. Check your network or re-upload the script.' },
         { status: 400 }
       );
     }

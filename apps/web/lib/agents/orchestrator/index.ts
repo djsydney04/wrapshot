@@ -89,8 +89,12 @@ export class AgentOrchestrator {
         // Step succeeded
         lastSuccessfulStep = i;
 
-        // Save context after each successful step
-        await this.tracker.saveContext(this.context);
+        // Save context after each successful step (non-fatal if it fails)
+        try {
+          await this.tracker.saveContext(this.context);
+        } catch (ctxErr) {
+          console.warn(`[Orchestrator] Failed to save context after ${step.status}, continuing:`, ctxErr instanceof Error ? ctxErr.message : ctxErr);
+        }
 
         console.log(`[Orchestrator] Completed step: ${step.status}`);
       }

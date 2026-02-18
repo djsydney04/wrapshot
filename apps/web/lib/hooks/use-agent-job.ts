@@ -202,16 +202,16 @@ export function useStartAgentJob() {
         body: JSON.stringify({ projectId, scriptId, jobType }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.error || 'Failed to start agent job');
       }
 
-      const data = await response.json();
       return data.jobId;
     } catch (err) {
-      console.error('Error starting agent job:', err);
       const message = err instanceof Error ? err.message : 'Failed to start job';
+      console.error('Error starting agent job:', message);
       setError(message);
       return null;
     } finally {

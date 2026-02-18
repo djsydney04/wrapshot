@@ -156,6 +156,10 @@ export async function executeElementExtractor(
 
       // Normalize and add elements
       for (const element of parseResult.data.elements) {
+        // Skip elements with missing required fields
+        if (!element.name || typeof element.name !== 'string') continue;
+        if (!element.category || typeof element.category !== 'string') continue;
+
         const normalizedCategory = normalizeCategory(element.category);
         if (!normalizedCategory) {
           continue;
@@ -165,7 +169,9 @@ export async function executeElementExtractor(
           category: normalizedCategory,
           name: element.name.trim(),
           description: element.description?.trim(),
-          sceneNumbers: element.sceneNumbers.map(s => String(s).trim()),
+          sceneNumbers: Array.isArray(element.sceneNumbers)
+            ? element.sceneNumbers.map(s => String(s).trim()).filter(Boolean)
+            : [],
         };
 
         // Check for duplicates
@@ -178,8 +184,8 @@ export async function executeElementExtractor(
           // Merge scene numbers
           const allSceneNumbers = new Set([...existing.sceneNumbers, ...normalizedElement.sceneNumbers]);
           existing.sceneNumbers = Array.from(allSceneNumbers).sort((a, b) => {
-            const aNum = parseInt(a);
-            const bNum = parseInt(b);
+            const aNum = parseInt(a) || 0;
+            const bNum = parseInt(b) || 0;
             return aNum - bNum;
           });
         } else {

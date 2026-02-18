@@ -36,8 +36,27 @@ export async function executeParserStep(
 
     await tracker.updateProgress(1, 3, 'Downloading PDF');
 
-    // Fetch the PDF
-    const pdfResponse = await fetch(script.fileUrl);
+    // Fetch the PDF with timeout
+    const fetchController = new AbortController();
+    const fetchTimeout = setTimeout(() => fetchController.abort(), 60000);
+
+    let pdfResponse: Response;
+    try {
+      pdfResponse = await fetch(script.fileUrl, { signal: fetchController.signal });
+    } catch (fetchErr) {
+      clearTimeout(fetchTimeout);
+      const msg = fetchErr instanceof Error && fetchErr.name === 'AbortError'
+        ? 'PDF download timed out after 60s'
+        : `Failed to download PDF: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`;
+      return {
+        success: false,
+        error: msg,
+        errorDetails: { url: script.fileUrl },
+      };
+    } finally {
+      clearTimeout(fetchTimeout);
+    }
+
     if (!pdfResponse.ok) {
       return {
         success: false,
@@ -49,17 +68,34 @@ export async function executeParserStep(
     const arrayBuffer = await pdfResponse.arrayBuffer();
     const pdfBuffer = Buffer.from(arrayBuffer);
 
+    if (pdfBuffer.length === 0) {
+      return {
+        success: false,
+        error: 'Downloaded PDF file is empty (0 bytes)',
+        errorDetails: { url: script.fileUrl },
+      };
+    }
+
     await tracker.updateProgress(2, 3, 'Parsing PDF content');
 
     // Parse the PDF
     const parsed = await parsePdfScript(pdfBuffer);
-    const normalizedText = normalizeScriptText(parsed.text);
 
-    if (!normalizedText || normalizedText.length < 100) {
+    if (!parsed.text || parsed.text.trim().length === 0) {
       return {
         success: false,
-        error: 'Script appears to be empty or too short',
-        errorDetails: { extractedLength: normalizedText.length },
+        error: 'PDF parsed successfully but contains no extractable text. The PDF may be image-based (scanned) — try uploading a text-based PDF.',
+        errorDetails: { pageCount: parsed.pageCount },
+      };
+    }
+
+    const normalizedText = normalizeScriptText(parsed.text);
+
+    if (normalizedText.length < 100) {
+      return {
+        success: false,
+        error: `Script appears to be too short (${normalizedText.length} characters extracted). The PDF may not contain a valid screenplay.`,
+        errorDetails: { extractedLength: normalizedText.length, pageCount: parsed.pageCount },
       };
     }
 

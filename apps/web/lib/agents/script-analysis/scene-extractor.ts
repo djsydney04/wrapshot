@@ -154,8 +154,10 @@ export async function executeSceneExtractor(
         // Normalize timeOfDay
         scene.timeOfDay = normalizeTimeOfDay(scene.timeOfDay);
 
-        // Normalize characters to uppercase
-        scene.characters = (scene.characters || []).map(c => c.toUpperCase().trim());
+        // Normalize characters to uppercase, filtering out nulls/empties
+        scene.characters = (scene.characters || [])
+          .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
+          .map(c => c.toUpperCase().trim());
 
         // Update known characters
         for (const charName of scene.characters) {

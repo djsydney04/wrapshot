@@ -46,7 +46,7 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
 
   // Agent job state
   const [activeScriptId, setActiveScriptId] = React.useState<string | null>(null);
-  const { startJob, loading: startingJob } = useStartAgentJob();
+  const { startJob, loading: startingJob, error: startJobError } = useStartAgentJob();
   const { job, isRunning, isComplete, isFailed } = useAgentJob({ scriptId: activeScriptId || undefined });
 
   // Track completion to trigger parent refresh
@@ -131,6 +131,10 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
       if (jobId) {
         toast.info("Script analysis started", {
           description: "AI is analyzing your script for scenes, cast, and elements",
+        });
+      } else {
+        toast.error("Failed to start script analysis", {
+          description: startJobError || "Check that the AI service is configured correctly",
         });
       }
 

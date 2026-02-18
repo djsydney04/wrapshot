@@ -194,23 +194,23 @@ export class JsonParser {
     // Fix single quotes to double quotes (careful with apostrophes)
     repaired = this.fixQuotes(repaired);
 
-    // Fix unquoted keys
-    repaired = repaired.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
+    // Fix unquoted keys (only match keys that aren't already quoted)
+    repaired = repaired.replace(/([{,]\s*)(?!")(\w+)(\s*:)/g, '$1"$2"$3');
 
-    // Fix missing commas between elements
+    // Fix missing commas between adjacent objects/arrays
     repaired = repaired.replace(/}\s*{/g, '},{');
     repaired = repaired.replace(/]\s*\[/g, '],[');
 
-    // Remove comments
-    repaired = repaired.replace(/\/\/[^\n]*/g, '');
+    // Remove comments (only outside of strings — simplified heuristic)
+    repaired = repaired.replace(/\/\/[^\n"]*$/gm, '');
     repaired = repaired.replace(/\/\*[\s\S]*?\*\//g, '');
 
     const result = this.tryDirectParse<T>(repaired);
     if (result !== null) return result;
 
-    // Try with newline normalization
-    repaired = repaired.replace(/\n/g, ' ').replace(/\s+/g, ' ');
-    return this.tryDirectParse<T>(repaired);
+    // Try with whitespace normalization (collapse runs of whitespace, preserving single spaces)
+    const normalized = repaired.replace(/[\t\r]+/g, ' ').replace(/\n\s*/g, ' ').replace(/\s{2,}/g, ' ');
+    return this.tryDirectParse<T>(normalized);
   }
 
   /**

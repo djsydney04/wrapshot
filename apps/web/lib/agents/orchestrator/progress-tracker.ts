@@ -5,6 +5,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { sanitizeForJsonb } from '@/lib/scripts/parser';
 import { STEP_DEFINITIONS, SCRIPT_ANALYSIS_STEPS } from '../constants';
 import type { AgentJob, AgentJobStatus, AgentJobResult, AgentContext } from '../types';
 
@@ -82,8 +83,12 @@ export class ProgressTracker {
       updateData.errorDetails = update.errorDetails;
     }
     if (update.context !== undefined) {
-      updateData.context = update.context;
+      updateData.context = sanitizeForJsonb(update.context);
     }
+
+    // Sanitize any JSONB fields to remove null bytes that break PostgreSQL
+    if (updateData.result) updateData.result = sanitizeForJsonb(updateData.result);
+    if (updateData.errorDetails) updateData.errorDetails = sanitizeForJsonb(updateData.errorDetails);
 
     const { error } = await supabase
       .from('AgentJob')
