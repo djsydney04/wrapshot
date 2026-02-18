@@ -25,24 +25,37 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
+  MoreHorizontal,
   Send,
   ShieldCheck,
   RotateCcw,
   MessageSquare,
-  UserCircle,
-  CheckCircle2,
-  AlertTriangle,
+  UserPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { BudgetCategory, BudgetLineItem } from "@/lib/actions/budgets";
 import type { BudgetRequestPermissions } from "@/lib/actions/budget-requests";
 import {
   reorderBudgetCategories,
-  updateBudgetCategory,
   assignDepartmentHead,
   submitDepartmentBudget,
   reviewDepartmentBudget,
@@ -74,281 +87,13 @@ type DragItem =
   | { type: "category"; category: BudgetCategory }
   | { type: "lineitem"; lineItem: BudgetLineItem };
 
-const DEPT_STATUS_STYLES: Record<DepartmentBudgetStatus, string> = {
-  NOT_STARTED: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400",
-  IN_PROGRESS: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  SUBMITTED: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  REVISION_REQUESTED: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  APPROVED: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+const STATUS_DOT_COLOR: Record<DepartmentBudgetStatus, string> = {
+  NOT_STARTED: "bg-neutral-300 dark:bg-neutral-600",
+  IN_PROGRESS: "bg-blue-500",
+  SUBMITTED: "bg-amber-500",
+  REVISION_REQUESTED: "bg-orange-500",
+  APPROVED: "bg-emerald-500",
 };
-
-function DepartmentAllocationInput({
-  department,
-  onRefresh,
-}: {
-  department: BudgetCategory;
-  onRefresh: () => void;
-}) {
-  const [value, setValue] = React.useState<string>(
-    department.allocatedBudget?.toString() ?? ""
-  );
-  const [isSaving, setIsSaving] = React.useState(false);
-
-  React.useEffect(() => {
-    setValue(department.allocatedBudget?.toString() ?? "");
-  }, [department.allocatedBudget]);
-
-  const handleSave = async () => {
-    const parsed = parseFloat(value);
-    const allocatedBudgetValue = Number.isFinite(parsed) ? parsed : 0;
-    try {
-      setIsSaving(true);
-      await updateBudgetCategory(department.id, {
-        allocatedBudget: allocatedBudgetValue,
-      });
-      toast.success("Department allocation saved");
-      onRefresh();
-    } catch (error) {
-      console.error("Error updating department allocation:", error);
-      toast.error("Failed to save allocation");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-1">
-      <input
-        type="number"
-        step="0.01"
-        min="0"
-        className="w-24 bg-transparent border border-border rounded px-2 py-1 text-right text-sm"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={handleSave}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.currentTarget.blur();
-          }
-        }}
-      />
-      {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-    </div>
-  );
-}
-
-function DepartmentWorkflowActions({
-  department,
-  isFinanceManager,
-  isAssignedHead,
-  projectMembers,
-  onRefresh,
-}: {
-  department: BudgetCategory;
-  isFinanceManager: boolean;
-  isAssignedHead: boolean;
-  projectMembers: { userId: string; name: string; email: string }[];
-  onRefresh: () => void;
-}) {
-  const [loading, setLoading] = React.useState(false);
-  const [showRevisionNotes, setShowRevisionNotes] = React.useState(false);
-  const [revisionNotes, setRevisionNotes] = React.useState("");
-  const [assigningHead, setAssigningHead] = React.useState(false);
-
-  const handleAssignHead = async (userId: string) => {
-    setAssigningHead(true);
-    try {
-      await assignDepartmentHead(department.id, userId || null);
-      toast.success(userId ? "Department head assigned" : "Department head unassigned");
-      onRefresh();
-    } catch (err) {
-      console.error("Error assigning department head:", err);
-      toast.error(err instanceof Error ? err.message : "Failed to assign department head");
-    } finally {
-      setAssigningHead(false);
-    }
-  };
-
-  const handleSubmit = async () => {
-    setLoading(true);
-    try {
-      await submitDepartmentBudget(department.id);
-      toast.success("Department budget submitted for review");
-      onRefresh();
-    } catch (err) {
-      console.error("Error submitting department budget:", err);
-      toast.error(err instanceof Error ? err.message : "Failed to submit");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleApprove = async () => {
-    setLoading(true);
-    try {
-      await reviewDepartmentBudget(department.id, "APPROVE");
-      toast.success("Department budget approved");
-      onRefresh();
-    } catch (err) {
-      console.error("Error approving department budget:", err);
-      toast.error(err instanceof Error ? err.message : "Failed to approve");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRequestRevision = async () => {
-    setLoading(true);
-    try {
-      await reviewDepartmentBudget(department.id, "REQUEST_REVISION", revisionNotes);
-      toast.success("Revision requested");
-      setShowRevisionNotes(false);
-      setRevisionNotes("");
-      onRefresh();
-    } catch (err) {
-      console.error("Error requesting revision:", err);
-      toast.error(err instanceof Error ? err.message : "Failed to request revision");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleReopen = async () => {
-    setLoading(true);
-    try {
-      await reopenDepartmentBudget(department.id);
-      toast.success("Department budget reopened for edits");
-      onRefresh();
-    } catch (err) {
-      console.error("Error reopening department budget:", err);
-      toast.error(err instanceof Error ? err.message : "Failed to reopen");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const memberOptions = [
-    { value: "", label: "Unassigned" },
-    ...projectMembers.map((m) => ({
-      value: m.userId,
-      label: m.name || m.email,
-    })),
-  ];
-
-  const canSubmit =
-    (isAssignedHead || isFinanceManager) &&
-    ["NOT_STARTED", "IN_PROGRESS", "REVISION_REQUESTED"].includes(department.departmentStatus);
-
-  const canReview = isFinanceManager && department.departmentStatus === "SUBMITTED";
-  const canReopen = isFinanceManager && department.departmentStatus === "APPROVED";
-
-  return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Department head assignment (finance managers only) */}
-        {isFinanceManager && (
-          <div className="flex items-center gap-1.5">
-            <UserCircle className="h-3.5 w-3.5 text-muted-foreground" />
-            <div className="w-44">
-              <Select
-                value={department.assignedUserId ?? ""}
-                onChange={(e) => void handleAssignHead(e.target.value)}
-                options={memberOptions}
-                disabled={assigningHead || loading}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Show assigned head name for non-managers */}
-        {!isFinanceManager && department.assignedUserId && (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <UserCircle className="h-3.5 w-3.5" />
-            {projectMembers.find((m) => m.userId === department.assignedUserId)?.name || "Assigned"}
-          </div>
-        )}
-
-        {/* Submit for review */}
-        {canSubmit && (
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={loading}
-            onClick={handleSubmit}
-          >
-            {loading ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Send className="h-3.5 w-3.5" />
-            )}
-            Submit for Review
-          </Button>
-        )}
-
-        {/* Approve / Request Revision */}
-        {canReview && (
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={loading}
-              onClick={handleApprove}
-            >
-              {loading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <ShieldCheck className="h-3.5 w-3.5" />
-              )}
-              Approve
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={loading}
-              onClick={() => setShowRevisionNotes(!showRevisionNotes)}
-            >
-              <MessageSquare className="h-3.5 w-3.5" />
-              Request Revision
-            </Button>
-          </>
-        )}
-
-        {/* Reopen */}
-        {canReopen && (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={loading}
-            onClick={handleReopen}
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Reopen
-          </Button>
-        )}
-      </div>
-
-      {/* Revision notes input */}
-      {showRevisionNotes && (
-        <div className="flex items-start gap-2">
-          <Textarea
-            value={revisionNotes}
-            onChange={(e) => setRevisionNotes(e.target.value)}
-            placeholder="Notes for the department head..."
-            rows={2}
-            className="flex-1"
-          />
-          <Button
-            size="sm"
-            disabled={loading}
-            onClick={handleRequestRevision}
-          >
-            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Send"}
-          </Button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export function BudgetBuilder({
   budgetId,
@@ -366,10 +111,10 @@ export function BudgetBuilder({
     [budgetPermissions?.assignedDepartmentCategoryIds]
   );
 
-  // Expanded state for categories
-  const [expandedCategories, setExpandedCategories] = React.useState<Set<string>>(() => {
-    return new Set(categories.map((c) => c.id));
-  });
+  // Expanded state
+  const [expandedCategories, setExpandedCategories] = React.useState<Set<string>>(
+    () => new Set(categories.map((c) => c.id))
+  );
   const [expandedDepartments, setExpandedDepartments] = React.useState<Set<string>>(
     () => new Set(categories.filter((c) => !c.parentCategoryId).map((c) => c.id))
   );
@@ -386,18 +131,29 @@ export function BudgetBuilder({
   const [activeLineItemCategoryId, setActiveLineItemCategoryId] = React.useState<string | null>(null);
   const [editLineItem, setEditLineItem] = React.useState<BudgetLineItem | null>(null);
 
-  // Sort categories by sortOrder
-  const sortedCategories = React.useMemo(() => {
-    return [...categories].sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [categories]);
+  // Dialog states
+  const [assignDialogDept, setAssignDialogDept] = React.useState<BudgetCategory | null>(null);
+  const [assignUserId, setAssignUserId] = React.useState("");
+  const [assignLoading, setAssignLoading] = React.useState(false);
+  const [revisionDialogDept, setRevisionDialogDept] = React.useState<BudgetCategory | null>(null);
+  const [revisionNotes, setRevisionNotes] = React.useState("");
+  const [workflowLoading, setWorkflowLoading] = React.useState<string | null>(null);
 
-  const categoriesById = React.useMemo(() => {
-    return new Map(categories.map((category) => [category.id, category]));
-  }, [categories]);
+  // Sorted/grouped categories
+  const sortedCategories = React.useMemo(
+    () => [...categories].sort((a, b) => a.sortOrder - b.sortOrder),
+    [categories]
+  );
 
-  const parentCategories = React.useMemo(() => {
-    return sortedCategories.filter((category) => !category.parentCategoryId);
-  }, [sortedCategories]);
+  const categoriesById = React.useMemo(
+    () => new Map(categories.map((c) => [c.id, c])),
+    [categories]
+  );
+
+  const parentCategories = React.useMemo(
+    () => sortedCategories.filter((c) => !c.parentCategoryId),
+    [sortedCategories]
+  );
 
   const childCategoriesByParent = React.useMemo(() => {
     const grouped = new Map<string, BudgetCategory[]>();
@@ -410,23 +166,18 @@ export function BudgetBuilder({
     return grouped;
   }, [sortedCategories]);
 
-  const orphanCategories = React.useMemo(() => {
-    return sortedCategories.filter(
-      (category) => category.parentCategoryId && !categoriesById.has(category.parentCategoryId)
-    );
-  }, [sortedCategories, categoriesById]);
-
-  // Department approval progress
-  const { approvedCount, totalAssigned } = React.useMemo(() => {
-    const assigned = parentCategories.filter((c) => c.assignedUserId);
-    const approved = assigned.filter((c) => c.departmentStatus === "APPROVED");
-    return { approvedCount: approved.length, totalAssigned: assigned.length };
-  }, [parentCategories]);
+  const orphanCategories = React.useMemo(
+    () =>
+      sortedCategories.filter(
+        (c) => c.parentCategoryId && !categoriesById.has(c.parentCategoryId)
+      ),
+    [sortedCategories, categoriesById]
+  );
 
   React.useEffect(() => {
     setExpandedDepartments((prev) => {
       const next = new Set(prev);
-      parentCategories.forEach((category) => next.add(category.id));
+      parentCategories.forEach((c) => next.add(c.id));
       return next;
     });
   }, [parentCategories]);
@@ -434,12 +185,11 @@ export function BudgetBuilder({
   React.useEffect(() => {
     setExpandedCategories((prev) => {
       const next = new Set(prev);
-      categories.forEach((category) => next.add(category.id));
+      categories.forEach((c) => next.add(c.id));
       return next;
     });
   }, [categories]);
 
-  // Group line items by category
   const lineItemsByCategory = React.useMemo(() => {
     const grouped: Record<string, BudgetLineItem[]> = {};
     for (const category of categories) {
@@ -452,59 +202,37 @@ export function BudgetBuilder({
   const canEditDepartment = React.useCallback(
     (department: BudgetCategory): boolean => {
       if (budgetStatus === "LOCKED") return false;
-
-      // Finance managers can edit when department is not approved
-      if (isFinanceManager) {
-        return department.departmentStatus !== "APPROVED";
-      }
-
-      // Assigned department heads can edit when department is in editable status
+      if (isFinanceManager) return department.departmentStatus !== "APPROVED";
       if (assignedDeptIds.has(department.id)) {
         return ["NOT_STARTED", "IN_PROGRESS", "REVISION_REQUESTED"].includes(
           department.departmentStatus
         );
       }
-
       return false;
     },
     [budgetStatus, isFinanceManager, assignedDeptIds]
   );
 
-  // Sensors for drag and drop
+  // DnD sensors
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const activeId = active.id as string;
-
+    const activeId = event.active.id as string;
     if (activeId.startsWith("category-")) {
-      const categoryId = activeId.replace("category-", "");
-      const category = categories.find((c) => c.id === categoryId);
-      if (category) {
-        setActiveItem({ type: "category", category });
-      }
+      const category = categories.find((c) => c.id === activeId.replace("category-", ""));
+      if (category) setActiveItem({ type: "category", category });
     } else if (activeId.startsWith("lineitem-")) {
-      const lineItemId = activeId.replace("lineitem-", "");
-      const lineItem = lineItems.find((li) => li.id === lineItemId);
-      if (lineItem) {
-        setActiveItem({ type: "lineitem", lineItem });
-      }
+      const lineItem = lineItems.find((li) => li.id === activeId.replace("lineitem-", ""));
+      if (lineItem) setActiveItem({ type: "lineitem", lineItem });
     }
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveItem(null);
-
     if (!over || active.id === over.id) return;
 
     const activeId = active.id as string;
@@ -513,29 +241,26 @@ export function BudgetBuilder({
     if (activeId.startsWith("category-") && overId.startsWith("category-")) {
       const activeCategoryId = activeId.replace("category-", "");
       const overCategoryId = overId.replace("category-", "");
-
       const activeCategory = categoriesById.get(activeCategoryId);
       const overCategory = categoriesById.get(overCategoryId);
-
       if (!activeCategory || !overCategory) return;
       if (activeCategory.parentCategoryId !== overCategory.parentCategoryId) return;
 
-      const siblingCategories = activeCategory.parentCategoryId
+      const siblings = activeCategory.parentCategoryId
         ? childCategoriesByParent.get(activeCategory.parentCategoryId) || []
         : parentCategories;
-      const sortedSiblings = [...siblingCategories].sort((a, b) => a.sortOrder - b.sortOrder);
-      const oldIndex = sortedSiblings.findIndex((c) => c.id === activeCategoryId);
-      const newIndex = sortedSiblings.findIndex((c) => c.id === overCategoryId);
+      const sorted = [...siblings].sort((a, b) => a.sortOrder - b.sortOrder);
+      const oldIdx = sorted.findIndex((c) => c.id === activeCategoryId);
+      const newIdx = sorted.findIndex((c) => c.id === overCategoryId);
 
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const newOrder = arrayMove(sortedSiblings, oldIndex, newIndex);
+      if (oldIdx !== -1 && newIdx !== -1) {
+        const newOrder = arrayMove(sorted, oldIdx, newIdx);
         try {
           setIsApplyingChange(true);
           await reorderBudgetCategories(budgetId, newOrder.map((c) => c.id));
           toast.success("Category order updated");
           onRefresh();
-        } catch (error) {
-          console.error("Failed to reorder categories:", error);
+        } catch {
           toast.error("Failed to reorder categories");
         } finally {
           setIsApplyingChange(false);
@@ -546,49 +271,38 @@ export function BudgetBuilder({
     if (activeId.startsWith("lineitem-") && overId.startsWith("lineitem-")) {
       const activeLineItemId = activeId.replace("lineitem-", "");
       const overLineItemId = overId.replace("lineitem-", "");
-
       const activeLineItem = lineItems.find((li) => li.id === activeLineItemId);
       const overLineItem = lineItems.find((li) => li.id === overLineItemId);
 
       if (activeLineItem && overLineItem) {
         if (activeLineItem.categoryId === overLineItem.categoryId) {
-          const categoryItems = lineItemsByCategory[activeLineItem.categoryId] || [];
-          const sortedItems = [...categoryItems].sort((a, b) => a.sortOrder - b.sortOrder);
-          const oldIndex = sortedItems.findIndex((li) => li.id === activeLineItemId);
-          const newIndex = sortedItems.findIndex((li) => li.id === overLineItemId);
-
-          if (oldIndex !== -1 && newIndex !== -1) {
-            const newOrder = arrayMove(sortedItems, oldIndex, newIndex);
+          const items = lineItemsByCategory[activeLineItem.categoryId] || [];
+          const sorted = [...items].sort((a, b) => a.sortOrder - b.sortOrder);
+          const oldIdx = sorted.findIndex((li) => li.id === activeLineItemId);
+          const newIdx = sorted.findIndex((li) => li.id === overLineItemId);
+          if (oldIdx !== -1 && newIdx !== -1) {
+            const newOrder = arrayMove(sorted, oldIdx, newIdx);
             try {
               setIsApplyingChange(true);
-              await reorderLineItems(
-                activeLineItem.categoryId,
-                newOrder.map((li) => li.id)
-              );
+              await reorderLineItems(activeLineItem.categoryId, newOrder.map((li) => li.id));
               toast.success("Line item order updated");
               onRefresh();
-            } catch (error) {
-              console.error("Failed to reorder line items:", error);
+            } catch {
               toast.error("Failed to reorder line items");
             } finally {
               setIsApplyingChange(false);
             }
           }
         } else {
-          const targetCategoryItems = lineItemsByCategory[overLineItem.categoryId] || [];
-          const sortedTargetItems = [...targetCategoryItems].sort((a, b) => a.sortOrder - b.sortOrder);
-          const overIndex = sortedTargetItems.findIndex((li) => li.id === overLineItemId);
+          const targetItems = lineItemsByCategory[overLineItem.categoryId] || [];
+          const sorted = [...targetItems].sort((a, b) => a.sortOrder - b.sortOrder);
+          const overIdx = sorted.findIndex((li) => li.id === overLineItemId);
           try {
             setIsApplyingChange(true);
-            await moveLineItemToCategory(
-              activeLineItemId,
-              overLineItem.categoryId,
-              overIndex
-            );
+            await moveLineItemToCategory(activeLineItemId, overLineItem.categoryId, overIdx);
             toast.success("Line item moved");
             onRefresh();
-          } catch (error) {
-            console.error("Failed to move line item:", error);
+          } catch {
             toast.error("Failed to move line item");
           } finally {
             setIsApplyingChange(false);
@@ -600,21 +314,15 @@ export function BudgetBuilder({
     if (activeId.startsWith("lineitem-") && overId.startsWith("category-")) {
       const activeLineItemId = activeId.replace("lineitem-", "");
       const targetCategoryId = overId.replace("category-", "");
-
       const activeLineItem = lineItems.find((li) => li.id === activeLineItemId);
       if (activeLineItem && activeLineItem.categoryId !== targetCategoryId) {
-        const targetCategoryItems = lineItemsByCategory[targetCategoryId] || [];
+        const targetItems = lineItemsByCategory[targetCategoryId] || [];
         try {
           setIsApplyingChange(true);
-          await moveLineItemToCategory(
-            activeLineItemId,
-            targetCategoryId,
-            targetCategoryItems.length
-          );
+          await moveLineItemToCategory(activeLineItemId, targetCategoryId, targetItems.length);
           toast.success("Line item moved");
           onRefresh();
-        } catch (error) {
-          console.error("Failed to move line item:", error);
+        } catch {
           toast.error("Failed to move line item");
         } finally {
           setIsApplyingChange(false);
@@ -623,18 +331,13 @@ export function BudgetBuilder({
     }
   };
 
-  const handleDragCancel = () => {
-    setActiveItem(null);
-  };
+  const handleDragCancel = () => setActiveItem(null);
 
   const toggleCategory = (categoryId: string) => {
     setExpandedCategories((prev) => {
       const next = new Set(prev);
-      if (next.has(categoryId)) {
-        next.delete(categoryId);
-      } else {
-        next.add(categoryId);
-      }
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
       return next;
     });
   };
@@ -642,11 +345,8 @@ export function BudgetBuilder({
   const toggleDepartment = (categoryId: string) => {
     setExpandedDepartments((prev) => {
       const next = new Set(prev);
-      if (next.has(categoryId)) {
-        next.delete(categoryId);
-      } else {
-        next.add(categoryId);
-      }
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
       return next;
     });
   };
@@ -679,24 +379,101 @@ export function BudgetBuilder({
     }
   };
 
-  // Calculate totals
-  const { totalEstimated, totalActual, totalAllocated } = React.useMemo(() => {
+  // Workflow actions
+  const handleAssignHead = async () => {
+    if (!assignDialogDept) return;
+    setAssignLoading(true);
+    try {
+      await assignDepartmentHead(assignDialogDept.id, assignUserId || null);
+      toast.success(assignUserId ? "Department head assigned" : "Department head unassigned");
+      setAssignDialogDept(null);
+      onRefresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to assign");
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const handleSubmitDept = async (dept: BudgetCategory) => {
+    setWorkflowLoading(dept.id);
+    try {
+      await submitDepartmentBudget(dept.id);
+      toast.success("Department submitted for review");
+      onRefresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to submit");
+    } finally {
+      setWorkflowLoading(null);
+    }
+  };
+
+  const handleApproveDept = async (dept: BudgetCategory) => {
+    setWorkflowLoading(dept.id);
+    try {
+      await reviewDepartmentBudget(dept.id, "APPROVE");
+      toast.success("Department approved");
+      onRefresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to approve");
+    } finally {
+      setWorkflowLoading(null);
+    }
+  };
+
+  const handleRequestRevision = async () => {
+    if (!revisionDialogDept) return;
+    setWorkflowLoading(revisionDialogDept.id);
+    try {
+      await reviewDepartmentBudget(revisionDialogDept.id, "REQUEST_REVISION", revisionNotes);
+      toast.success("Revision requested");
+      setRevisionDialogDept(null);
+      setRevisionNotes("");
+      onRefresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to request revision");
+    } finally {
+      setWorkflowLoading(null);
+    }
+  };
+
+  const handleReopenDept = async (dept: BudgetCategory) => {
+    setWorkflowLoading(dept.id);
+    try {
+      await reopenDepartmentBudget(dept.id);
+      toast.success("Department reopened for edits");
+      onRefresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to reopen");
+    } finally {
+      setWorkflowLoading(null);
+    }
+  };
+
+  // Totals
+  const { totalEstimated, totalActual } = React.useMemo(() => {
     const estimated = lineItems.reduce((sum, li) => sum + li.estimatedTotal, 0);
     const actual = lineItems.reduce((sum, li) => sum + li.actualCost, 0);
-    const allocated = categories.reduce((sum, cat) => sum + (cat.allocatedBudget || 0), 0);
-    return { totalEstimated: estimated, totalActual: actual, totalAllocated: allocated };
-  }, [lineItems, categories]);
+    return { totalEstimated: estimated, totalActual: actual };
+  }, [lineItems]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
-  };
 
   const anyCanEdit = canEdit || assignedDeptIds.size > 0;
+
+  const memberOptions = [
+    { value: "", label: "Unassigned" },
+    ...projectMembers.map((m) => ({
+      value: m.userId,
+      label: m.name || m.email,
+    })),
+  ];
 
   return (
     <div className="space-y-4">
@@ -707,7 +484,7 @@ export function BudgetBuilder({
           {isApplyingChange && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Saving changes...
+              Saving...
             </div>
           )}
           {budgetStatus === "LOCKED" && (
@@ -732,58 +509,17 @@ export function BudgetBuilder({
         )}
       </div>
 
-      {/* Department Approval Progress */}
-      {totalAssigned > 0 && (
-        <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/20">
-          {approvedCount === totalAssigned ? (
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-          ) : (
-            <AlertTriangle className="h-4 w-4 text-amber-600" />
-          )}
-          <div className="flex-1">
-            <p className="text-sm font-medium">
-              {approvedCount}/{totalAssigned} department{totalAssigned !== 1 ? "s" : ""} approved
-            </p>
-            <div className="mt-1.5 h-1.5 w-full rounded-full bg-muted">
-              <div
-                className={cn(
-                  "h-full rounded-full transition-all",
-                  approvedCount === totalAssigned ? "bg-emerald-500" : "bg-amber-500"
-                )}
-                style={{ width: `${totalAssigned > 0 ? (approvedCount / totalAssigned) * 100 : 0}%` }}
-              />
-            </div>
-          </div>
-          <div className="flex gap-1.5 flex-wrap">
-            {parentCategories
-              .filter((c) => c.assignedUserId)
-              .map((dept) => (
-                <Badge
-                  key={dept.id}
-                  className={cn("text-[10px] px-1.5", DEPT_STATUS_STYLES[dept.departmentStatus])}
-                >
-                  {dept.code}
-                </Badge>
-              ))}
-          </div>
+      {/* Totals */}
+      <div className="flex items-center gap-6 rounded-xl border border-border bg-muted/30 px-4 py-3">
+        <div className="flex-1">
+          <span className="text-xs text-muted-foreground">Estimated</span>
+          <p className="text-xl font-semibold">{formatCurrency(totalEstimated)}</p>
         </div>
-      )}
-
-      {/* Totals Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-xl border border-border bg-muted/30">
-        <div>
-          <span className="text-sm text-muted-foreground">Total Allocated</span>
-          <p className="text-2xl font-semibold">{formatCurrency(totalAllocated)}</p>
-        </div>
-        <div>
-          <span className="text-sm text-muted-foreground">Total Estimated</span>
-          <p className="text-2xl font-semibold">{formatCurrency(totalEstimated)}</p>
-        </div>
-        <div>
-          <span className="text-sm text-muted-foreground">Total Actual</span>
+        <div className="flex-1">
+          <span className="text-xs text-muted-foreground">Actual</span>
           <p
             className={cn(
-              "text-2xl font-semibold",
+              "text-xl font-semibold",
               totalActual > totalEstimated ? "text-red-600" : "text-emerald-600"
             )}
           >
@@ -801,156 +537,165 @@ export function BudgetBuilder({
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <div className="space-y-4">
+          <div className="space-y-3">
             {parentCategories.map((department) => {
-              const childCategories = childCategoriesByParent.get(department.id) || [];
-              const departmentLineItems = childCategories.flatMap(
-                (category) => lineItemsByCategory[category.id] || []
+              const childCats = childCategoriesByParent.get(department.id) || [];
+              const deptLineItems = childCats.flatMap(
+                (cat) => lineItemsByCategory[cat.id] || []
               );
-              const departmentEstimated = departmentLineItems.reduce(
+              const deptEstimated = deptLineItems.reduce(
                 (sum, li) => sum + li.estimatedTotal,
                 0
               );
-              const departmentActual = departmentLineItems.reduce(
-                (sum, li) => sum + li.actualCost,
-                0
-              );
-              const departmentAllocated =
-                (department.allocatedBudget || 0) ||
-                childCategories.reduce((sum, cat) => sum + (cat.allocatedBudget || 0), 0);
-              const departmentVariance = departmentAllocated - departmentActual;
-              const categoryIds = childCategories.map((c) => `category-${c.id}`);
-
+              const categoryIds = childCats.map((c) => `category-${c.id}`);
               const deptCanEdit = canEditDepartment(department);
               const isAssignedHead = assignedDeptIds.has(department.id);
+              const isLoading = workflowLoading === department.id;
+
+              const canSubmit =
+                (isAssignedHead || isFinanceManager) &&
+                ["NOT_STARTED", "IN_PROGRESS", "REVISION_REQUESTED"].includes(
+                  department.departmentStatus
+                );
+              const canReview =
+                isFinanceManager && department.departmentStatus === "SUBMITTED";
+              const canReopen =
+                isFinanceManager && department.departmentStatus === "APPROVED";
+              const hasActions =
+                deptCanEdit || canSubmit || canReview || canReopen || isFinanceManager;
+
+              const assigneeName = department.assignedUserId
+                ? projectMembers.find((m) => m.userId === department.assignedUserId)?.name ||
+                  "Assigned"
+                : null;
 
               return (
-                <div
-                  key={department.id}
-                  className={cn(
-                    "rounded-xl border bg-card",
-                    department.departmentStatus === "APPROVED"
-                      ? "border-emerald-200 dark:border-emerald-900/50"
-                      : department.departmentStatus === "SUBMITTED"
-                        ? "border-amber-200 dark:border-amber-900/50"
-                        : department.departmentStatus === "REVISION_REQUESTED"
-                          ? "border-orange-200 dark:border-orange-900/50"
-                          : "border-border"
-                  )}
-                >
+                <div key={department.id} className="rounded-xl border border-border bg-card">
                   {/* Department header */}
-                  <div className="px-4 py-3 border-b border-border bg-muted/20 space-y-2">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0"
-                        onClick={() => toggleDepartment(department.id)}
-                      >
-                        {expandedDepartments.has(department.id) ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </Button>
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <span className="flex h-6 px-2 items-center justify-center rounded bg-muted text-xs font-semibold">
-                          {department.code}
-                        </span>
-                        <span className="font-semibold truncate">{department.name}</span>
-                        <Badge
-                          className={cn(
-                            "text-[10px] px-1.5",
-                            DEPT_STATUS_STYLES[department.departmentStatus]
-                          )}
-                        >
-                          {DEPARTMENT_BUDGET_STATUS_LABELS[department.departmentStatus]}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {childCategories.length} category{childCategories.length !== 1 ? "ies" : "y"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm">
-                        <div className="text-right">
-                          <span className="text-muted-foreground text-xs mr-1">Alloc:</span>
-                          {deptCanEdit ? (
-                            <DepartmentAllocationInput
-                              department={department}
-                              onRefresh={onRefresh}
-                            />
-                          ) : (
-                            <span className="font-medium">{formatCurrency(departmentAllocated)}</span>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <span className="text-muted-foreground text-xs mr-1">Est:</span>
-                          <span className="font-medium">{formatCurrency(departmentEstimated)}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-muted-foreground text-xs mr-1">Actual:</span>
-                          <span className="font-medium">{formatCurrency(departmentActual)}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-muted-foreground text-xs mr-1">Var:</span>
-                          <span
-                            className={cn(
-                              "font-medium",
-                              departmentVariance < 0 ? "text-red-600" : "text-emerald-600"
-                            )}
-                          >
-                            {formatCurrency(departmentVariance)}
-                          </span>
-                        </div>
-                      </div>
-                      {deptCanEdit && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setEditCategory(null);
-                            setDefaultParentCategoryId(department.id);
-                            setShowCategoryForm(true);
-                          }}
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          Add Category
-                        </Button>
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <button
+                      type="button"
+                      className="flex flex-1 items-center gap-3 min-w-0 text-left"
+                      onClick={() => toggleDepartment(department.id)}
+                    >
+                      {expandedDepartments.has(department.id) ? (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                       )}
-                    </div>
-
-                    {/* Department workflow actions */}
-                    {(isFinanceManager || isAssignedHead) && budgetStatus !== "LOCKED" && (
-                      <DepartmentWorkflowActions
-                        department={department}
-                        isFinanceManager={isFinanceManager}
-                        isAssignedHead={isAssignedHead}
-                        projectMembers={projectMembers}
-                        onRefresh={onRefresh}
+                      <span
+                        className={cn("h-2.5 w-2.5 rounded-full shrink-0", STATUS_DOT_COLOR[department.departmentStatus])}
+                        title={DEPARTMENT_BUDGET_STATUS_LABELS[department.departmentStatus]}
                       />
+                      <span className="font-semibold truncate">{department.name}</span>
+                      {assigneeName && (
+                        <span className="text-xs text-muted-foreground truncate hidden sm:inline">
+                          {assigneeName}
+                        </span>
+                      )}
+                      <span className="ml-auto text-sm font-medium tabular-nums shrink-0">
+                        {formatCurrency(deptEstimated)}
+                      </span>
+                    </button>
+
+                    {hasActions && budgetStatus !== "LOCKED" && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon-sm" className="h-7 w-7 shrink-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52">
+                          {deptCanEdit && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditCategory(null);
+                                setDefaultParentCategoryId(department.id);
+                                setShowCategoryForm(true);
+                              }}
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Add Category
+                            </DropdownMenuItem>
+                          )}
+                          {isFinanceManager && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setAssignUserId(department.assignedUserId ?? "");
+                                setAssignDialogDept(department);
+                              }}
+                            >
+                              <UserPlus className="mr-2 h-4 w-4" />
+                              Assign Department Head
+                            </DropdownMenuItem>
+                          )}
+                          {(deptCanEdit || canSubmit || canReview || canReopen) && isFinanceManager && (
+                            <DropdownMenuSeparator />
+                          )}
+                          {canSubmit && (
+                            <DropdownMenuItem
+                              onClick={() => void handleSubmitDept(department)}
+                              disabled={isLoading}
+                            >
+                              <Send className="mr-2 h-4 w-4" />
+                              Submit for Review
+                            </DropdownMenuItem>
+                          )}
+                          {canReview && (
+                            <>
+                              <DropdownMenuItem
+                                onClick={() => void handleApproveDept(department)}
+                                disabled={isLoading}
+                              >
+                                <ShieldCheck className="mr-2 h-4 w-4" />
+                                Approve
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setRevisionNotes("");
+                                  setRevisionDialogDept(department);
+                                }}
+                              >
+                                <MessageSquare className="mr-2 h-4 w-4" />
+                                Request Revision
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {canReopen && (
+                            <DropdownMenuItem
+                              onClick={() => void handleReopenDept(department)}
+                              disabled={isLoading}
+                            >
+                              <RotateCcw className="mr-2 h-4 w-4" />
+                              Reopen for Edits
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </div>
 
                   {/* Revision notes banner */}
-                  {department.departmentStatus === "REVISION_REQUESTED" && department.reviewNotes && (
-                    <div className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 p-3 dark:border-orange-900/50 dark:bg-orange-900/10">
-                      <MessageSquare className="h-4 w-4 text-orange-600 mt-0.5 shrink-0" />
-                      <div>
-                        <p className="text-xs font-medium text-orange-700 dark:text-orange-400">
-                          Revision requested
-                        </p>
-                        <p className="text-sm text-orange-800 dark:text-orange-300 mt-0.5">
+                  {department.departmentStatus === "REVISION_REQUESTED" &&
+                    department.reviewNotes && (
+                      <div className="mx-4 mt-1 mb-2 flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 p-2.5 text-sm dark:border-orange-900/50 dark:bg-orange-900/10">
+                        <MessageSquare className="h-3.5 w-3.5 text-orange-500 mt-0.5 shrink-0" />
+                        <p className="text-orange-800 dark:text-orange-300">
                           {department.reviewNotes}
                         </p>
                       </div>
-                    </div>
-                  )}
+                    )}
 
+                  {/* Expanded content */}
                   {expandedDepartments.has(department.id) && (
-                    <div className="p-4 space-y-3">
-                      {childCategories.length > 0 ? (
-                        <SortableContext items={categoryIds} strategy={verticalListSortingStrategy}>
+                    <div className="px-4 pb-4 pt-2 space-y-3">
+                      {childCats.length > 0 ? (
+                        <SortableContext
+                          items={categoryIds}
+                          strategy={verticalListSortingStrategy}
+                        >
                           <div className="space-y-3">
-                            {childCategories.map((category) => (
+                            {childCats.map((category) => (
                               <SortableBudgetCategoryCard
                                 key={category.id}
                                 category={category}
@@ -968,7 +713,8 @@ export function BudgetBuilder({
                         </SortableContext>
                       ) : (
                         <div className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                          No categories yet for this department.
+                          No categories yet.
+                          {deptCanEdit && " Use the menu to add one."}
                         </div>
                       )}
                     </div>
@@ -1047,6 +793,92 @@ export function BudgetBuilder({
           editLineItem={editLineItem}
         />
       )}
+
+      {/* Assign Department Head Dialog */}
+      <Dialog
+        open={assignDialogDept !== null}
+        onOpenChange={(open) => {
+          if (!open) setAssignDialogDept(null);
+        }}
+      >
+        <DialogContent onClose={() => setAssignDialogDept(null)}>
+          <DialogHeader>
+            <DialogTitle>Assign Department Head</DialogTitle>
+            <DialogDescription>
+              Choose a team member to lead {assignDialogDept?.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            <Select
+              value={assignUserId}
+              onChange={(e) => setAssignUserId(e.target.value)}
+              options={memberOptions}
+              disabled={assignLoading}
+            />
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAssignDialogDept(null)}
+              disabled={assignLoading}
+            >
+              Cancel
+            </Button>
+            <Button onClick={() => void handleAssignHead()} disabled={assignLoading}>
+              {assignLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Save"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Request Revision Dialog */}
+      <Dialog
+        open={revisionDialogDept !== null}
+        onOpenChange={(open) => {
+          if (!open) setRevisionDialogDept(null);
+        }}
+      >
+        <DialogContent onClose={() => setRevisionDialogDept(null)}>
+          <DialogHeader>
+            <DialogTitle>Request Revision</DialogTitle>
+            <DialogDescription>
+              Add notes for the department head of {revisionDialogDept?.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            <Textarea
+              value={revisionNotes}
+              onChange={(e) => setRevisionNotes(e.target.value)}
+              placeholder="What needs to be changed..."
+              rows={3}
+              disabled={workflowLoading !== null}
+            />
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRevisionDialogDept(null)}
+              disabled={workflowLoading !== null}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleRequestRevision()}
+              disabled={workflowLoading !== null}
+            >
+              {workflowLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Send"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
