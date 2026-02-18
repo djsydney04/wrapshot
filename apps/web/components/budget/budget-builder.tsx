@@ -31,6 +31,7 @@ import {
   RotateCcw,
   MessageSquare,
   UserPlus,
+  Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -71,6 +72,7 @@ import {
 import { LineItemOverlay } from "./budget-line-item-row";
 import { AddCategoryForm } from "./add-category-form";
 import { AddLineItemForm } from "./add-line-item-form";
+import { AddTransactionForm } from "@/components/forms/add-transaction-form";
 
 interface BudgetBuilderProps {
   budgetId: string;
@@ -138,6 +140,7 @@ export function BudgetBuilder({
   const [revisionDialogDept, setRevisionDialogDept] = React.useState<BudgetCategory | null>(null);
   const [revisionNotes, setRevisionNotes] = React.useState("");
   const [workflowLoading, setWorkflowLoading] = React.useState<string | null>(null);
+  const [showTransactionForm, setShowTransactionForm] = React.useState(false);
 
   // Sorted/grouped categories
   const sortedCategories = React.useMemo(
@@ -202,7 +205,11 @@ export function BudgetBuilder({
   const canEditDepartment = React.useCallback(
     (department: BudgetCategory): boolean => {
       if (budgetStatus === "LOCKED") return false;
-      if (isFinanceManager) return department.departmentStatus !== "APPROVED";
+      // Finance managers (or canEdit from parent which includes admin/coordinator check)
+      if (isFinanceManager || canEdit) {
+        return department.departmentStatus !== "APPROVED";
+      }
+      // Assigned department heads can edit when department is in editable status
       if (assignedDeptIds.has(department.id)) {
         return ["NOT_STARTED", "IN_PROGRESS", "REVISION_REQUESTED"].includes(
           department.departmentStatus
@@ -210,7 +217,7 @@ export function BudgetBuilder({
       }
       return false;
     },
-    [budgetStatus, isFinanceManager, assignedDeptIds]
+    [budgetStatus, isFinanceManager, canEdit, assignedDeptIds]
   );
 
   // DnD sensors
@@ -467,6 +474,12 @@ export function BudgetBuilder({
 
   const anyCanEdit = canEdit || assignedDeptIds.size > 0;
 
+  // Sub-categories for the transaction form (exclude top-level departments)
+  const subCategories = React.useMemo(
+    () => categories.filter((c) => c.parentCategoryId),
+    [categories]
+  );
+
   const memberOptions = [
     { value: "", label: "Unassigned" },
     ...projectMembers.map((m) => ({
@@ -494,19 +507,31 @@ export function BudgetBuilder({
             </div>
           )}
         </div>
-        {isFinanceManager && budgetStatus !== "LOCKED" && (
-          <Button
-            onClick={() => {
-              setEditCategory(null);
-              setDefaultParentCategoryId(null);
-              setShowCategoryForm(true);
-            }}
-            size="sm"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add Department
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {anyCanEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowTransactionForm(true)}
+            >
+              <Receipt className="h-4 w-4 mr-1" />
+              Log Expense
+            </Button>
+          )}
+          {isFinanceManager && budgetStatus !== "LOCKED" && (
+            <Button
+              onClick={() => {
+                setEditCategory(null);
+                setDefaultParentCategoryId(null);
+                setShowCategoryForm(true);
+              }}
+              size="sm"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Department
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Totals */}
@@ -597,6 +622,23 @@ export function BudgetBuilder({
                         {formatCurrency(deptEstimated)}
                       </span>
                     </button>
+
+                    {/* Direct add category button */}
+                    {deptCanEdit && (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="h-7 w-7 shrink-0"
+                        title="Add category"
+                        onClick={() => {
+                          setEditCategory(null);
+                          setDefaultParentCategoryId(department.id);
+                          setShowCategoryForm(true);
+                        }}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    )}
 
                     {hasActions && budgetStatus !== "LOCKED" && (
                       <DropdownMenu>
@@ -714,7 +756,7 @@ export function BudgetBuilder({
                       ) : (
                         <div className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
                           No categories yet.
-                          {deptCanEdit && " Use the menu to add one."}
+                          {deptCanEdit && " Click + to add one."}
                         </div>
                       )}
                     </div>
@@ -879,6 +921,16 @@ export function BudgetBuilder({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Log Expense / Transaction Form */}
+      <AddTransactionForm
+        budgetId={budgetId}
+        categories={subCategories}
+        lineItems={lineItems}
+        open={showTransactionForm}
+        onOpenChange={setShowTransactionForm}
+        onSuccess={onRefresh}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getFireworksApiKey } from "@/lib/ai/config";
+import { getFireworksClient } from "@/lib/ai/fireworks";
 
 export interface ParsedReceiptData {
   vendor: string | null;
@@ -11,10 +11,7 @@ export interface ParsedReceiptData {
   confidence: number; // 0-1
 }
 
-interface FireworksMessage {
-  role: "system" | "user" | "assistant";
-  content: string | Array<{ type: "text" | "image_url"; text?: string; image_url?: { url: string } }>;
-}
+type ImageContent = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
 
 export async function POST(request: Request) {
   try {
@@ -35,8 +32,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const fireworksKey = getFireworksApiKey();
-    if (!fireworksKey) {
+    let client;
+    try {
+      client = getFireworksClient();
+    } catch {
       console.error("Fireworks key not configured");
       return NextResponse.json(
         { error: "Receipt parsing not configured" },
@@ -45,15 +44,13 @@ export async function POST(request: Request) {
     }
 
     // Build the image content for the API
-    let imageContent: string;
+    let imageSource: string;
     if (imageBase64) {
-      // If base64 is provided, use it directly
-      imageContent = imageBase64.startsWith("data:")
+      imageSource = imageBase64.startsWith("data:")
         ? imageBase64
         : `data:image/jpeg;base64,${imageBase64}`;
     } else {
-      // Use the URL directly
-      imageContent = imageUrl;
+      imageSource = imageUrl;
     }
 
     const systemPrompt = `You are a receipt parsing assistant. Analyze the receipt image and extract the following information:
@@ -77,54 +74,36 @@ If you cannot extract a field, use null. The confidence score should reflect how
 For dates, convert any format to YYYY-MM-DD. For amounts, extract just the number without currency symbols.
 Return ONLY the JSON object, no other text.`;
 
-    const messages: FireworksMessage[] = [
-      { role: "system", content: systemPrompt },
+    const userContent: ImageContent[] = [
       {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "Please analyze this receipt and extract the purchase details.",
-          },
-          {
-            type: "image_url",
-            image_url: { url: imageContent },
-          },
-        ],
+        type: "text",
+        text: "Please analyze this receipt and extract the purchase details.",
+      },
+      {
+        type: "image_url",
+        image_url: { url: imageSource },
       },
     ];
 
-    const response = await fetch(
-      "https://api.fireworks.ai/inference/v1/chat/completions",
+    const response = await client.chat.completions.create(
       {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${fireworksKey}`,
-        },
-        body: JSON.stringify({
-          model: "accounts/fireworks/models/kimi-k2p5",
-          messages,
-          max_tokens: 1000,
-          temperature: 0.1, // Low temperature for consistent extraction
-        }),
-      }
+        model: "accounts/fireworks/models/kimi-k2p5",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+        max_tokens: 1000,
+        temperature: 0.1,
+        posthogDistinctId: user.id,
+        posthogProperties: { feature: "receipt_parsing" },
+      } as Parameters<typeof client.chat.completions.create>[0],
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Fireworks API error:", response.status, errorText);
-      return NextResponse.json(
-        { error: "Failed to parse receipt" },
-        { status: 500 }
-      );
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
+    const completion = response as import("openai/resources/chat/completions").ChatCompletion;
+    const content = completion.choices?.[0]?.message?.content;
 
     if (!content) {
-      console.error("No content in Fireworks response:", data);
+      console.error("No content in Fireworks response:", completion);
       return NextResponse.json(
         { error: "No response from Wrapshot Intelligence" },
         { status: 500 }
