@@ -41,7 +41,7 @@ export function SettingsLayout({
   const pathname = usePathname();
 
   return (
-    <div className="flex h-full flex-col bg-background">
+    <div className="flex h-full flex-col bg-transparent">
       <Header breadcrumbs={breadcrumbs} />
 
       <div className="flex-1 overflow-auto relative">
@@ -122,7 +122,7 @@ interface SettingsCardProps {
 
 export function SettingsCard({ children, className }: SettingsCardProps) {
   return (
-    <div className={cn("rounded-lg border border-border bg-card overflow-hidden", className)}>
+    <div className={cn("rounded-lg overflow-hidden surface-pop", className)}>
       {children}
     </div>
   );

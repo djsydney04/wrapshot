@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   ChevronLeft,
+  ChevronDown,
   ChevronRight,
   Film,
   Search,
@@ -32,10 +33,58 @@ interface SidebarProps {
   };
 }
 
+interface NavChildItem {
+  label: string;
+  href: string;
+  badge?: string;
+}
+
+interface NavItem {
+  label: string;
+  href: string;
+  icon: React.ElementType;
+  tourId: string;
+  children?: NavChildItem[];
+}
+
+const NAV_ITEMS: NavItem[] = [
+  {
+    label: "Dashboard",
+    href: "/",
+    icon: LayoutDashboard,
+    tourId: "dashboard",
+  },
+  {
+    label: "Projects",
+    href: "/projects",
+    icon: Film,
+    tourId: "projects",
+    children: [
+      { label: "All Projects", href: "/projects" },
+      { label: "New Project", href: "/projects/new", badge: "New" },
+    ],
+  },
+  {
+    label: "Finance",
+    href: "/finance",
+    icon: DollarSign,
+    tourId: "finance",
+    children: [
+      { label: "Budgets", href: "/finance" },
+      { label: "New Budget", href: "/finance/new" },
+    ],
+  },
+];
+
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { sidebarOpen, toggleSidebar, openCommandPalette } = useLayoutStore();
   const projects = useProjectStore((state) => state.projects);
+  const [expandedGroups, setExpandedGroups] = React.useState<Record<string, boolean>>(() => ({
+    "/projects": true,
+    "/finance": false,
+  }));
 
   // Keyboard shortcut for sidebar toggle
   React.useEffect(() => {
@@ -57,36 +106,44 @@ export function Sidebar({ user }: SidebarProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [toggleSidebar, openCommandPalette]);
 
-  const navItems = [
-    {
-      label: "Dashboard",
-      href: "/",
-      icon: LayoutDashboard,
-      tourId: "dashboard",
-    },
-    {
-      label: "Projects",
-      href: "/projects",
-      icon: Film,
-      tourId: "projects",
-    },
-    {
-      label: "Finance",
-      href: "/finance",
-      icon: DollarSign,
-      tourId: "finance",
-    },
-  ];
+  React.useEffect(() => {
+    setExpandedGroups((prev) => {
+      const next = { ...prev };
+      for (const item of NAV_ITEMS) {
+        if (!item.children) continue;
+        const groupActive =
+          pathname === item.href ||
+          pathname.startsWith(`${item.href}/`) ||
+          item.children.some(
+            (child) => pathname === child.href || pathname.startsWith(`${child.href}/`)
+          );
+
+        if (groupActive) {
+          next[item.href] = true;
+        }
+      }
+      return next;
+    });
+  }, [pathname]);
 
   return (
     <aside
       className={cn(
-        "relative flex h-screen flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-200",
+        "relative flex h-screen flex-col overflow-hidden border-r border-sidebar-border bg-[hsl(var(--sidebar-bg)/0.95)] text-sidebar-foreground shadow-[16px_0_36px_-28px_hsl(var(--sidebar-bg)/0.9)] backdrop-blur-xl transition-all duration-200",
         sidebarOpen ? "w-[240px]" : "w-[48px]"
       )}
     >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(180deg,hsl(var(--sidebar-hover)/0.42),transparent_40%),radial-gradient(circle_at_92%_-20%,hsl(var(--accent-blue)/0.2),transparent_44%)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-0 opacity-[0.18] [background-image:radial-gradient(hsl(var(--sidebar-fg-active)/0.26)_0.6px,transparent_0.6px)] [background-size:4px_4px]"
+      />
+
       {/* Header */}
-      <div className="flex h-12 items-center justify-between px-3 border-b border-sidebar-border">
+      <div className="relative z-10 flex h-12 items-center justify-between border-b border-sidebar-border px-3">
         {sidebarOpen ? (
           <>
             <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
@@ -117,10 +174,10 @@ export function Sidebar({ user }: SidebarProps) {
 
       {/* Search */}
       {sidebarOpen && (
-        <div className="px-2 py-2">
+        <div className="relative z-10 px-2 py-2">
           <Button
             variant="ghost"
-            className="w-full justify-start gap-2 text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover font-normal h-8"
+            className="h-8 w-full justify-start gap-2 font-normal text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover"
             onClick={openCommandPalette}
             data-tour="command-palette"
           >
@@ -134,10 +191,16 @@ export function Sidebar({ user }: SidebarProps) {
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto scrollbar-thin px-2 py-2">
+      <nav className="relative z-10 flex-1 overflow-y-auto scrollbar-thin px-2 py-2">
+        {sidebarOpen && (
+          <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground-muted/80">
+            Workspace
+          </p>
+        )}
+
         <div className="space-y-1">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+          {NAV_ITEMS.map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.icon;
 
             if (!sidebarOpen) {
@@ -159,12 +222,89 @@ export function Sidebar({ user }: SidebarProps) {
               );
             }
 
+            const groupExpanded = item.children ? expandedGroups[item.href] ?? false : false;
+            const groupActive =
+              isActive ||
+              Boolean(
+                item.children?.some(
+                  (child) => pathname === child.href || pathname.startsWith(`${child.href}/`)
+                )
+              );
+
+            if (item.children && item.children.length > 0) {
+              return (
+                <div key={item.href} className="space-y-1">
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      onClick={() => router.push(item.href)}
+                      className={cn(
+                        "h-8 flex-1 justify-start gap-2 font-normal text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover",
+                        groupActive && "bg-sidebar-active/75 text-sidebar-foreground-active"
+                      )}
+                      data-tour={item.tourId}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() =>
+                        setExpandedGroups((prev) => ({
+                          ...prev,
+                          [item.href]: !groupExpanded,
+                        }))
+                      }
+                      className="h-8 w-8 text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover"
+                    >
+                      <ChevronDown
+                        className={cn(
+                          "h-3.5 w-3.5 transition-transform duration-200",
+                          !groupExpanded && "-rotate-90"
+                        )}
+                      />
+                    </Button>
+                  </div>
+
+                  {groupExpanded && (
+                    <div className="ml-4 space-y-1 border-l border-sidebar-border/70 pl-2">
+                      {item.children.map((child) => {
+                        const childActive =
+                          pathname === child.href || pathname.startsWith(`${child.href}/`);
+
+                        return (
+                          <Button
+                            key={child.href}
+                            variant="ghost"
+                            onClick={() => router.push(child.href)}
+                            className={cn(
+                              "h-7 w-full justify-start gap-2 px-2 text-xs font-medium text-sidebar-foreground-muted/90 hover:text-sidebar-foreground-active hover:bg-sidebar-hover",
+                              childActive && "bg-sidebar-active/70 text-sidebar-foreground-active"
+                            )}
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-sidebar-foreground-muted/70" />
+                            <span>{child.label}</span>
+                            {child.badge && (
+                              <span className="ml-auto rounded-sm border border-sidebar-kbd-border bg-sidebar-kbd px-1 py-0.5 text-[10px] leading-none text-sidebar-kbd-foreground">
+                                {child.badge}
+                              </span>
+                            )}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
             return (
               <Link key={item.href} href={item.href} data-tour={item.tourId}>
                 <Button
                   variant="ghost"
                   className={cn(
-                    "w-full justify-start gap-2 font-normal h-8 text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover",
+                    "h-8 w-full justify-start gap-2 font-normal text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover",
                     isActive && "bg-sidebar-active text-sidebar-foreground-active"
                   )}
                 >
@@ -182,19 +322,21 @@ export function Sidebar({ user }: SidebarProps) {
             <Separator className="my-3 bg-sidebar-border" />
             <div className="space-y-1">
               <div className="flex items-center justify-between px-2 py-1">
-                <span className="text-xs font-medium text-sidebar-foreground-muted uppercase tracking-wider">
-                  Projects
+                <span className="text-xs font-medium uppercase tracking-wider text-sidebar-foreground-muted">
+                  Recent Projects
                 </span>
                 <Link href="/projects/new">
-                  <Button variant="ghost" size="icon-sm" className="h-5 w-5 text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="h-5 w-5 text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover"
+                  >
                     <Plus className="h-3 w-3" />
                   </Button>
                 </Link>
               </div>
               {projects.length === 0 ? (
-                <p className="px-2 py-2 text-xs text-sidebar-foreground-muted">
-                  No projects yet
-                </p>
+                <p className="px-2 py-2 text-xs text-sidebar-foreground-muted">No projects yet</p>
               ) : (
                 projects.slice(0, 5).map((project) => {
                   const isActive = pathname.includes(project.id);
@@ -203,7 +345,7 @@ export function Sidebar({ user }: SidebarProps) {
                       <Button
                         variant="ghost"
                         className={cn(
-                          "w-full justify-start gap-2 font-normal h-8 text-sm text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover",
+                          "h-8 w-full justify-start gap-2 text-sm font-normal text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover",
                           isActive && "bg-sidebar-active text-sidebar-foreground-active"
                         )}
                       >
@@ -220,7 +362,7 @@ export function Sidebar({ user }: SidebarProps) {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-sidebar-border p-2 space-y-1">
+      <div className="relative z-10 space-y-1 border-t border-sidebar-border p-2">
         {sidebarOpen ? (
           <>
             {/* Share & Feedback Buttons */}
@@ -232,7 +374,7 @@ export function Sidebar({ user }: SidebarProps) {
               <Button
                 variant="ghost"
                 className={cn(
-                  "w-full justify-start gap-2 font-normal h-8 text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover",
+                  "h-8 w-full justify-start gap-2 font-normal text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover",
                   pathname.startsWith("/settings") && "bg-sidebar-active text-sidebar-foreground-active"
                 )}
               >
@@ -243,12 +385,9 @@ export function Sidebar({ user }: SidebarProps) {
 
             {/* User Account */}
             <div className="flex items-center gap-2 px-2 py-1.5">
-              <Avatar
-                alt={user?.name || user?.email || "User"}
-                size="sm"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate text-sidebar-foreground">
+              <Avatar alt={user?.name || user?.email || "User"} size="sm" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-sidebar-foreground">
                   {user?.name || user?.email?.split("@")[0] || "User"}
                 </p>
               </div>
@@ -285,7 +424,11 @@ export function Sidebar({ user }: SidebarProps) {
               </Link>
             </SimpleTooltip>
             <SimpleTooltip content="User menu" side="right">
-              <Button variant="ghost" size="icon" className="w-full text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-full text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover"
+              >
                 <User className="h-4 w-4" />
               </Button>
             </SimpleTooltip>

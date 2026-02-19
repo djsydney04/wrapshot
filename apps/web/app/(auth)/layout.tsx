@@ -61,8 +61,8 @@ export default async function AuthLayout({
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex flex-col justify-center px-4 py-12 sm:px-6 lg:px-20 xl:px-24 bg-background">
-        <div className="mx-auto w-full max-w-sm">
+      <div className="relative flex flex-col justify-center px-4 py-12 sm:px-6 lg:px-20 xl:px-24 bg-background">
+        <div className="relative mx-auto w-full max-w-sm rounded-2xl p-6 surface-pop sm:p-8">
           {/* Mobile Logo */}
           <div className="flex items-center mb-8 lg:hidden">
             <span className="font-semibold text-lg">wrapshoot</span>

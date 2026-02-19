@@ -54,6 +54,7 @@ import { useShootingDays } from "@/lib/hooks/use-shooting-days";
 import { useAgentJob } from "@/lib/hooks/use-agent-job";
 import { useAgentProgressToast } from "@/lib/hooks/use-agent-progress-toast";
 import { trackProjectViewed } from "@/lib/analytics/posthog";
+import { cn } from "@/lib/utils";
 
 const statusVariant: Record<Project["status"], "development" | "pre-production" | "production" | "post-production" | "completed" | "on-hold"> = {
   DEVELOPMENT: "development",
@@ -71,6 +72,57 @@ const statusLabel: Record<Project["status"], string> = {
   POST_PRODUCTION: "Post-Production",
   COMPLETED: "Completed",
   ON_HOLD: "On Hold",
+};
+
+const SECTION_META: Record<ProjectSection, { title: string; description: string }> = {
+  overview: {
+    title: "Project Overview",
+    description: "Track setup progress, upcoming work, and production health at a glance.",
+  },
+  assistant: {
+    title: "Smart Assistant",
+    description: "Ask project-aware questions about schedule, permits, scenes, cast, and risks.",
+  },
+  script: {
+    title: "Script Intelligence",
+    description: "Manage script versions, run analysis, and review extracted results.",
+  },
+  schedule: {
+    title: "Schedule & Stripeboard",
+    description: "Build shooting days, assign scenes, and optimize run-of-show planning.",
+  },
+  callsheets: {
+    title: "Call Sheets",
+    description: "Create, publish, export, and distribute call sheets to cast and crew.",
+  },
+  cast: {
+    title: "Cast",
+    description: "Maintain cast records, invites, and scene assignments.",
+  },
+  crew: {
+    title: "Crew",
+    description: "Organize team members by department, role, and production access.",
+  },
+  locations: {
+    title: "Locations",
+    description: "Manage locations, permit status, and location intelligence notes.",
+  },
+  scenes: {
+    title: "Scenes",
+    description: "Review and manage scenes across stripboard and production states.",
+  },
+  gear: {
+    title: "Elements & Props",
+    description: "Track production elements, props, and linked scene requirements.",
+  },
+  budget: {
+    title: "Budget",
+    description: "Control department budgets, spend tracking, and approval workflow.",
+  },
+  settings: {
+    title: "Project Settings",
+    description: "Manage project-level configuration and team permissions.",
+  },
 };
 
 type DataKey = "scenes" | "scripts" | "cast" | "crew" | "locations" | "elements";
@@ -553,6 +605,7 @@ export default function ProjectDetailPage() {
     activeSectionDataKeys.length > 0 &&
     activeSectionDataKeys.some((key) => !loadedData[key]) &&
     activeSectionErrorKeys.length === 0;
+  const sectionMeta = SECTION_META[activeSection];
 
   const renderSection = () => {
     if (activeSectionErrorKeys.length > 0) {
@@ -679,16 +732,19 @@ export default function ProjectDetailPage() {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-background">
       {/* Header */}
-      <header className="flex h-12 items-center justify-between border-b border-border px-4">
+      <header className="flex h-14 items-center justify-between border-b border-border/85 bg-background/75 px-4 backdrop-blur-xl">
         <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
+          >
             <ChevronLeft className="h-4 w-4" />
             <span className="text-sm font-medium">Projects</span>
           </Link>
-          <span className="text-muted-foreground">/</span>
-          <span className="text-sm font-medium">{project.name}</span>
+          <span className="text-muted-foreground/60">/</span>
+          <span className="text-sm font-semibold">{project.name}</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -732,20 +788,39 @@ export default function ProjectDetailPage() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-hidden flex">
+      <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-56 border-r border-border flex-shrink-0 hidden md:flex flex-col">
+        <aside className="hidden w-72 flex-shrink-0 border-r border-border/85 bg-background/65 md:flex md:flex-col">
           {/* Project Mini Header */}
-          <div className="px-4 py-4 border-b border-border">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                <Film className="h-5 w-5 text-muted-foreground" />
+          <div className="border-b border-border/85 p-4">
+            <div className="skeuo-panel relative overflow-hidden rounded-xl p-3">
+              <div className="skeuo-grain pointer-events-none absolute inset-0" />
+              <div className="relative flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{project.name}</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Badge variant={statusVariant[project.status]} className="text-[10px]">
+                      {statusLabel[project.status]}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="skeuo-chip flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground">
+                  <Film className="h-3.5 w-3.5" />
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">{project.name}</p>
-                <Badge variant={statusVariant[project.status]} className="text-[10px] mt-0.5">
-                  {statusLabel[project.status]}
-                </Badge>
+              <div className="relative mt-3 grid grid-cols-2 gap-2">
+                <div className="skeuo-chip rounded-md px-2 py-1">
+                  <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                    Scenes
+                  </p>
+                  <p className="text-sm font-semibold tabular-nums">{sidebarScenesCount}</p>
+                </div>
+                <div className="skeuo-chip rounded-md px-2 py-1">
+                  <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                    Shoot Days
+                  </p>
+                  <p className="text-sm font-semibold tabular-nums">{sidebarShootingDaysCount}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -764,35 +839,56 @@ export default function ProjectDetailPage() {
               gear: sidebarElementsCount,
               hasScript: scripts.length > 0,
             }}
-            className="flex-1"
+            className="flex-1 px-2 py-2"
           />
         </aside>
 
         {/* Main Content */}
         <main className="flex-1 overflow-auto">
           {/* Mobile Section Tabs (hidden on desktop) */}
-          <div className="md:hidden border-b border-border px-4 py-2 overflow-x-auto">
-            <div className="flex gap-2">
+          <div className="border-b border-border px-4 py-2 md:hidden">
+            <div className="scrollbar-thin flex gap-2 overflow-x-auto pb-1">
               {(["overview", "assistant", "scenes", "cast", "crew", "locations", "schedule", "callsheets", "gear", "budget", "script", "settings"] as ProjectSection[]).map(
                 (section) => (
                   <button
                     key={section}
                     onClick={() => handleSectionChange(section)}
-                    className={`px-3 py-1.5 text-sm rounded-lg whitespace-nowrap transition-colors ${
+                    className={cn(
+                      "whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm transition-colors",
                       activeSection === section
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted"
-                    }`}
+                        ? "border-border bg-foreground text-background"
+                        : "border-border/70 text-muted-foreground hover:bg-muted"
+                    )}
                   >
-                    {section === "callsheets" ? "Call Sheets" : section.charAt(0).toUpperCase() + section.slice(1)}
+                    {section === "callsheets"
+                      ? "Call Sheets"
+                      : section.charAt(0).toUpperCase() + section.slice(1)}
                   </button>
                 )
               )}
             </div>
           </div>
 
-          {/* Section Content */}
-          <div className="p-6">{renderSection()}</div>
+          <div className="mx-auto w-full max-w-[1320px] p-4 md:p-6">
+            <div className="skeuo-panel mb-4 rounded-xl px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                {sectionMeta.title}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">{sectionMeta.description}</p>
+            </div>
+
+            {/* Section Content */}
+            <div
+              className={cn(
+                "min-h-[220px]",
+                activeSection === "assistant"
+                  ? ""
+                  : "skeuo-panel rounded-2xl p-4 md:p-5"
+              )}
+            >
+              {renderSection()}
+            </div>
+          </div>
         </main>
       </div>
 
