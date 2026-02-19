@@ -8,6 +8,7 @@ import {
   Search,
   LayoutDashboard,
   Plus,
+  Bot,
   Settings,
   CreditCard,
   DollarSign,
@@ -103,6 +104,14 @@ export function CommandPalette() {
                 <LayoutDashboard className="h-4 w-4" />
                 Go to Dashboard
               </Command.Item>
+              <Command.Item
+                value="assistant"
+                onSelect={() => runCommand(() => router.push("/assistant"))}
+                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm aria-selected:bg-accent"
+              >
+                <Bot className="h-4 w-4" />
+                Open Assistant
+              </Command.Item>
             </Command.Group>
 
             {/* Projects */}
@@ -113,7 +122,9 @@ export function CommandPalette() {
                     key={project.id}
                     value={`project-${project.name}`}
                     onSelect={() =>
-                      runCommand(() => router.push(`/projects/${project.id}`))
+                      runCommand(() =>
+                        router.push(`/projects/${project.id}?section=dashboard`)
+                      )
                     }
                     className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm aria-selected:bg-accent"
                   >
@@ -133,6 +144,14 @@ export function CommandPalette() {
               >
                 <Film className="h-4 w-4" />
                 All Projects
+              </Command.Item>
+              <Command.Item
+                value="assistant-page"
+                onSelect={() => runCommand(() => router.push("/assistant"))}
+                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm aria-selected:bg-accent"
+              >
+                <Bot className="h-4 w-4" />
+                Assistant
               </Command.Item>
               <Command.Item
                 value="finance"

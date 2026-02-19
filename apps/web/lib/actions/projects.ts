@@ -67,6 +67,7 @@ export async function createProject(
       status: data.status || "DEVELOPMENT",
       startDate: data.startDate || null,
       endDate: data.endDate || null,
+      coverImageUrl: data.coverImageUrl || null,
     })
     .select()
     .single();
@@ -142,6 +143,7 @@ export async function getProjects(): Promise<Project[]> {
         status,
         startDate,
         endDate,
+        coverImageUrl,
         createdAt,
         updatedAt
       )
@@ -163,6 +165,7 @@ export async function getProjects(): Promise<Project[]> {
     status: ProjectStatus;
     startDate: string | null;
     endDate: string | null;
+    coverImageUrl: string | null;
     createdAt: string;
     updatedAt: string;
   };
@@ -316,6 +319,7 @@ export async function updateProject(
       ...(data.status && { status: data.status }),
       ...(data.startDate !== undefined && { startDate: data.startDate }),
       ...(data.endDate !== undefined && { endDate: data.endDate }),
+      ...(data.coverImageUrl !== undefined && { coverImageUrl: data.coverImageUrl }),
       updatedAt: new Date().toISOString(),
     })
     .eq("id", projectId)

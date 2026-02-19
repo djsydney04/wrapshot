@@ -23,7 +23,9 @@ export function TimedSurvey() {
   const [submitted, setSubmitted] = React.useState(false);
   const [dismissed, setDismissed] = React.useState(false);
 
-  const surveyId = process.env.NEXT_PUBLIC_POSTHOG_EVERYUSER_SURVEY_ID;
+  const surveyId =
+    process.env.NEXT_PUBLIC_POSTHOG_TIMED_SURVEY_ID ||
+    process.env.NEXT_PUBLIC_POSTHOG_EVERYUSER_SURVEY_ID;
   const ph = posthog ?? posthogLib;
 
   React.useEffect(() => {
@@ -101,7 +103,9 @@ export function TimedSurvey() {
           survey_type: "timed_prompt",
         });
       } else {
-        console.warn("[TimedSurvey] Missing NEXT_PUBLIC_POSTHOG_EVERYUSER_SURVEY_ID");
+        console.warn(
+          "[TimedSurvey] Missing NEXT_PUBLIC_POSTHOG_TIMED_SURVEY_ID (or legacy NEXT_PUBLIC_POSTHOG_EVERYUSER_SURVEY_ID)"
+        );
       }
     }
 

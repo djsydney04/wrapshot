@@ -7,9 +7,11 @@ import {
   Send,
   Download,
   Loader2,
+  AlertTriangle,
   ChevronDown,
   ChevronRight,
   CheckCircle,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -24,6 +26,16 @@ import {
   publishCallSheet,
   type CallSheetFullData,
 } from "@/lib/actions/call-sheets";
+import {
+  getPostDependenciesForShootingDay,
+  syncPostBlockersToCallSheet,
+  type PostDependencyAlert,
+} from "@/lib/actions/post-production";
+import {
+  getArtDependenciesForShootingDay,
+  syncArtBlockersToCallSheet,
+} from "@/lib/actions/art-department";
+import type { DepartmentDayDependency } from "@/lib/actions/departments-readiness";
 import { updateCastCallTimes, updateDepartmentCallTimes } from "@/lib/actions/shooting-days";
 import { CallSheetPreview } from "./call-sheet-preview";
 import { DistributeDialog } from "./distribute-dialog";
@@ -68,6 +80,12 @@ export function CallSheetEditor({
   const [downloadingPdf, setDownloadingPdf] = React.useState(false);
   const [showDistribute, setShowDistribute] = React.useState(false);
   const [fullData, setFullData] = React.useState<CallSheetFullData | null>(null);
+  const [loadingPostAlerts, setLoadingPostAlerts] = React.useState(false);
+  const [syncingPostAlerts, setSyncingPostAlerts] = React.useState(false);
+  const [postAlerts, setPostAlerts] = React.useState<PostDependencyAlert[]>([]);
+  const [loadingArtAlerts, setLoadingArtAlerts] = React.useState(false);
+  const [syncingArtAlerts, setSyncingArtAlerts] = React.useState(false);
+  const [artAlerts, setArtAlerts] = React.useState<DepartmentDayDependency[]>([]);
 
   // Editable notes fields
   const [nearestHospital, setNearestHospital] = React.useState("");
@@ -141,10 +159,46 @@ export function CallSheetEditor({
     if (data) {
       setLoadError(null);
       setFullData(data);
+      return data;
     } else if (error) {
       setLoadError(error);
     }
+    return null;
   }, [shootingDay.id, projectId]);
+
+  const loadPostAlerts = React.useCallback(async () => {
+    setLoadingPostAlerts(true);
+    try {
+      const { alerts } = await getPostDependenciesForShootingDay(projectId, shootingDay.id);
+      setPostAlerts(alerts.filter((alert) => alert.severity === "BLOCKER"));
+    } catch (error) {
+      console.error("Failed to load post blockers for call sheet editor", error);
+      setPostAlerts([]);
+    } finally {
+      setLoadingPostAlerts(false);
+    }
+  }, [projectId, shootingDay.id]);
+
+  const loadArtAlerts = React.useCallback(async () => {
+    setLoadingArtAlerts(true);
+    try {
+      const { alerts } = await getArtDependenciesForShootingDay(projectId, shootingDay.id);
+      setArtAlerts(alerts.filter((alert) => alert.severity === "CRITICAL"));
+    } catch (error) {
+      console.error("Failed to load art blockers for call sheet editor", error);
+      setArtAlerts([]);
+    } finally {
+      setLoadingArtAlerts(false);
+    }
+  }, [projectId, shootingDay.id]);
+
+  React.useEffect(() => {
+    void loadPostAlerts();
+  }, [loadPostAlerts]);
+
+  React.useEffect(() => {
+    void loadArtAlerts();
+  }, [loadArtAlerts]);
 
   const persistCallSheet = React.useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     if (!fullData) {
@@ -315,6 +369,50 @@ export function CallSheetEditor({
       toast.error(error instanceof Error ? error.message : "Failed to export PDF.");
     } finally {
       setDownloadingPdf(false);
+    }
+  };
+
+  const handleSyncPostAlerts = async () => {
+    setSyncingPostAlerts(true);
+    try {
+      const result = await syncPostBlockersToCallSheet(shootingDay.id);
+      setAdvanceNotes(result.advanceNotes || "");
+      await Promise.all([reloadCallSheetData(), loadPostAlerts()]);
+
+      if (result.blockerCount > 0) {
+        toast.success(
+          `Synced ${result.blockerCount} post blocker${result.blockerCount === 1 ? "" : "s"} to advance notes.`
+        );
+      } else {
+        toast.success("No open post blockers. Auto-synced blocker notes were removed.");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to sync post blockers.");
+    } finally {
+      setSyncingPostAlerts(false);
+    }
+  };
+
+  const handleSyncArtAlerts = async () => {
+    setSyncingArtAlerts(true);
+    try {
+      const result = await syncArtBlockersToCallSheet(shootingDay.id);
+      const [latestCallSheet] = await Promise.all([reloadCallSheetData(), loadArtAlerts()]);
+      if (latestCallSheet?.callSheet.advanceNotes !== undefined) {
+        setAdvanceNotes(latestCallSheet.callSheet.advanceNotes || "");
+      }
+
+      if (result.blockerCount > 0) {
+        toast.success(
+          `Synced ${result.blockerCount} art blocker${result.blockerCount === 1 ? "" : "s"} to call sheet notes.`
+        );
+      } else {
+        toast.success("No open art blockers. Auto-synced blocker notes were removed.");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to sync art blockers.");
+    } finally {
+      setSyncingArtAlerts(false);
     }
   };
 
@@ -718,6 +816,84 @@ export function CallSheetEditor({
               onToggle={() => toggleSection("notes")}
             >
               <div className="space-y-4">
+                <div className="rounded-md border border-border bg-muted/20 p-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                      Art Blockers
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={handleSyncArtAlerts}
+                      disabled={syncingArtAlerts}
+                    >
+                      {syncingArtAlerts ? (
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                      )}
+                      Sync to Call Sheet
+                    </Button>
+                  </div>
+                  {loadingArtAlerts ? (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Loading art blockers...</span>
+                    </div>
+                  ) : artAlerts.length > 0 ? (
+                    <ul className="space-y-1 text-xs text-amber-700 dark:text-amber-300">
+                      {artAlerts.map((alert) => (
+                        <li key={alert.id} className="flex items-start gap-1.5">
+                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <span>{alert.message}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No open art blockers.</p>
+                  )}
+                </div>
+                <div className="rounded-md border border-border bg-muted/20 p-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                      Post Blockers
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={handleSyncPostAlerts}
+                      disabled={syncingPostAlerts}
+                    >
+                      {syncingPostAlerts ? (
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                      )}
+                      Sync to Advance Notes
+                    </Button>
+                  </div>
+                  {loadingPostAlerts ? (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Loading post blockers...</span>
+                    </div>
+                  ) : postAlerts.length > 0 ? (
+                    <ul className="space-y-1 text-xs text-amber-700 dark:text-amber-300">
+                      {postAlerts.map((alert) => (
+                        <li key={alert.id} className="flex items-start gap-1.5">
+                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <span>{alert.message}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No open post blockers.</p>
+                  )}
+                </div>
                 <div>
                   <label className="block text-xs text-muted-foreground mb-1">Safety Notes</label>
                   <Textarea

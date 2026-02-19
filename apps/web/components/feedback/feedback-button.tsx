@@ -28,7 +28,9 @@ export function FeedbackButton({
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [submitted, setSubmitted] = React.useState(false);
 
-  const surveyId = process.env.NEXT_PUBLIC_POSTHOG_SURVEY_ID;
+  const surveyId =
+    process.env.NEXT_PUBLIC_POSTHOG_FEEDBACK_SURVEY_ID ||
+    process.env.NEXT_PUBLIC_POSTHOG_SURVEY_ID;
   const feedbackSource = source || (variant === "header" ? "top_bar" : "sidebar");
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -15,6 +15,7 @@ import {
   User,
   LayoutDashboard,
   DollarSign,
+  Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,12 @@ const NAV_ITEMS: NavItem[] = [
       { label: "Budgets", href: "/finance" },
       { label: "New Budget", href: "/finance/new" },
     ],
+  },
+  {
+    label: "Assistant",
+    href: "/assistant",
+    icon: Bot,
+    tourId: "assistant",
   },
 ];
 

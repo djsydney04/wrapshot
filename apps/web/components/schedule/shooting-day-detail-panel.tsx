@@ -3,6 +3,7 @@
 import * as React from "react";
 import { format } from "date-fns";
 import {
+  AlertTriangle,
   Clock,
   MapPin,
   Pencil,
@@ -32,6 +33,19 @@ import { SceneOrderEditor } from "./scene-order-editor";
 import { CastCallTimesEditor } from "./cast-call-times-editor";
 import { DepartmentCallTimesEditor } from "./department-call-times-editor";
 import type { ShootingDay, Scene, CastMember, Location } from "@/lib/types";
+import {
+  getPostDependenciesForShootingDay,
+  type PostDayReadiness,
+  type PostDependencyAlert,
+} from "@/lib/actions/post-production";
+import {
+  getArtDependenciesForShootingDay,
+  type ArtDayReadiness,
+} from "@/lib/actions/art-department";
+import {
+  getDepartmentDayDependencies,
+  type DepartmentDayDependency,
+} from "@/lib/actions/departments-readiness";
 
 interface ShootingDayDetailPanelProps {
   shootingDay: ShootingDay | null;
@@ -102,6 +116,12 @@ export function ShootingDayDetailPanel({
   const [isEditing, setIsEditing] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
   const [activeSection, setActiveSection] = React.useState<ActiveSection>("overview");
+  const [artReadiness, setArtReadiness] = React.useState<ArtDayReadiness | null>(null);
+  const [artAlerts, setArtAlerts] = React.useState<DepartmentDayDependency[]>([]);
+  const [postReadiness, setPostReadiness] = React.useState<PostDayReadiness | null>(null);
+  const [postAlerts, setPostAlerts] = React.useState<PostDependencyAlert[]>([]);
+  const [departmentAlerts, setDepartmentAlerts] = React.useState<DepartmentDayDependency[]>([]);
+  const [loadingPostReadiness, setLoadingPostReadiness] = React.useState(false);
   const [editedValues, setEditedValues] = React.useState({
     generalCall: "",
     wrapTime: "",
@@ -126,6 +146,47 @@ export function ShootingDayDetailPanel({
       });
     }
   }, [shootingDay]);
+
+  React.useEffect(() => {
+    if (!shootingDay || !open) return;
+
+    let active = true;
+    setLoadingPostReadiness(true);
+
+    void Promise.all([
+      getArtDependenciesForShootingDay(shootingDay.projectId, shootingDay.id),
+      getPostDependenciesForShootingDay(shootingDay.projectId, shootingDay.id),
+      getDepartmentDayDependencies(shootingDay.projectId, {
+        shootingDayId: shootingDay.id,
+        status: "OPEN",
+      }),
+    ])
+      .then(([artResult, postResult, departmentResult]) => {
+        if (!active) return;
+        setArtReadiness(artResult.readiness);
+        setArtAlerts(artResult.alerts);
+        setPostReadiness(postResult.readiness);
+        setPostAlerts(postResult.alerts);
+        setDepartmentAlerts(departmentResult.data || []);
+      })
+      .catch((error) => {
+        if (!active) return;
+        console.error("Failed to load dependencies for shooting day", error);
+        setArtReadiness(null);
+        setArtAlerts([]);
+        setPostReadiness(null);
+        setPostAlerts([]);
+        setDepartmentAlerts([]);
+      })
+      .finally(() => {
+        if (!active) return;
+        setLoadingPostReadiness(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [open, shootingDay]);
 
   if (!shootingDay) {
     return null;
@@ -406,6 +467,124 @@ export function ShootingDayDetailPanel({
                   <div className="text-xs text-muted-foreground">Cast</div>
                 </div>
               </div>
+            </SlidePanelSection>
+
+            <SlidePanelSection title="Post Readiness">
+              {loadingPostReadiness ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Clock className="h-4 w-4 animate-pulse" />
+                  <span>Loading post dependencies...</span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
+                        postReadiness?.status === "READY"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                          : postReadiness?.status === "IN_PROGRESS"
+                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                            : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                      )}
+                    >
+                      {postReadiness?.status ? postReadiness.status.replace("_", " ") : "NOT_READY"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {postReadiness?.blockerCount || 0} blocker
+                      {(postReadiness?.blockerCount || 0) === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  {postReadiness?.summary ? (
+                    <p className="text-xs text-muted-foreground">{postReadiness.summary}</p>
+                  ) : null}
+                  {postAlerts.length > 0 ? (
+                    <div className="rounded-md border border-amber-300/60 bg-amber-100/40 p-2 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/20 dark:text-amber-200">
+                      <p className="mb-1 flex items-center gap-1 font-medium">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Open Post Alerts
+                      </p>
+                      <ul className="space-y-1">
+                        {postAlerts.slice(0, 3).map((alert) => (
+                          <li key={alert.id}>• {alert.message}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </SlidePanelSection>
+
+            <SlidePanelSection title="Art Readiness">
+              {loadingPostReadiness ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Clock className="h-4 w-4 animate-pulse" />
+                  <span>Loading art dependencies...</span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
+                        artReadiness?.status === "READY"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                          : artReadiness?.status === "IN_PROGRESS"
+                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                            : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                      )}
+                    >
+                      {artReadiness?.status ? artReadiness.status.replace("_", " ") : "NOT_READY"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {artReadiness?.blockerCount || 0} blocker
+                      {(artReadiness?.blockerCount || 0) === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  {artReadiness?.summary ? (
+                    <p className="text-xs text-muted-foreground">{artReadiness.summary}</p>
+                  ) : null}
+                  {artAlerts.length > 0 ? (
+                    <div className="rounded-md border border-amber-300/60 bg-amber-100/40 p-2 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/20 dark:text-amber-200">
+                      <p className="mb-1 flex items-center gap-1 font-medium">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Open Art Alerts
+                      </p>
+                      <ul className="space-y-1">
+                        {artAlerts.slice(0, 3).map((alert) => (
+                          <li key={alert.id}>• {alert.message}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </SlidePanelSection>
+
+            <SlidePanelSection title="Department Alerts">
+              {loadingPostReadiness ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Clock className="h-4 w-4 animate-pulse" />
+                  <span>Loading department alerts...</span>
+                </div>
+              ) : departmentAlerts.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    Art, Camera, G&E, and Post blockers surface here and auto-feed call sheet notes.
+                  </p>
+                  <div className="rounded-md border border-amber-300/60 bg-amber-100/40 p-2 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/20 dark:text-amber-200">
+                    <ul className="space-y-1">
+                      {departmentAlerts.slice(0, 6).map((alert) => (
+                        <li key={alert.id}>
+                          • [{alert.department}] {alert.message}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No open department alerts.</p>
+              )}
             </SlidePanelSection>
 
             {/* Notes */}

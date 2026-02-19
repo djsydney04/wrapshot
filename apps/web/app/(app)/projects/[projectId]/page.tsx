@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Film,
   Loader2,
@@ -38,8 +38,11 @@ import { LocationsSection } from "@/components/projects/sections/locations-secti
 import { ScriptSection } from "@/components/projects/sections/script-section";
 import { BudgetSection } from "@/components/projects/sections/budget-section";
 import { CallSheetsSection } from "@/components/projects/sections/callsheets-section";
+import { ArtSection } from "@/components/projects/sections/art-section";
+import { CameraSection } from "@/components/projects/sections/camera-section";
+import { GeSection } from "@/components/projects/sections/ge-section";
+import { PostSection } from "@/components/projects/sections/post-section";
 import { SettingsSection } from "@/components/projects/sections/settings-section";
-import { AssistantSection } from "@/components/projects/sections/assistant-section";
 import { SetupWizard } from "@/components/projects/setup-wizard";
 import { useProjectStore } from "@/lib/stores/project-store";
 import { getProject } from "@/lib/actions/projects";
@@ -75,13 +78,9 @@ const statusLabel: Record<Project["status"], string> = {
 };
 
 const SECTION_META: Record<ProjectSection, { title: string; description: string }> = {
-  overview: {
-    title: "Project Overview",
+  dashboard: {
+    title: "Project Dashboard",
     description: "Track setup progress, upcoming work, and production health at a glance.",
-  },
-  assistant: {
-    title: "Smart Assistant",
-    description: "Ask project-aware questions about schedule, permits, scenes, cast, and risks.",
   },
   script: {
     title: "Script Intelligence",
@@ -94,6 +93,25 @@ const SECTION_META: Record<ProjectSection, { title: string; description: string 
   callsheets: {
     title: "Call Sheets",
     description: "Create, publish, export, and distribute call sheets to cast and crew.",
+  },
+  art: {
+    title: "Art",
+    description:
+      "Manage continuity, pull lists, and build/strike workflows linked to schedule and call sheets.",
+  },
+  camera: {
+    title: "Camera",
+    description:
+      "Build shot lists, package requirements, rental bookings, and daily camera reports.",
+  },
+  ge: {
+    title: "G&E",
+    description:
+      "Manage lighting plans, rigging dependencies, and power/safety readiness by shoot day.",
+  },
+  post: {
+    title: "Post Production",
+    description: "Run dailies ingest/QC, track cuts and notes, and manage VFX plus delivery.",
   },
   cast: {
     title: "Cast",
@@ -128,11 +146,14 @@ const SECTION_META: Record<ProjectSection, { title: string; description: string 
 type DataKey = "scenes" | "scripts" | "cast" | "crew" | "locations" | "elements";
 
 const SECTION_DATA_KEYS: Record<ProjectSection, DataKey[]> = {
-  overview: ["scenes", "scripts", "cast", "crew"],
-  assistant: [],
+  dashboard: ["scenes", "scripts", "cast", "crew"],
   script: ["scripts"],
   schedule: ["scenes", "locations", "cast"],
   callsheets: ["scenes", "cast", "crew"],
+  art: ["scenes", "crew"],
+  camera: ["scenes", "crew"],
+  ge: ["scenes"],
+  post: ["scenes"],
   cast: ["cast"],
   crew: ["crew"],
   locations: ["locations"],
@@ -151,13 +172,60 @@ const DATA_KEY_LABEL: Record<DataKey, string> = {
   elements: "elements",
 };
 
+const SECTION_ORDER: ProjectSection[] = [
+  "dashboard",
+  "script",
+  "scenes",
+  "schedule",
+  "callsheets",
+  "art",
+  "camera",
+  "ge",
+  "post",
+  "cast",
+  "crew",
+  "locations",
+  "gear",
+  "budget",
+  "settings",
+];
+
+const WORKFLOW_PLAN: { id: string; label: string; section: ProjectSection }[] = [
+  { id: "script", label: "Script Ready", section: "script" },
+  { id: "breakdown", label: "Break Down Scenes", section: "scenes" },
+  { id: "schedule", label: "Plan Shoot Days", section: "schedule" },
+  { id: "callsheets", label: "Publish Call Sheets", section: "callsheets" },
+  { id: "art", label: "Art Plan", section: "art" },
+  { id: "camera", label: "Camera Plan", section: "camera" },
+  { id: "ge", label: "G&E Plan", section: "ge" },
+  { id: "post", label: "Post Readiness", section: "post" },
+];
+
+function normalizeSection(section: string | null): ProjectSection | null {
+  if (!section) return null;
+  if (section === "overview" || section === "assistant") return "dashboard";
+  if (SECTION_ORDER.includes(section as ProjectSection)) {
+    return section as ProjectSection;
+  }
+  return null;
+}
+
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const projectId = params.projectId as string;
+  const sectionStorageKey = React.useMemo(
+    () => `project-last-section-${projectId}`,
+    [projectId]
+  );
+  const sectionFromQuery = React.useMemo(
+    () => normalizeSection(searchParams.get("section")),
+    [searchParams]
+  );
 
-  const [activeSection, setActiveSection] = React.useState<ProjectSection>("scenes");
+  const [activeSection, setActiveSection] = React.useState<ProjectSection>("dashboard");
   const [showWizard, setShowWizard] = React.useState(false);
   const [wizardDismissed, setWizardDismissed] = React.useState(false);
   const [project, setProject] = React.useState<Project | null>(null);
@@ -403,6 +471,23 @@ export default function ProjectDetailPage() {
   }, [activeSection, loadSectionData, loading]);
 
   React.useEffect(() => {
+    if (sectionFromQuery) {
+      setActiveSection(sectionFromQuery);
+      return;
+    }
+
+    const stored = localStorage.getItem(sectionStorageKey);
+    const normalizedStored = normalizeSection(stored);
+    if (normalizedStored) {
+      setActiveSection(normalizedStored);
+    }
+  }, [sectionFromQuery, sectionStorageKey]);
+
+  React.useEffect(() => {
+    localStorage.setItem(sectionStorageKey, activeSection);
+  }, [activeSection, sectionStorageKey]);
+
+  React.useEffect(() => {
     if (loading || loadedData.scripts) return;
     void loadDataKey("scripts");
   }, [loadDataKey, loadedData.scripts, loading]);
@@ -564,8 +649,15 @@ export default function ProjectDetailPage() {
   const handleSectionChange = React.useCallback(
     (section: ProjectSection) => {
       setActiveSection(section);
+
+      const currentSection = normalizeSection(searchParams.get("section"));
+      if (currentSection === section) return;
+
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("section", section);
+      router.replace(`/projects/${projectId}?${params.toString()}`, { scroll: false });
     },
-    []
+    [projectId, router, searchParams]
   );
 
   if (loading) {
@@ -596,6 +688,34 @@ export default function ProjectDetailPage() {
       ? dbShootingDays.length
       : project.shootingDaysCount;
   const sidebarElementsCount = loadedData.elements ? elements.length : 0;
+  const hasScript = scripts.length > 0;
+  const hasBreakdown = sidebarScenesCount > 0 && sidebarElementsCount > 0;
+  const hasSchedule = sidebarShootingDaysCount > 0;
+  const hasCallSheets = (sidebarShootingDaysCount > 0) && (crew.length > 0 || cast.length > 0);
+  const hasArtPlan = sidebarScenesCount > 0 && sidebarShootingDaysCount > 0;
+  const hasCameraPlan = sidebarScenesCount > 0 && sidebarShootingDaysCount > 0;
+  const hasGePlan = sidebarScenesCount > 0 && sidebarShootingDaysCount > 0;
+  const hasPostReadiness = sidebarScenesCount > 0 && sidebarShootingDaysCount > 0;
+
+  const workflowCompletion = [
+    hasScript,
+    hasBreakdown,
+    hasSchedule,
+    hasCallSheets,
+    hasArtPlan,
+    hasCameraPlan,
+    hasGePlan,
+    hasPostReadiness,
+  ];
+  const firstPendingWorkflowIndex = workflowCompletion.findIndex((isComplete) => !isComplete);
+  const workflowSteps = WORKFLOW_PLAN.map((step, index) => ({
+    ...step,
+    status: workflowCompletion[index]
+      ? ("done" as const)
+      : index === firstPendingWorkflowIndex
+        ? ("current" as const)
+        : ("upcoming" as const),
+  }));
 
   const activeSectionDataKeys = SECTION_DATA_KEYS[activeSection];
   const activeSectionErrorKeys = activeSectionDataKeys.filter(
@@ -637,7 +757,7 @@ export default function ProjectDetailPage() {
     }
 
     switch (activeSection) {
-      case "overview":
+      case "dashboard":
         return (
           <OverviewSection
             project={project}
@@ -660,8 +780,6 @@ export default function ProjectDetailPage() {
             onNavigate={(section) => handleSectionChange(section as ProjectSection)}
           />
         );
-      case "assistant":
-        return <AssistantSection projectId={projectId} />;
       case "schedule":
         if (!loadedData.scenes || !loadedData.cast || shootingDaysLoading) {
           return (
@@ -690,6 +808,40 @@ export default function ProjectDetailPage() {
             scenes={dbScenes}
             cast={cast}
             crew={crew}
+          />
+        );
+      case "art":
+        return (
+          <ArtSection
+            projectId={projectId}
+            scenes={dbScenes}
+            shootingDays={shootingDays}
+            crew={crew}
+          />
+        );
+      case "camera":
+        return (
+          <CameraSection
+            projectId={projectId}
+            scenes={dbScenes}
+            shootingDays={shootingDays}
+            crew={crew}
+          />
+        );
+      case "ge":
+        return (
+          <GeSection
+            projectId={projectId}
+            scenes={dbScenes}
+            shootingDays={shootingDays}
+          />
+        );
+      case "post":
+        return (
+          <PostSection
+            projectId={projectId}
+            shootingDays={shootingDays}
+            scenes={dbScenes}
           />
         );
       case "cast":
@@ -829,6 +981,7 @@ export default function ProjectDetailPage() {
           <ProjectSidebar
             activeSection={activeSection}
             onSectionChange={handleSectionChange}
+            workflow={workflowSteps}
             counts={{
               scenes: sidebarScenesCount,
               cast: sidebarCastCount,
@@ -837,7 +990,7 @@ export default function ProjectDetailPage() {
               shootingDays: sidebarShootingDaysCount,
               callSheets: sidebarShootingDaysCount,
               gear: sidebarElementsCount,
-              hasScript: scripts.length > 0,
+              hasScript,
             }}
             className="flex-1 px-2 py-2"
           />
@@ -848,7 +1001,7 @@ export default function ProjectDetailPage() {
           {/* Mobile Section Tabs (hidden on desktop) */}
           <div className="border-b border-border px-4 py-2 md:hidden">
             <div className="scrollbar-thin flex gap-2 overflow-x-auto pb-1">
-              {(["overview", "assistant", "scenes", "cast", "crew", "locations", "schedule", "callsheets", "gear", "budget", "script", "settings"] as ProjectSection[]).map(
+              {SECTION_ORDER.map(
                 (section) => (
                   <button
                     key={section}
@@ -862,7 +1015,15 @@ export default function ProjectDetailPage() {
                   >
                     {section === "callsheets"
                       ? "Call Sheets"
-                      : section.charAt(0).toUpperCase() + section.slice(1)}
+                      : section === "art"
+                        ? "Art"
+                      : section === "camera"
+                        ? "Camera"
+                        : section === "ge"
+                          ? "G&E"
+                        : section === "post"
+                          ? "Post"
+                        : section.charAt(0).toUpperCase() + section.slice(1)}
                   </button>
                 )
               )}
@@ -879,12 +1040,7 @@ export default function ProjectDetailPage() {
 
             {/* Section Content */}
             <div
-              className={cn(
-                "min-h-[220px]",
-                activeSection === "assistant"
-                  ? ""
-                  : "skeuo-panel rounded-2xl p-4 md:p-5"
-              )}
+              className={cn("min-h-[220px]", "skeuo-panel rounded-2xl p-4 md:p-5")}
             >
               {renderSection()}
             </div>

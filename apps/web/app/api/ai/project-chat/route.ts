@@ -21,6 +21,9 @@ interface SceneContextRow {
   location: { name: string } | { name: string }[] | null;
 }
 
+const CHAT_HISTORY_LIMIT = 40;
+const CHAT_RENDER_LIMIT = 240;
+
 function trimText(value: string | null | undefined, maxLength: number): string {
   if (!value) return "";
   const normalized = value.replace(/\s+/g, " ").trim();
@@ -250,13 +253,48 @@ export async function GET(request: Request) {
     .eq("projectId", projectId)
     .eq("userId", user.id)
     .order("createdAt", { ascending: true })
-    .limit(200);
+    .limit(CHAT_RENDER_LIMIT);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   return NextResponse.json({ data: (data || []) as ChatMessageRow[] });
+}
+
+export async function DELETE(request: Request) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const projectId = searchParams.get("projectId");
+
+  if (!projectId) {
+    return NextResponse.json({ error: "projectId is required" }, { status: 400 });
+  }
+
+  const access = await ensureProjectAccess(projectId, user.id);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: 403 });
+  }
+
+  const { error } = await supabase
+    .from("ProjectAIChatMessage")
+    .delete()
+    .eq("projectId", projectId)
+    .eq("userId", user.id);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
 }
 
 export async function POST(request: Request) {
@@ -316,7 +354,7 @@ export async function POST(request: Request) {
         .eq("projectId", projectId)
         .eq("userId", user.id)
         .order("createdAt", { ascending: false })
-        .limit(24),
+        .limit(CHAT_HISTORY_LIMIT),
       buildProjectContext(projectId),
     ]);
 
@@ -337,7 +375,8 @@ export async function POST(request: Request) {
       temperature: 0.3,
     });
 
-    const assistantMessage = response.trim();
+    const assistantMessage =
+      response.trim() || "I couldn't generate a response from this context. Please try again.";
 
     const { data: insertedAssistant, error: assistantInsertError } = await supabase
       .from("ProjectAIChatMessage")
