@@ -21,6 +21,14 @@ export interface ShootingDayInput {
   estimatedWrap?: string;
   notes?: string;
   scenes?: string[];
+  filmScheduleTemplate?: string;
+  filmScheduleItems?: Array<{
+    id: string;
+    time: string;
+    label: string;
+    detail?: string;
+    tone?: "default" | "accent" | "break" | "wrap";
+  }>;
 }
 
 export interface ShootingDayRow {
@@ -36,6 +44,16 @@ export interface ShootingDayRow {
   actualWrap: string | null;
   weatherNotes: string | null;
   notes: string | null;
+  filmScheduleTemplate: string | null;
+  filmScheduleItems:
+    | Array<{
+        id: string;
+        time: string;
+        label: string;
+        detail?: string;
+        tone?: "default" | "accent" | "break" | "wrap";
+      }>
+    | null;
   status: ShootingDayStatus;
   createdAt: string;
   updatedAt: string;
@@ -92,6 +110,8 @@ export async function createShootingDay(input: ShootingDayInput) {
       generalCall: input.generalCall || null,
       estimatedWrap: input.estimatedWrap || null,
       notes: input.notes || null,
+      filmScheduleTemplate: input.filmScheduleTemplate || null,
+      filmScheduleItems: input.filmScheduleItems || null,
       isShootingDay: true,
     })
     .select()

@@ -20,6 +20,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { DailyFilmSchedule } from "./daily-film-schedule";
+import { formatPageEighths, sumPageEighths } from "@/lib/utils/page-eighths";
+import {
+  DEFAULT_FILM_DAY_TEMPLATE_ID,
+  getFilmDayTemplateOptions,
+} from "@/lib/schedule/film-day";
 import {
   SlidePanel,
   SlidePanelHeader,
@@ -32,7 +37,13 @@ import {
 import { SceneOrderEditor } from "./scene-order-editor";
 import { CastCallTimesEditor } from "./cast-call-times-editor";
 import { DepartmentCallTimesEditor } from "./department-call-times-editor";
-import type { ShootingDay, Scene, CastMember, Location } from "@/lib/types";
+import type {
+  ShootingDay,
+  Scene,
+  CastMember,
+  Location,
+  ShootingDayScheduleItem,
+} from "@/lib/types";
 import {
   getPostDependenciesForShootingDay,
   type PostDayReadiness,
@@ -122,7 +133,16 @@ export function ShootingDayDetailPanel({
   const [postAlerts, setPostAlerts] = React.useState<PostDependencyAlert[]>([]);
   const [departmentAlerts, setDepartmentAlerts] = React.useState<DepartmentDayDependency[]>([]);
   const [loadingPostReadiness, setLoadingPostReadiness] = React.useState(false);
-  const [editedValues, setEditedValues] = React.useState({
+  const [editedValues, setEditedValues] = React.useState<{
+    generalCall: string;
+    wrapTime: string;
+    crewCall: string;
+    talentCall: string;
+    status: string;
+    notes: string;
+    locationId: string;
+    filmScheduleTemplate: string;
+  }>({
     generalCall: "",
     wrapTime: "",
     crewCall: "",
@@ -130,7 +150,17 @@ export function ShootingDayDetailPanel({
     status: "",
     notes: "",
     locationId: "",
+    filmScheduleTemplate: DEFAULT_FILM_DAY_TEMPLATE_ID,
   });
+  const [customScheduleItems, setCustomScheduleItems] = React.useState<ShootingDayScheduleItem[]>([]);
+  const filmDayTemplateOptions = React.useMemo(
+    () =>
+      getFilmDayTemplateOptions().map((template) => ({
+        value: template.value,
+        label: template.label,
+      })),
+    []
+  );
 
   // Reset edited values when shooting day changes
   React.useEffect(() => {
@@ -143,7 +173,10 @@ export function ShootingDayDetailPanel({
         status: shootingDay.status,
         notes: shootingDay.notes || "",
         locationId: shootingDay.locationId || "",
+        filmScheduleTemplate:
+          shootingDay.filmScheduleTemplate || DEFAULT_FILM_DAY_TEMPLATE_ID,
       });
+      setCustomScheduleItems(shootingDay.filmScheduleItems || []);
     }
   }, [shootingDay]);
 
@@ -196,7 +229,7 @@ export function ShootingDayDetailPanel({
   const dayScenes = scenes.filter((s) => shootingDay.scenes.includes(s.id));
 
   // Get total pages
-  const totalPages = dayScenes.reduce((sum, s) => sum + s.pageCount, 0);
+  const totalPageEighths = sumPageEighths(dayScenes);
 
   // Get unique cast from scenes
   const castIds = new Set(dayScenes.flatMap((s) => s.castIds || []));
@@ -212,6 +245,51 @@ export function ShootingDayDetailPanel({
     wrapTime: isEditing ? editedValues.wrapTime : shootingDay.wrapTime,
     crewCall: isEditing ? editedValues.crewCall : shootingDay.crewCall,
     talentCall: isEditing ? editedValues.talentCall : shootingDay.talentCall,
+    filmScheduleTemplate: isEditing
+      ? editedValues.filmScheduleTemplate
+      : shootingDay.filmScheduleTemplate,
+    filmScheduleItems: isEditing ? customScheduleItems : shootingDay.filmScheduleItems,
+  };
+
+  const normalizeScheduleItems = (items: ShootingDayScheduleItem[]) =>
+    items
+      .map((item) => ({
+        ...item,
+        label: item.label.trim(),
+        detail: item.detail?.trim() || "",
+      }))
+      .filter((item) => item.time && item.label);
+
+  const addCustomScheduleItem = () => {
+    setCustomScheduleItems((prev) => [
+      ...prev,
+      {
+        id:
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : `custom-${Date.now()}-${prev.length + 1}`,
+        time: editedValues.generalCall || shootingDay.generalCall || "07:00",
+        label: "Custom Call",
+        detail: "",
+        tone: "default",
+      },
+    ]);
+  };
+
+  const updateCustomScheduleItem = (
+    index: number,
+    field: keyof ShootingDayScheduleItem,
+    value: string
+  ) => {
+    setCustomScheduleItems((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const removeCustomScheduleItem = (index: number) => {
+    setCustomScheduleItems((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
   };
 
   const handleDelete = async () => {
@@ -237,6 +315,8 @@ export function ShootingDayDetailPanel({
       status: editedValues.status as ShootingDay["status"],
       notes: editedValues.notes || undefined,
       locationId: editedValues.locationId || undefined,
+      filmScheduleTemplate: editedValues.filmScheduleTemplate || undefined,
+      filmScheduleItems: normalizeScheduleItems(customScheduleItems),
     });
 
     setIsEditing(false);
@@ -252,6 +332,9 @@ export function ShootingDayDetailPanel({
     { id: "cast", label: "Cast", icon: <Users className="h-4 w-4" /> },
     { id: "departments", label: "Departments", icon: <Building className="h-4 w-4" /> },
   ];
+  const selectedTemplateLabel =
+    filmDayTemplateOptions.find((option) => option.value === editedValues.filmScheduleTemplate)
+      ?.label || "Single-Cam 12 Hour";
 
   return (
     <SlidePanel open={open} onOpenChange={onOpenChange} showOverlay>
@@ -410,6 +493,103 @@ export function ShootingDayDetailPanel({
               </div>
             </SlidePanelSection>
 
+            <SlidePanelSection title="Film Day Assets">
+              {isEditing ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">
+                      Industry Template
+                    </label>
+                    <Select
+                      value={editedValues.filmScheduleTemplate}
+                      onChange={(e) =>
+                        setEditedValues({
+                          ...editedValues,
+                          filmScheduleTemplate: e.target.value,
+                        })
+                      }
+                      options={filmDayTemplateOptions}
+                    />
+                  </div>
+                  <div>
+                    <div className="mb-1 flex items-center justify-between">
+                      <label className="block text-xs text-muted-foreground">
+                        Custom Call Times
+                      </label>
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={addCustomScheduleItem}>
+                        Add Custom Call
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {customScheduleItems.map((item, index) => (
+                        <div key={item.id || index} className="grid grid-cols-[110px_1fr_1fr_32px] gap-2">
+                          <Input
+                            type="time"
+                            value={item.time}
+                            onChange={(e) =>
+                              updateCustomScheduleItem(index, "time", e.target.value)
+                            }
+                          />
+                          <Input
+                            value={item.label}
+                            onChange={(e) =>
+                              updateCustomScheduleItem(index, "label", e.target.value)
+                            }
+                            placeholder="Call label"
+                          />
+                          <Input
+                            value={item.detail || ""}
+                            onChange={(e) =>
+                              updateCustomScheduleItem(index, "detail", e.target.value)
+                            }
+                            placeholder="Detail (optional)"
+                          />
+                          <Button
+                            variant="ghost"
+                            className="h-9 w-8 p-0 text-destructive hover:text-destructive"
+                            onClick={() => removeCustomScheduleItem(index)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      {customScheduleItems.length === 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          No custom calls yet. Add as many as you need.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Template:</span>{" "}
+                    <span className="font-medium">{selectedTemplateLabel}</span>
+                  </p>
+                  {customScheduleItems.length > 0 ? (
+                    <div className="rounded-md border border-border divide-y divide-border">
+                      {customScheduleItems.map((item) => (
+                        <div key={item.id} className="grid grid-cols-[96px_1fr] gap-2 px-3 py-2 text-sm">
+                          <span className="font-mono text-muted-foreground">{item.time}</span>
+                          <span>
+                            <span className="font-medium">{item.label}</span>
+                            {item.detail ? (
+                              <span className="text-muted-foreground"> · {item.detail}</span>
+                            ) : null}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No additional custom call times.
+                    </p>
+                  )}
+                </div>
+              )}
+            </SlidePanelSection>
+
             <SlidePanelSection title="Daily Film Schedule">
               <DailyFilmSchedule
                 shootingDay={schedulePreviewDay}
@@ -458,7 +638,7 @@ export function ShootingDayDetailPanel({
                 </div>
                 <div className="rounded-lg bg-muted/50 p-3 text-center">
                   <div className="text-2xl font-semibold">
-                    {totalPages.toFixed(1)}
+                    {formatPageEighths(totalPageEighths)}
                   </div>
                   <div className="text-xs text-muted-foreground">Pages</div>
                 </div>

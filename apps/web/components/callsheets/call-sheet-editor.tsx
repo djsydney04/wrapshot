@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
+import { formatDecimalPagesAsEighths } from "@/lib/utils/page-eighths";
 import {
   getFullCallSheetData,
   updateCallSheet,
@@ -66,6 +66,15 @@ type DeptCallTimeEdit = {
   notes: string;
 };
 
+function normalizeHexColor(value: string | null | undefined, fallback: string): string {
+  if (!value) return fallback;
+  const normalized = value.trim();
+  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(normalized)) {
+    return normalized;
+  }
+  return fallback;
+}
+
 export function CallSheetEditor({
   projectId,
   shootingDay,
@@ -93,6 +102,11 @@ export function CallSheetEditor({
   const [parkingNotes, setParkingNotes] = React.useState("");
   const [mealNotes, setMealNotes] = React.useState("");
   const [advanceNotes, setAdvanceNotes] = React.useState("");
+  const [brandDisplayName, setBrandDisplayName] = React.useState("");
+  const [brandLogoUrl, setBrandLogoUrl] = React.useState("");
+  const [headerAccentColor, setHeaderAccentColor] = React.useState("#111827");
+  const [headerTextColor, setHeaderTextColor] = React.useState("#111111");
+  const [footerText, setFooterText] = React.useState("");
 
   // Cast & department call times
   const [castCallTimes, setCastCallTimes] = React.useState<CastCallTimeEdit[]>([]);
@@ -100,7 +114,7 @@ export function CallSheetEditor({
 
   // Collapsible sections
   const [expandedSections, setExpandedSections] = React.useState<Set<string>>(
-    new Set(["general", "scenes", "cast", "departments", "location", "notes"])
+    new Set(["general", "style", "scenes", "cast", "departments", "location", "notes"])
   );
 
   const toggleSection = (section: string) => {
@@ -125,6 +139,11 @@ export function CallSheetEditor({
         setParkingNotes(data.callSheet.parkingNotes || "");
         setMealNotes(data.callSheet.mealNotes || "");
         setAdvanceNotes(data.callSheet.advanceNotes || "");
+        setBrandDisplayName(data.callSheet.brandDisplayName || "");
+        setBrandLogoUrl(data.callSheet.brandLogoUrl || "");
+        setHeaderAccentColor(normalizeHexColor(data.callSheet.headerAccentColor, "#111827"));
+        setHeaderTextColor(normalizeHexColor(data.callSheet.headerTextColor, "#111111"));
+        setFooterText(data.callSheet.footerText || "");
 
         // Initialize cast call times from data
         setCastCallTimes(
@@ -226,6 +245,11 @@ export function CallSheetEditor({
         parkingNotes: parkingNotes || null,
         mealNotes: mealNotes || null,
         advanceNotes: advanceNotes || null,
+        brandDisplayName: brandDisplayName || null,
+        brandLogoUrl: brandLogoUrl || null,
+        headerAccentColor: headerAccentColor || null,
+        headerTextColor: headerTextColor || null,
+        footerText: footerText || null,
       });
 
       if (callSheetResult.error) {
@@ -283,6 +307,11 @@ export function CallSheetEditor({
     parkingNotes,
     reloadCallSheetData,
     safetyNotes,
+    brandDisplayName,
+    brandLogoUrl,
+    headerAccentColor,
+    headerTextColor,
+    footerText,
     shootingDay.id,
   ]);
 
@@ -476,6 +505,11 @@ export function CallSheetEditor({
       parkingNotes,
       mealNotes,
       advanceNotes,
+      brandDisplayName,
+      brandLogoUrl,
+      headerAccentColor,
+      headerTextColor,
+      footerText,
     },
   };
 
@@ -570,6 +604,61 @@ export function CallSheetEditor({
               </div>
             </CollapsibleSection>
 
+            <CollapsibleSection
+              title="Style & Branding"
+              expanded={expandedSections.has("style")}
+              onToggle={() => toggleSection("style")}
+            >
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Brand Name</label>
+                    <Input
+                      value={brandDisplayName}
+                      onChange={(e) => setBrandDisplayName(e.target.value)}
+                      placeholder={fullData.project?.productionCompany || "Production Company"}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Logo URL</label>
+                    <Input
+                      value={brandLogoUrl}
+                      onChange={(e) => setBrandLogoUrl(e.target.value)}
+                      placeholder="https://..."
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Header Accent</label>
+                    <Input
+                      type="color"
+                      value={headerAccentColor}
+                      onChange={(e) => setHeaderAccentColor(e.target.value)}
+                      className="h-9 p-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Header Text</label>
+                    <Input
+                      type="color"
+                      value={headerTextColor}
+                      onChange={(e) => setHeaderTextColor(e.target.value)}
+                      className="h-9 p-1"
+                    />
+                  </div>
+                  <div className="md:col-span-1">
+                    <label className="block text-xs text-muted-foreground mb-1">Footer Text</label>
+                    <Input
+                      value={footerText}
+                      onChange={(e) => setFooterText(e.target.value)}
+                      placeholder="Generated by..."
+                    />
+                  </div>
+                </div>
+              </div>
+            </CollapsibleSection>
+
             {/* Scene Schedule */}
             <CollapsibleSection
               title={`Scene Schedule (${fullData.scenes.length})`}
@@ -602,7 +691,7 @@ export function CallSheetEditor({
                           </td>
                           <td className="px-3 py-2">{s.scene.intExt}</td>
                           <td className="px-3 py-2">{s.scene.dayNight}</td>
-                          <td className="px-3 py-2">{Number(s.scene.pageCount).toFixed(1)}</td>
+                          <td className="px-3 py-2">{formatDecimalPagesAsEighths(s.scene.pageCount)}</td>
                           <td className="px-3 py-2 text-muted-foreground">
                             {s.scene.setName || s.scene.location?.name || "—"}
                           </td>
@@ -738,7 +827,7 @@ export function CallSheetEditor({
 
             {/* Department Calls */}
             <CollapsibleSection
-              title={`Department Calls (${deptCallTimes.length})`}
+              title={`Department & Custom Calls (${deptCallTimes.length})`}
               expanded={expandedSections.has("departments")}
               onToggle={() => toggleSection("departments")}
             >
@@ -777,7 +866,7 @@ export function CallSheetEditor({
                 </div>
               ) : null}
               <Button variant="outline" size="sm" className="mt-2 text-xs" onClick={addDeptCallTime}>
-                + Add Department
+                + Add Custom Call
               </Button>
             </CollapsibleSection>
 

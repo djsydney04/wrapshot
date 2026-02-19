@@ -19,10 +19,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { formatScenePages } from "@/lib/utils/page-eighths";
 import { getScenes, deleteScene, type Scene } from "@/lib/actions/scenes";
 import {
   getElementsWithSceneCounts,
+  createElement,
   deleteElement,
+  updateElement,
   type Element,
 } from "@/lib/actions/elements";
 import {
@@ -178,8 +182,17 @@ export function AnalysisResultsPanel({
     null,
   );
   const [editingSynopsis, setEditingSynopsis] = React.useState("");
+  const [editingElementId, setEditingElementId] = React.useState<string | null>(null);
+  const [editingElementName, setEditingElementName] = React.useState("");
+  const [editingElementDescription, setEditingElementDescription] = React.useState("");
+  const [editingElementCategory, setEditingElementCategory] =
+    React.useState<ElementCategory>("PROP");
   const [editingCastId, setEditingCastId] = React.useState<string | null>(null);
   const [editingActorName, setEditingActorName] = React.useState("");
+  const [newElementName, setNewElementName] = React.useState("");
+  const [newElementDescription, setNewElementDescription] = React.useState("");
+  const [newElementCategory, setNewElementCategory] =
+    React.useState<ElementCategory>("PROP");
 
   // Action in progress
   const [actionInProgress, setActionInProgress] = React.useState<string | null>(
@@ -228,6 +241,86 @@ export function AnalysisResultsPanel({
       setElements((prev) => prev.filter((e) => e.id !== elementId));
       onDataRefresh();
     }
+    setActionInProgress(null);
+  };
+
+  const handleStartEditElement = (element: Element) => {
+    setEditingElementId(element.id);
+    setEditingElementName(element.name);
+    setEditingElementDescription(element.description || "");
+    setEditingElementCategory(element.category);
+  };
+
+  const handleCancelEditElement = () => {
+    setEditingElementId(null);
+    setEditingElementName("");
+    setEditingElementDescription("");
+    setEditingElementCategory("PROP");
+  };
+
+  const handleSaveElement = async (elementId: string) => {
+    const name = editingElementName.trim();
+    if (!name) {
+      toast.error("Element name is required");
+      return;
+    }
+
+    setActionInProgress(elementId);
+    const result = await updateElement(elementId, {
+      name,
+      category: editingElementCategory,
+      description: editingElementDescription.trim() || undefined,
+    });
+
+    if (result.error || !result.data) {
+      toast.error("Failed to update element");
+      setActionInProgress(null);
+      return;
+    }
+
+    setElements((prev) =>
+      prev.map((element) =>
+        element.id === elementId
+          ? {
+              ...element,
+              name: result.data!.name,
+              category: result.data!.category,
+              description: result.data!.description,
+            }
+          : element
+      )
+    );
+    onDataRefresh();
+    handleCancelEditElement();
+    setActionInProgress(null);
+  };
+
+  const handleAddElement = async () => {
+    const name = newElementName.trim();
+    if (!name) {
+      toast.error("Element name is required");
+      return;
+    }
+
+    setActionInProgress("create-element");
+    const result = await createElement({
+      projectId,
+      category: newElementCategory,
+      name,
+      description: newElementDescription.trim() || undefined,
+    });
+
+    if (result.error || !result.data) {
+      toast.error("Failed to add element");
+      setActionInProgress(null);
+      return;
+    }
+
+    setElements((prev) => [...prev, result.data as Element]);
+    setNewElementName("");
+    setNewElementDescription("");
+    setNewElementCategory("PROP");
+    onDataRefresh();
     setActionInProgress(null);
   };
 
@@ -304,6 +397,14 @@ export function AnalysisResultsPanel({
     }
     return grouped;
   }, [elements]);
+  const elementCategoryOptions = React.useMemo(
+    () =>
+      (Object.keys(ELEMENT_CATEGORY_LABELS) as ElementCategory[]).map((category) => ({
+        value: category,
+        label: ELEMENT_CATEGORY_LABELS[category],
+      })),
+    []
+  );
 
   const visibleScenes = showAllScenes ? scenes : scenes.slice(0, 5);
   const visibleCast = showAllCast ? cast : cast.slice(0, 5);
@@ -400,7 +501,7 @@ export function AnalysisResultsPanel({
                 </span>
                 {scene.pageCount > 0 && (
                   <span className="text-xs text-muted-foreground shrink-0">
-                    {scene.pageCount}pg
+                    {formatScenePages(scene)}pg
                   </span>
                 )}
                 {editingSceneId === scene.id ? (
@@ -472,35 +573,133 @@ export function AnalysisResultsPanel({
           navigateLabel="Open in Elements"
           onNavigate={() => onNavigate("gear")}
         >
-          <div className="space-y-2">
-            {Array.from(elementsByCategory.entries()).map(
-              ([category, items]) => (
-                <div key={category}>
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {ELEMENT_CATEGORY_LABELS[category] || category} ({items.length})
-                  </span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {items.map((el) => (
-                      <Badge
-                        key={el.id}
-                        variant="secondary"
-                        className="text-xs gap-1 group/chip"
+          <div className="space-y-3">
+            <div className="rounded-md border border-border bg-muted/20 p-2">
+              <div className="grid grid-cols-[170px_1fr_1fr_auto] gap-2">
+                <Select
+                  value={newElementCategory}
+                  onChange={(event) =>
+                    setNewElementCategory(event.target.value as ElementCategory)
+                  }
+                  options={elementCategoryOptions}
+                />
+                <Input
+                  value={newElementName}
+                  onChange={(event) => setNewElementName(event.target.value)}
+                  placeholder="Add element name"
+                />
+                <Input
+                  value={newElementDescription}
+                  onChange={(event) => setNewElementDescription(event.target.value)}
+                  placeholder="Description (optional)"
+                />
+                <Button
+                  size="sm"
+                  className="h-9"
+                  onClick={handleAddElement}
+                  disabled={actionInProgress === "create-element"}
+                >
+                  {actionInProgress === "create-element" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    "Add"
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {Array.from(elementsByCategory.entries()).map(([category, items]) => (
+              <div key={category}>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {ELEMENT_CATEGORY_LABELS[category] || category} ({items.length})
+                </span>
+                <div className="mt-1 space-y-1">
+                  {items.map((element) => {
+                    const isEditingElement = editingElementId === element.id;
+                    return (
+                      <div
+                        key={element.id}
+                        className="rounded-md border border-border bg-muted/20 px-2 py-1.5"
                       >
-                        {el.name}
-                        <button
-                          type="button"
-                          className="opacity-0 group-hover/chip:opacity-100 transition-opacity ml-0.5"
-                          onClick={() => handleDeleteElement(el.id)}
-                          disabled={actionInProgress === el.id}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
+                        {isEditingElement ? (
+                          <div className="grid grid-cols-[170px_1fr_1fr_auto] gap-2">
+                            <Select
+                              value={editingElementCategory}
+                              onChange={(event) =>
+                                setEditingElementCategory(event.target.value as ElementCategory)
+                              }
+                              options={elementCategoryOptions}
+                            />
+                            <Input
+                              value={editingElementName}
+                              onChange={(event) => setEditingElementName(event.target.value)}
+                              placeholder="Element name"
+                            />
+                            <Input
+                              value={editingElementDescription}
+                              onChange={(event) =>
+                                setEditingElementDescription(event.target.value)
+                              }
+                              placeholder="Description (optional)"
+                            />
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                onClick={() => handleSaveElement(element.id)}
+                                disabled={actionInProgress === element.id}
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                onClick={handleCancelEditElement}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="font-medium">{element.name}</span>
+                            {element.description && (
+                              <span className="truncate text-xs text-muted-foreground">
+                                {element.description}
+                              </span>
+                            )}
+                            {element.sceneCount ? (
+                              <Badge variant="secondary" className="text-[10px]">
+                                {element.sceneCount} scene
+                                {element.sceneCount === 1 ? "" : "s"}
+                              </Badge>
+                            ) : null}
+                            <span className="flex-1" />
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              className="h-6 w-6"
+                              onClick={() => handleStartEditElement(element)}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDeleteElement(element.id)}
+                              disabled={actionInProgress === element.id}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              ),
-            )}
+              </div>
+            ))}
           </div>
         </AnalysisSection>
 

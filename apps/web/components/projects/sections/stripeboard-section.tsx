@@ -27,6 +27,7 @@ import { BreakdownPanel } from "@/components/stripeboard/breakdown-panel";
 import { UnscheduledPool } from "@/components/stripeboard/unscheduled-pool";
 import { AddSceneForm } from "@/components/forms/add-scene-form";
 import { cn } from "@/lib/utils";
+import { formatPageEighths, sumPageEighths } from "@/lib/utils/page-eighths";
 import {
   updateScene as updateSceneAction,
   deleteScene as deleteSceneAction,
@@ -338,7 +339,7 @@ export function StripeboardSection({
 
   const activeScene = activeId ? sceneById.get(activeId) || null : null;
 
-  const totalPages = localScenes.reduce((sum, s) => sum + s.pageCount, 0);
+  const totalPageEighths = sumPageEighths(localScenes);
   const completedScenes = localScenes.filter((s) => s.status === "COMPLETED").length;
   const scheduledScenes = localScenes.filter(
     (s) => s.status === "SCHEDULED" || assignedSceneIds.has(s.id)
@@ -383,7 +384,7 @@ export function StripeboardSection({
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span>{localScenes.length} scenes</span>
               <span>·</span>
-              <span>{totalPages.toFixed(1)} pages</span>
+              <span>{formatPageEighths(totalPageEighths)} pages</span>
               <span>·</span>
               <span>{scheduledScenes} scheduled</span>
               <span>·</span>
@@ -404,7 +405,7 @@ export function StripeboardSection({
                 )}
               >
                 <Columns3 className="h-3.5 w-3.5" />
-                Stripeboard
+                Stripboard
               </button>
               <button
                 onClick={() => setViewMode("list")}

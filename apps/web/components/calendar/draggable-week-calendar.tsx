@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ShootingDayCard } from "./shooting-day-card";
+import { formatScenePages } from "@/lib/utils/page-eighths";
 import type { ShootingDay, Scene, CastMember, Location } from "@/lib/types";
 
 interface DraggableWeekCalendarProps {
@@ -124,7 +125,7 @@ function DraggableSceneItem({
           {scene.synopsis || "No synopsis"}
         </p>
         <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
-          <span>{scene.pageCount} pg</span>
+          <span>{formatScenePages(scene)} pg</span>
           {scene.estimatedMinutes && (
             <span className="flex items-center gap-0.5">
               <Clock className="h-2.5 w-2.5" />

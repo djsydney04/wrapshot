@@ -93,7 +93,7 @@ const SECTION_META: Record<ProjectSection, { title: string; description: string 
     description: "Manage script versions, run analysis, and review extracted results.",
   },
   schedule: {
-    title: "Schedule & Stripeboard",
+    title: "Schedule & Stripboard",
     description: "Build shooting days, assign scenes, and optimize run-of-show planning.",
   },
   callsheets: {

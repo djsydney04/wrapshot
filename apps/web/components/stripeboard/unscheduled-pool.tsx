@@ -7,6 +7,7 @@ import { FileText, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { SortableSceneStrip } from "./scene-strip";
 import { cn } from "@/lib/utils";
+import { formatPageEighths, sumPageEighths } from "@/lib/utils/page-eighths";
 import type { Scene } from "@/lib/actions/scenes";
 import type { SceneStripSize } from "./scene-strip";
 
@@ -68,10 +69,7 @@ export function UnscheduledPool({
     [sortedScenes]
   );
 
-  const totalPages = scenes.reduce(
-    (sum, s) => sum + (s.pageEighths ? s.pageEighths / 8 : s.pageCount),
-    0
-  );
+  const totalPageEighths = sumPageEighths(scenes);
 
   return (
     <div
@@ -90,7 +88,7 @@ export function UnscheduledPool({
             <span className="font-medium text-sm">Unscheduled</span>
           </div>
           <span className="text-xs text-muted-foreground">
-            {scenes.length} · {totalPages.toFixed(1)}pg
+            {scenes.length} · {formatPageEighths(totalPageEighths)} pg
           </span>
         </div>
         <div className="relative">

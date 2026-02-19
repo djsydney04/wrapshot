@@ -18,7 +18,12 @@ import {
 } from "@/components/ui/dialog";
 import { useProjectStore } from "@/lib/stores/project-store";
 import { createShootingDay, updateShootingDay } from "@/lib/actions/shooting-days";
-import { deriveLunchTime } from "@/lib/schedule/film-day";
+import {
+  DEFAULT_FILM_DAY_TEMPLATE_ID,
+  deriveLunchTime,
+  getFilmDayTemplateOptions,
+} from "@/lib/schedule/film-day";
+import { formatPageEighths, formatScenePages, sumPageEighths } from "@/lib/utils/page-eighths";
 import type { ShootingDay } from "@/lib/types";
 import { trackShootingDayCreated } from "@/lib/analytics/posthog";
 
@@ -54,6 +59,14 @@ export function AddShootingDayForm({
   } = useProjectStore();
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const filmDayTemplateOptions = React.useMemo(
+    () =>
+      getFilmDayTemplateOptions().map((template) => ({
+        value: template.value,
+        label: template.label,
+      })),
+    []
+  );
 
   const existingDays = getShootingDaysForProject(projectId);
   const scenes = getScenesForProject(projectId);
@@ -86,6 +99,8 @@ export function AddShootingDayForm({
         editingDay?.lunchTime || deriveLunchTime(crewCall, generalCall),
       notes: editingDay?.notes || "",
       selectedScenes: editingDay?.scenes || ([] as string[]),
+      filmScheduleTemplate:
+        editingDay?.filmScheduleTemplate || DEFAULT_FILM_DAY_TEMPLATE_ID,
     };
   }, [editingDay, defaultDate, defaultStartTime, defaultEndTime]);
 
@@ -171,6 +186,7 @@ export function AddShootingDayForm({
             lunchTime: formData.lunchTime || undefined,
             scenes: formData.selectedScenes,
             notes: formData.notes || undefined,
+            filmScheduleTemplate: formData.filmScheduleTemplate || undefined,
           });
         } else {
           const result = await updateShootingDay(editingDay.id, {
@@ -181,6 +197,7 @@ export function AddShootingDayForm({
             estimatedWrap: formData.wrapTime || undefined,
             scenes: formData.selectedScenes,
             notes: formData.notes || undefined,
+            filmScheduleTemplate: formData.filmScheduleTemplate || undefined,
           });
 
           if (result.error) {
@@ -212,6 +229,7 @@ export function AddShootingDayForm({
             lunchTime: formData.lunchTime || undefined,
             scenes: formData.selectedScenes,
             notes: formData.notes || undefined,
+            filmScheduleTemplate: formData.filmScheduleTemplate || undefined,
           });
         } else {
           const result = await createShootingDay({
@@ -224,6 +242,7 @@ export function AddShootingDayForm({
             estimatedWrap: formData.wrapTime || undefined,
             scenes: formData.selectedScenes,
             notes: formData.notes || undefined,
+            filmScheduleTemplate: formData.filmScheduleTemplate || undefined,
           });
 
           if (result.error) {
@@ -256,6 +275,7 @@ export function AddShootingDayForm({
         lunchTime: deriveLunchTime("06:30", "07:00"),
         notes: "",
         selectedScenes: [],
+        filmScheduleTemplate: DEFAULT_FILM_DAY_TEMPLATE_ID,
       });
       setLunchTimeManuallyEdited(false);
       onOpenChange(false);
@@ -323,9 +343,9 @@ export function AddShootingDayForm({
 
         <form onSubmit={handleSubmit}>
           <DialogBody className="space-y-5">
-            {/* Date, Unit, Status Row */}
-            <div className="space-y-3">
-              <div className="grid gap-3 grid-cols-3">
+              {/* Date, Unit, Status Row */}
+              <div className="space-y-3">
+                <div className="grid gap-3 grid-cols-3">
                 <div>
                   <label className="block text-sm font-medium mb-1.5">
                     Date *
@@ -380,8 +400,23 @@ export function AddShootingDayForm({
                         : []),
                     ]}
                   />
+                  </div>
                 </div>
-              </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    Film Day Template
+                  </label>
+                  <Select
+                    value={formData.filmScheduleTemplate}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        filmScheduleTemplate: e.target.value,
+                      })
+                    }
+                    options={filmDayTemplateOptions}
+                  />
+                </div>
 
               {/* Conflict Warning */}
               {conflictingDay && (
@@ -511,7 +546,7 @@ export function AddShootingDayForm({
                             {scene.intExt} • {scene.dayNight}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            • {scene.pageCount} pg
+                            • {formatScenePages(scene)} pg
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground truncate">
@@ -526,10 +561,11 @@ export function AddShootingDayForm({
                     {formData.selectedScenes.length} scene
                     {formData.selectedScenes.length !== 1 ? "s" : ""} selected
                     {" • "}
-                    {scenes
-                      .filter((s) => formData.selectedScenes.includes(s.id))
-                      .reduce((sum, s) => sum + s.pageCount, 0)
-                      .toFixed(2)}{" "}
+                    {formatPageEighths(
+                      sumPageEighths(
+                        scenes.filter((s) => formData.selectedScenes.includes(s.id))
+                      )
+                    )}{" "}
                     pages
                   </p>
                 )}

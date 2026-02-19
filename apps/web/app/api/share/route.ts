@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
       </p>
       <ul style="margin: 12px 0 0 0; padding-left: 20px; color: #4b5563; font-size: 14px;">
         <li>Scene breakdown & script management</li>
-        <li>Drag-and-drop stripeboard scheduling</li>
+        <li>Drag-and-drop stripboard scheduling</li>
         <li>Cast & crew management</li>
         <li>Budget tracking</li>
         <li>Call sheet generation</li>

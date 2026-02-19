@@ -8,6 +8,7 @@ import { SceneKanban } from "@/components/scenes/scene-kanban";
 import { SceneTimeline } from "@/components/scenes/scene-timeline";
 import { AddSceneForm } from "@/components/forms/add-scene-form";
 import { cn } from "@/lib/utils";
+import { formatPageEighths, sumPageEighths } from "@/lib/utils/page-eighths";
 import {
   reorderScenes as reorderScenesAction,
   updateScene as updateSceneAction,
@@ -78,7 +79,7 @@ export function ScenesSection({
     setEditingScene(scene);
   };
 
-  const totalPages = localScenes.reduce((sum, s) => sum + s.pageCount, 0);
+  const totalPageEighths = sumPageEighths(localScenes);
   const completedScenes = localScenes.filter((s) => s.status === "COMPLETED").length;
 
   const viewModes: { id: ViewMode; label: string; icon: React.ElementType }[] = [
@@ -96,7 +97,7 @@ export function ScenesSection({
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>{localScenes.length} scenes</span>
             <span>·</span>
-            <span>{totalPages.toFixed(1)} pages</span>
+            <span>{formatPageEighths(totalPageEighths)} pages</span>
             <span>·</span>
             <span>{completedScenes} completed</span>
           </div>

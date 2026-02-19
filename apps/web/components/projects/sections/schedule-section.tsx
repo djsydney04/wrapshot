@@ -536,7 +536,7 @@ export function ScheduleSection({
                 )}
               >
                 <Columns3 className="h-3.5 w-3.5" />
-                Stripeboard
+                Stripboard
               </button>
             </div>
 

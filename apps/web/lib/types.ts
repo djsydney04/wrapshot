@@ -92,6 +92,18 @@ export interface ShootingDay {
   expectedWrap?: string;
   weatherBackup?: string;
   locationId?: string;
+  filmScheduleTemplate?: string;
+  filmScheduleItems?: ShootingDayScheduleItem[];
+}
+
+export type FilmScheduleTone = "default" | "accent" | "break" | "wrap";
+
+export interface ShootingDayScheduleItem {
+  id: string;
+  time: string;
+  label: string;
+  detail?: string;
+  tone?: FilmScheduleTone;
 }
 
 // Crew/Department Types

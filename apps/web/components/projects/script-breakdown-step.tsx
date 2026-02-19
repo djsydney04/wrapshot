@@ -326,7 +326,8 @@ export function ScriptBreakdownStep({
         <h2 className="text-xl font-semibold mb-2">Breakdown Complete!</h2>
         <p className="text-muted-foreground max-w-md mx-auto mb-6">
           {scenesCount} scenes have been imported from your script.
-          You can review and edit them in the Stripeboard.
+          You can review all AI-detected scenes, cast, and elements in the Script
+          analysis results and in the Stripboard.
         </p>
         {job?.result && (
           <div className="text-sm text-muted-foreground space-y-1">

@@ -74,8 +74,8 @@ Add these to `apps/web/.env.local`:
 
 ```bash
 # PostHog Analytics
-NEXT_PUBLIC_POSTHOG_KEY=phc_xxxxxxxxxxxxx      # Your PostHog project API key
-NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com  # PostHog host (US or EU)
+NEXT_POSTHOG_KEY=phc_xxxxxxxxxxxxx      # Your PostHog project API key
+NEXT_POSTHOG_HOST=https://us.i.posthog.com  # PostHog host (US or EU)
 NEXT_PUBLIC_POSTHOG_FEEDBACK_SURVEY_ID=019xxxxx-xxxx-xxxx   # Feedback button survey ID
 NEXT_PUBLIC_POSTHOG_TIMED_SURVEY_ID=019xxxxx-xxxx-xxxx      # Timed prompt survey ID
 ```
@@ -472,7 +472,7 @@ apps/web/
 
 ## Security Considerations
 
-1. **API Key**: The `NEXT_PUBLIC_POSTHOG_KEY` is a publishable key, safe for client-side
+1. **API Key**: `NEXT_POSTHOG_KEY` is passed from the server into client initialization
 2. **No PII in events**: Don't include passwords, full addresses, or sensitive data
 3. **User consent**: Consider adding cookie consent for GDPR compliance
 4. **Data retention**: Configure in PostHog dashboard under Settings

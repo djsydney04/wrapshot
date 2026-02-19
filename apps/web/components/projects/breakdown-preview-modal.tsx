@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { formatPageEighths } from "@/lib/utils/page-eighths";
 import type { ExtractedScene, BreakdownResult } from "@/lib/actions/script-breakdown";
 
 interface BreakdownPreviewModalProps {
@@ -31,7 +32,7 @@ export function BreakdownPreviewModal({
   const [editingScene, setEditingScene] = React.useState<number | null>(null);
   const [editValues, setEditValues] = React.useState<Partial<ExtractedScene>>({});
 
-  const totalPages = scenes.reduce((sum, s) => sum + s.page_length_eighths / 8, 0);
+  const totalPageEighths = scenes.reduce((sum, s) => sum + (s.page_length_eighths || 0), 0);
   const uniqueCharacters = new Set(scenes.flatMap((s) => s.characters || []));
   const uniqueLocations = new Set(scenes.map((s) => s.set_name));
 
@@ -82,7 +83,7 @@ export function BreakdownPreviewModal({
           <p className="text-xs text-muted-foreground">Scenes</p>
         </div>
         <div className="rounded-lg border border-border p-3 text-center">
-          <p className="text-2xl font-bold">{totalPages.toFixed(1)}</p>
+          <p className="text-2xl font-bold">{formatPageEighths(totalPageEighths)}</p>
           <p className="text-xs text-muted-foreground">Pages</p>
         </div>
         <div className="rounded-lg border border-border p-3 text-center">
@@ -133,7 +134,7 @@ export function BreakdownPreviewModal({
               </Badge>
               <span className="flex-1 text-sm truncate">{scene.set_name}</span>
               <span className="text-xs text-muted-foreground">
-                {(scene.page_length_eighths / 8).toFixed(1)} pg
+                {formatPageEighths(scene.page_length_eighths)} pg
               </span>
               <div className="flex items-center gap-1">
                 <Button

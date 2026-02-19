@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { formatScenePages } from "@/lib/utils/page-eighths";
 import type { Scene } from "@/lib/actions/scenes";
 import type { CastMember } from "@/lib/types";
 
@@ -145,7 +146,7 @@ export function SceneCard({
           <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <FileText className="h-3 w-3" />
-              {scene.pageCount}p
+              {formatScenePages(scene)}p
             </span>
             {scene.estimatedMinutes && (
               <span className="flex items-center gap-1">

@@ -45,16 +45,26 @@ function PostHogAuthWrapper({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export function PostHogProvider({ children }: { children: React.ReactNode }) {
+interface PostHogProviderProps {
+  children: React.ReactNode;
+  posthogKey?: string;
+  posthogHost?: string;
+}
+
+export function PostHogProvider({
+  children,
+  posthogKey,
+  posthogHost,
+}: PostHogProviderProps) {
   useEffect(() => {
-    const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-    const host = process.env.NEXT_PUBLIC_POSTHOG_HOST;
+    console.log("[PostHog] Initializing...", {
+      key: posthogKey ? "present" : "missing",
+      host: posthogHost,
+    });
 
-    console.log("[PostHog] Initializing...", { key: key ? "present" : "missing", host });
-
-    if (typeof window !== "undefined" && key) {
-      posthog.init(key, {
-        api_host: host || "https://us.i.posthog.com",
+    if (typeof window !== "undefined" && posthogKey) {
+      posthog.init(posthogKey, {
+        api_host: posthogHost || "https://us.i.posthog.com",
         person_profiles: "identified_only",
         capture_pageview: true,
         capture_pageleave: true,
@@ -69,7 +79,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
     } else {
       console.warn("[PostHog] Not initialized - missing key or not in browser");
     }
-  }, []);
+  }, [posthogHost, posthogKey]);
 
   return (
     <PHProvider client={posthog}>

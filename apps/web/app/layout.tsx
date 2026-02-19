@@ -64,12 +64,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const posthogKey = process.env.NEXT_POSTHOG_KEY;
+  const posthogHost = process.env.NEXT_POSTHOG_HOST;
+
   return (
     <html lang="en">
       <body
         className={`${manrope.variable} ${spaceGrotesk.variable} ${jetBrainsMono.variable} font-sans antialiased`}
       >
-        <PostHogProvider>
+        <PostHogProvider posthogKey={posthogKey} posthogHost={posthogHost}>
           {children}
           <CommandPalette />
           <Toaster position="bottom-right" richColors />

@@ -412,6 +412,8 @@ model ShootingDay {
   actualWrap    DateTime?         @db.Time
   weatherNotes  String?
   notes         String?           @db.Text
+  filmScheduleTemplate String?
+  filmScheduleItems Json?
   status        ShootingDayStatus @default(SCHEDULED)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
@@ -486,6 +488,11 @@ model CallSheet {
   parkingNotes    String?   @db.Text
   mealNotes       String?
   advanceNotes    String?   @db.Text
+  brandDisplayName String?
+  brandLogoUrl    String?
+  headerAccentColor String? @default("#111827")
+  headerTextColor String?   @default("#111111")
+  footerText      String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

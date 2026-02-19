@@ -23,6 +23,16 @@ interface SupabaseShootingDayRow {
   generalCall: string | null;
   estimatedWrap: string | null;
   notes: string | null;
+  filmScheduleTemplate: string | null;
+  filmScheduleItems:
+    | Array<{
+        id: string;
+        time: string;
+        label: string;
+        detail?: string;
+        tone?: "default" | "accent" | "break" | "wrap";
+      }>
+    | null;
   scenes?: { sceneId: string; sortOrder: number | null }[] | null;
 }
 
@@ -50,6 +60,8 @@ function transformToShootingDay(row: SupabaseShootingDayRow): ShootingDay {
     wrapTime: row.estimatedWrap || undefined,
     scenes: sceneIds,
     notes: row.notes || undefined,
+    filmScheduleTemplate: row.filmScheduleTemplate || undefined,
+    filmScheduleItems: row.filmScheduleItems || undefined,
   };
 }
 
@@ -97,6 +109,8 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
           generalCall,
           estimatedWrap,
           notes,
+          filmScheduleTemplate,
+          filmScheduleItems,
           scenes:ShootingDayScene(
             sceneId,
             sortOrder
@@ -234,6 +248,8 @@ export function useAllShootingDays() {
           generalCall,
           estimatedWrap,
           notes,
+          filmScheduleTemplate,
+          filmScheduleItems,
           scenes:ShootingDayScene(
             sceneId,
             sortOrder

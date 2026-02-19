@@ -24,6 +24,7 @@ import { GripVertical, Clock, FileText, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatPageEighths, formatScenePages, sumPageEighths } from "@/lib/utils/page-eighths";
 import type { ShootingDay, Scene } from "@/lib/types";
 
 interface SceneOrderEditorProps {
@@ -94,7 +95,7 @@ function SortableSceneCard({
           </Badge>
           <span className="text-xs text-muted-foreground ml-auto flex items-center gap-1">
             <FileText className="h-3 w-3" />
-            {scene.pageCount} pg
+            {formatScenePages(scene)} pg
           </span>
         </div>
 
@@ -228,7 +229,7 @@ export function SceneOrderEditor({
   };
 
   // Calculate total pages and estimated time
-  const totalPages = orderedScenes.reduce((sum, s) => sum + s.pageCount, 0);
+  const totalPageEighths = sumPageEighths(orderedScenes);
   const totalMinutes = orderedScenes.reduce(
     (sum, s) => sum + (s.estimatedMinutes || 0),
     0
@@ -240,7 +241,7 @@ export function SceneOrderEditor({
       <div className="flex items-center justify-between text-sm">
         <div className="text-muted-foreground">
           {orderedScenes.length} scene{orderedScenes.length !== 1 ? "s" : ""} ·{" "}
-          {totalPages.toFixed(1)} pages
+          {formatPageEighths(totalPageEighths)} pages
           {totalMinutes > 0 && ` · ~${totalMinutes} min`}
         </div>
         <Button

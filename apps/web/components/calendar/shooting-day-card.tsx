@@ -4,6 +4,7 @@ import * as React from "react";
 import { Clock, MapPin, FileText, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
+import { formatPageEighths, sumPageEighths } from "@/lib/utils/page-eighths";
 import type { ShootingDay, Scene, CastMember, Location } from "@/lib/types";
 
 interface ShootingDayCardProps {
@@ -47,7 +48,7 @@ export function ShootingDayCard({
   const dayScenes = scenes.filter((s) => shootingDay.scenes.includes(s.id));
 
   // Get total pages
-  const totalPages = dayScenes.reduce((sum, s) => sum + s.pageCount, 0);
+  const totalPageEighths = sumPageEighths(dayScenes);
 
   // Get unique cast from scenes
   const castIds = new Set(dayScenes.flatMap((s) => s.castIds || []));
@@ -136,8 +137,8 @@ export function ShootingDayCard({
               {dayScenes.length} scene{dayScenes.length !== 1 ? "s" : ""}
             </span>
           )}
-          {totalPages > 0 && (
-            <span>{totalPages.toFixed(1)} pg</span>
+          {totalPageEighths > 0 && (
+            <span>{formatPageEighths(totalPageEighths)} pg</span>
           )}
           {dayCast.length > 0 && (
             <span className="flex items-center gap-0.5">

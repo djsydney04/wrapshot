@@ -18,6 +18,11 @@ export interface CallSheetRow {
   parkingNotes: string | null;
   mealNotes: string | null;
   advanceNotes: string | null;
+  brandDisplayName: string | null;
+  brandLogoUrl: string | null;
+  headerAccentColor: string | null;
+  headerTextColor: string | null;
+  footerText: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -28,6 +33,11 @@ export interface CallSheetUpdates {
   parkingNotes?: string | null;
   mealNotes?: string | null;
   advanceNotes?: string | null;
+  brandDisplayName?: string | null;
+  brandLogoUrl?: string | null;
+  headerAccentColor?: string | null;
+  headerTextColor?: string | null;
+  footerText?: string | null;
 }
 
 export interface CallSheetFullData {

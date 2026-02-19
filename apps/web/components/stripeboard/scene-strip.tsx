@@ -7,6 +7,7 @@ import { GripVertical, Trash2, Clock, Users, ChevronDown, ChevronUp, Package } f
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { formatScenePages } from "@/lib/utils/page-eighths";
 import type { Scene } from "@/lib/actions/scenes";
 
 export type SceneStripSize = "compact" | "comfortable" | "expanded";
@@ -162,7 +163,7 @@ export const SceneStrip = React.forwardRef<HTMLDivElement, SceneStripProps>(
               )}
               <span className="flex items-center gap-1">
                 <Clock className="h-3.5 w-3.5" />
-                {scene.pageEighths ? `${scene.pageEighths}/8` : `${scene.pageCount} pg`}
+                {formatScenePages(scene)} pg
               </span>
             </div>
 
@@ -308,7 +309,7 @@ export const SceneStrip = React.forwardRef<HTMLDivElement, SceneStripProps>(
         </span>
       )}
       <span className={cn("text-muted-foreground", sceneSize === "expanded" ? "text-xs" : "text-[10px]")}>
-        {scene.pageEighths ? `${scene.pageEighths}/8` : `${scene.pageCount}pg`}
+        {formatScenePages(scene)}pg
       </span>
       </div>
     );

@@ -6,6 +6,7 @@ import { Calendar, Clock, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SortableSceneStrip } from "./scene-strip";
 import { cn } from "@/lib/utils";
+import { formatPageEighths, sumPageEighths } from "@/lib/utils/page-eighths";
 import type { Scene } from "@/lib/actions/scenes";
 import type { ShootingDay } from "@/lib/types";
 import type { SceneStripSize } from "./scene-strip";
@@ -45,10 +46,7 @@ export function ShootDayContainer({
   // Dim non-target containers when dragging
   const isDimmed = activeId && !isOver;
 
-  const totalPages = scenes.reduce(
-    (sum, s) => sum + (s.pageEighths ? s.pageEighths / 8 : s.pageCount),
-    0
-  );
+  const totalPageEighths = sumPageEighths(scenes);
 
   const formattedDate = new Date(shootingDay.date).toLocaleDateString("en-US", {
     weekday: "short",
@@ -93,7 +91,7 @@ export function ShootDayContainer({
           </span>
           <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-medium flex items-center gap-1">
             {isSaving && <Loader2 className="h-3 w-3 animate-spin" />}
-            {scenes.length} scenes · {totalPages.toFixed(1)} pages
+            {scenes.length} scenes · {formatPageEighths(totalPageEighths)} pages
           </span>
         </div>
       </div>

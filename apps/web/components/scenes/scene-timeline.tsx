@@ -22,6 +22,7 @@ import { ChevronLeft, ChevronRight, FileText, Users, Image as ImageIcon, Package
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { formatScenePages } from "@/lib/utils/page-eighths";
 import type { Scene } from "@/lib/actions/scenes";
 import type { CastMember, ShootingDay } from "@/lib/types";
 
@@ -282,7 +283,7 @@ function TimelineCard({
           <div className="flex items-center gap-2 mt-1.5 text-[10px] text-muted-foreground">
             <span className="flex items-center gap-0.5">
               <FileText className="h-2.5 w-2.5" />
-              {scene.pageCount}p
+              {formatScenePages(scene)}p
             </span>
             {sceneCastCount > 0 && (
               <span className="flex items-center gap-0.5">
