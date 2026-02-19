@@ -107,8 +107,8 @@ export default function SecuritySettingsPage() {
       {/* Two-Factor Authentication */}
       <SettingsCard>
         <SettingsCardBody>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-4">
               <div className={cn(
                 "flex h-10 w-10 items-center justify-center rounded-lg transition-colors",
                 twoFactorEnabled ? "bg-emerald-50" : "bg-muted"
@@ -138,6 +138,7 @@ export default function SecuritySettingsPage() {
             <Button
               variant={twoFactorEnabled ? "outline" : "default"}
               onClick={() => setTwoFactorEnabled(!twoFactorEnabled)}
+              className="w-full sm:w-auto"
             >
               {twoFactorEnabled ? "Disable" : "Enable"}
             </Button>
@@ -156,7 +157,7 @@ export default function SecuritySettingsPage() {
 
         <div className="divide-y divide-border">
           {sessions.map((session) => (
-            <div key={session.id} className="flex items-center gap-4 p-4">
+            <div key={session.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
               <div className={cn(
                 "flex h-9 w-9 items-center justify-center rounded-lg",
                 session.current ? "bg-blue-50" : "bg-muted"
@@ -175,7 +176,7 @@ export default function SecuritySettingsPage() {
                     </Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span>{session.browser}</span>
                   <span className="flex items-center gap-1">
                     <MapPin className="h-3 w-3" />
@@ -188,7 +189,7 @@ export default function SecuritySettingsPage() {
                 </div>
               </div>
               {!session.current && (
-                <Button variant="ghost" size="sm" className="text-muted-foreground">
+                <Button variant="ghost" size="sm" className="w-full text-muted-foreground sm:w-auto">
                   Revoke
                 </Button>
               )}

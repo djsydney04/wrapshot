@@ -211,18 +211,34 @@
 }
 
 @layer base {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   * {
     @apply border-border;
   }
   body {
     @apply bg-background text-foreground antialiased;
+    min-height: 100dvh;
     text-rendering: optimizeLegibility;
+    -webkit-text-size-adjust: 100%;
   }
   h1,
   h2,
   h3 {
     font-family: var(--font-space-grotesk), system-ui, sans-serif;
     letter-spacing: -0.018em;
+  }
+}
+
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
   }
 }
 
