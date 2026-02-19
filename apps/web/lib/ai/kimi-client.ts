@@ -12,8 +12,14 @@ import type { Stream } from "openai/streaming";
 import type { ChatCompletionChunk } from "openai/resources/chat/completions";
 
 interface KimiMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
+  tool_calls?: Array<{
+    id: string;
+    type: "function";
+    function: { name: string; arguments: string };
+  }>;
+  tool_call_id?: string;
 }
 
 interface KimiCompletionOptions {
@@ -80,6 +86,49 @@ export class KimiClient {
     }
 
     return content;
+  }
+
+  /**
+   * Completion with function-calling / tool use.
+   * Returns the full ChatCompletion so the caller can inspect tool_calls.
+   */
+  async completeWithTools(
+    options: KimiCompletionOptions & {
+      tools?: Array<{
+        type: "function";
+        function: { name: string; description: string; parameters: Record<string, unknown> };
+      }>;
+      tool_choice?: "auto" | "none";
+    }
+  ): Promise<ChatCompletion> {
+    const {
+      messages,
+      maxTokens = 4000,
+      temperature = 0.3,
+      timeout = 120000,
+      tools,
+      tool_choice = "auto",
+      posthogDistinctId,
+      posthogTraceId,
+      posthogProperties,
+    } = options;
+
+    const response = (await this.client.chat.completions.create(
+      {
+        model: this.model,
+        messages: messages as any,
+        max_tokens: maxTokens,
+        temperature,
+        ...(tools && tools.length > 0 ? { tools, tool_choice } : {}),
+        posthogDistinctId,
+        posthogTraceId,
+        posthogProperties,
+        posthogCaptureImmediate: true,
+      } as Parameters<typeof this.client.chat.completions.create>[0],
+      { timeout },
+    )) as ChatCompletion;
+
+    return response;
   }
 
   /**

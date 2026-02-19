@@ -2,11 +2,18 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { KimiClient, SCENE_EXTRACTION_PROMPT, KimiClient as KC } from "@/lib/ai/kimi-client";
 import { parsePdfScript, normalizeScriptText } from "@/lib/scripts/parser";
+import { ScriptChunker } from "@/lib/agents/script-analysis/chunker";
+import {
+  adjustChunkLocalPage,
+  dedupeBySceneNumberAndSet,
+  normalizeSceneNumber,
+  sortByScriptPageOrder,
+} from "@/lib/scripts/scene-order";
 import { getScriptAnalysisApiKey } from "@/lib/ai/config";
 
 export interface ExtractedScene {
   scene_number: string;
-  int_ext: "INT" | "EXT";
+  int_ext: "INT" | "EXT" | "BOTH";
   set_name: string;
   time_of_day: string;
   page_length_eighths: number;
@@ -20,6 +27,163 @@ export interface BreakdownResult {
   scenes: ExtractedScene[];
   total_pages: number;
   total_scenes: number;
+}
+
+interface SceneExtractionResponse {
+  scenes?: Partial<ExtractedScene>[];
+}
+
+const LEGACY_BREAKDOWN_MAX_CHARS_PER_CHUNK = 14000;
+const LEGACY_BREAKDOWN_MIN_CHARS_PER_CHUNK = 2500;
+
+async function extractScenesWithChunking(
+  scriptText: string,
+  scriptId: string,
+  kimi: KimiClient
+): Promise<ExtractedScene[]> {
+  const chunker = ScriptChunker.create({
+    maxCharsPerChunk: LEGACY_BREAKDOWN_MAX_CHARS_PER_CHUNK,
+    minCharsPerChunk: LEGACY_BREAKDOWN_MIN_CHARS_PER_CHUNK,
+  });
+  const { chunks } = chunker.chunk(
+    scriptText,
+    `legacy-breakdown-${scriptId}-${Date.now()}`,
+    scriptId
+  );
+
+  const extractedScenes: ExtractedScene[] = [];
+
+  for (const chunk of chunks) {
+    try {
+      const response = await kimi.complete({
+        messages: [
+          { role: "system", content: SCENE_EXTRACTION_PROMPT },
+          {
+            role: "user",
+            content:
+              `Extract all scenes from this screenplay section. ` +
+              `Keep scenes in the same order they appear in this section. ` +
+              `Section ${chunk.chunkIndex + 1} of ${chunks.length} ` +
+              `(estimated pages ${chunk.pageStart}-${chunk.pageEnd}).\n\n${chunk.chunkText}`,
+          },
+        ],
+        maxTokens: 8000,
+        temperature: 0.1,
+      });
+
+      const parsed = KC.extractJson<SceneExtractionResponse | BreakdownResult>(response);
+      const chunkScenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
+
+      for (const scene of chunkScenes) {
+        const normalized = normalizeExtractedScene(
+          scene,
+          extractedScenes.length + 1,
+          chunk.pageStart ?? 1
+        );
+        if (normalized) {
+          extractedScenes.push(normalized);
+        }
+      }
+    } catch (error) {
+      console.error(
+        `[LegacyScriptBreakdown] Failed to process chunk ${chunk.chunkIndex + 1}/${chunks.length}:`,
+        error
+      );
+    }
+  }
+
+  if (extractedScenes.length === 0) {
+    throw new Error("No scenes were extracted from any script chunk");
+  }
+
+  const deduped = dedupeBySceneNumberAndSet(
+    extractedScenes,
+    (scene) => scene.scene_number,
+    (scene) => scene.set_name
+  );
+
+  return sortByScriptPageOrder(deduped, (scene) => scene.script_page_start);
+}
+
+function normalizeExtractedScene(
+  scene: Partial<ExtractedScene>,
+  fallbackSceneNumber: number,
+  chunkPageStart: number
+): ExtractedScene | null {
+  const setName = String(scene.set_name || "").trim();
+  if (!setName) {
+    return null;
+  }
+
+  const sceneNumber = normalizeSceneNumber(scene.scene_number, fallbackSceneNumber);
+  const pageStart = adjustChunkLocalPage(scene.script_page_start, chunkPageStart);
+  const pageEndRaw = adjustChunkLocalPage(scene.script_page_end, chunkPageStart);
+  const pageEnd = pageEndRaw && pageStart ? Math.max(pageStart, pageEndRaw) : pageEndRaw;
+
+  return {
+    scene_number: sceneNumber,
+    int_ext: normalizeIntExt(scene.int_ext),
+    set_name: setName,
+    time_of_day: normalizeTimeOfDay(scene.time_of_day),
+    page_length_eighths: normalizePageLengthEighths(scene.page_length_eighths),
+    synopsis: String(scene.synopsis || "").trim(),
+    characters: normalizeCharacters(scene.characters),
+    script_page_start: pageStart || chunkPageStart,
+    script_page_end: pageEnd || pageStart || chunkPageStart,
+  };
+}
+
+function normalizeIntExt(value: ExtractedScene["int_ext"] | undefined): ExtractedScene["int_ext"] {
+  const normalized = String(value || "INT").toUpperCase();
+  if (normalized === "EXT") return "EXT";
+  if (
+    normalized === "BOTH" ||
+    normalized.includes("/") ||
+    normalized === "I/E" ||
+    normalized === "INT/EXT"
+  ) {
+    return "BOTH";
+  }
+  return "INT";
+}
+
+function normalizeTimeOfDay(value: string | undefined): string {
+  const normalized = String(value || "").toUpperCase();
+  const valid = [
+    "DAY",
+    "NIGHT",
+    "DAWN",
+    "DUSK",
+    "MORNING",
+    "AFTERNOON",
+    "EVENING",
+    "CONTINUOUS",
+  ];
+  const matched = valid.find((option) => normalized.includes(option));
+  return matched || "DAY";
+}
+
+function normalizePageLengthEighths(value: number | undefined): number {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return 1;
+  }
+
+  const normalized = Math.round(Number(value));
+  if (!Number.isFinite(normalized) || normalized <= 0) {
+    return 1;
+  }
+
+  return Math.min(normalized, 64);
+}
+
+function normalizeCharacters(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((character) => String(character || "").trim().toUpperCase())
+    .filter((character) => character.length > 0);
 }
 
 export async function POST(request: Request) {
@@ -99,36 +263,17 @@ export async function POST(request: Request) {
       );
     }
 
-    // Use Kimi to extract scenes
+    // Use Kimi to extract scenes in chunks so large scripts are fully processed.
     const kimi = new KimiClient(llmApiKey);
     let breakdownResult: BreakdownResult;
 
     try {
-      // For very long scripts, we might need to chunk. For now, send the whole thing
-      // with a character limit warning
-      const maxChars = 50000; // ~15 pages of script
-      const truncatedText = scriptText.length > maxChars
-        ? scriptText.slice(0, maxChars) + "\n\n[SCRIPT TRUNCATED FOR PROCESSING]"
-        : scriptText;
-
-      const response = await kimi.complete({
-        messages: [
-          { role: "system", content: SCENE_EXTRACTION_PROMPT },
-          {
-            role: "user",
-            content: `Please analyze this screenplay and extract all scenes:\n\n${truncatedText}`,
-          },
-        ],
-        maxTokens: 8000,
-        temperature: 0.1,
-      });
-
-      breakdownResult = KC.extractJson<BreakdownResult>(response);
-
-      // Validate the result
-      if (!breakdownResult.scenes || !Array.isArray(breakdownResult.scenes)) {
-        throw new Error("Invalid breakdown result: missing scenes array");
-      }
+      const orderedScenes = await extractScenesWithChunking(scriptText, scriptId, kimi);
+      breakdownResult = {
+        scenes: orderedScenes,
+        total_pages: pageCount,
+        total_scenes: orderedScenes.length,
+      };
     } catch (aiError) {
       console.error("Error in Wrapshot Intelligence breakdown:", aiError);
       await supabase

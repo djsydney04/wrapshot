@@ -3,11 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserId } from "@/lib/permissions/server";
+import {
+  dedupeBySceneNumberAndSet,
+  normalizeSceneNumber,
+  sortByScriptPageOrder,
+} from "@/lib/scripts/scene-order";
 import type { IntExt, DayNight } from "./scenes";
 
 export interface ExtractedScene {
   scene_number: string;
-  int_ext: "INT" | "EXT";
+  int_ext: "INT" | "EXT" | "BOTH";
   set_name: string;
   time_of_day: string;
   page_length_eighths: number;
@@ -103,8 +108,20 @@ export async function importBreakdownScenes(
 
     let sortOrder = (existingScenes?.[0]?.sortOrder ?? -1) + 1;
 
+    const orderedScenes = sortByScriptPageOrder(
+      dedupeBySceneNumberAndSet(
+        scenes,
+        (scene) => scene.scene_number,
+        (scene) => scene.set_name
+      ),
+      (scene) => scene.script_page_start
+    ).map((scene, index) => ({
+      ...scene,
+      scene_number: normalizeSceneNumber(scene.scene_number, index + 1),
+    }));
+
     // Create scenes from extracted data
-    const scenesToInsert = scenes.map((scene) => ({
+    const scenesToInsert = orderedScenes.map((scene) => ({
       projectId,
       scriptId,
       sceneNumber: scene.scene_number,
@@ -133,7 +150,7 @@ export async function importBreakdownScenes(
 
     // Now try to create cast members from character names
     const allCharacters = new Set<string>();
-    scenes.forEach((scene) => {
+    orderedScenes.forEach((scene) => {
       scene.characters?.forEach((char) => allCharacters.add(char.toUpperCase()));
     });
 
@@ -187,7 +204,8 @@ export async function importBreakdownScenes(
     const scenecastLinks: { sceneId: string; castMemberId: string }[] = [];
 
     insertedScenes?.forEach((scene, index) => {
-      const extractedScene = scenes[index];
+      const extractedScene = orderedScenes[index];
+      if (!extractedScene) return;
       extractedScene.characters?.forEach((char) => {
         const castId = castMap.get(char.toUpperCase());
         if (castId) {

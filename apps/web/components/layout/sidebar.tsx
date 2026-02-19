@@ -24,6 +24,7 @@ import { SimpleTooltip } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
 import { useLayoutStore } from "@/lib/stores/layout-store";
 import { useProjectStore } from "@/lib/stores/project-store";
+import { useAssistantPanelStore } from "@/lib/stores/assistant-panel-store";
 import { FeedbackButton } from "@/components/feedback/feedback-button";
 import { ShareButton } from "@/components/share/share-button";
 
@@ -88,6 +89,7 @@ export function Sidebar({ user }: SidebarProps) {
   const router = useRouter();
   const { sidebarOpen, toggleSidebar, openCommandPalette } = useLayoutStore();
   const projects = useProjectStore((state) => state.projects);
+  const toggleAssistantPanel = useAssistantPanelStore((s) => s.togglePanel);
   const [expandedGroups, setExpandedGroups] = React.useState<Record<string, boolean>>(() => ({
     "/projects": true,
     "/finance": false,
@@ -107,11 +109,15 @@ export function Sidebar({ user }: SidebarProps) {
         e.preventDefault();
         openCommandPalette();
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === "j") {
+        e.preventDefault();
+        toggleAssistantPanel();
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [toggleSidebar, openCommandPalette]);
+  }, [toggleSidebar, openCommandPalette, toggleAssistantPanel]);
 
   React.useEffect(() => {
     setExpandedGroups((prev) => {
@@ -211,6 +217,22 @@ export function Sidebar({ user }: SidebarProps) {
             const Icon = item.icon;
 
             if (!sidebarOpen) {
+              // Assistant item toggles panel even when collapsed
+              if (item.tourId === "assistant") {
+                return (
+                  <SimpleTooltip key={item.href} content={`${item.label} (⌘J)`} side="right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      data-tour={item.tourId}
+                      onClick={toggleAssistantPanel}
+                      className="w-full text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover"
+                    >
+                      <Icon className="h-4 w-4" />
+                    </Button>
+                  </SimpleTooltip>
+                );
+              }
               return (
                 <SimpleTooltip key={item.href} content={item.label} side="right">
                   <Link href={item.href} data-tour={item.tourId}>
@@ -303,6 +325,27 @@ export function Sidebar({ user }: SidebarProps) {
                     </div>
                   )}
                 </div>
+              );
+            }
+
+            // Assistant item toggles the side panel
+            if (item.tourId === "assistant") {
+              return (
+                <Button
+                  key={item.href}
+                  variant="ghost"
+                  data-tour={item.tourId}
+                  onClick={toggleAssistantPanel}
+                  className={cn(
+                    "h-8 w-full justify-start gap-2 font-normal text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                  <kbd className="ml-auto pointer-events-none h-5 select-none rounded border border-sidebar-kbd-border bg-sidebar-kbd px-1.5 font-mono text-[10px] font-medium text-sidebar-kbd-foreground">
+                    ⌘J
+                  </kbd>
+                </Button>
               );
             }
 

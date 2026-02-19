@@ -45,6 +45,7 @@ import { PostSection } from "@/components/projects/sections/post-section";
 import { SettingsSection } from "@/components/projects/sections/settings-section";
 import { SetupWizard } from "@/components/projects/setup-wizard";
 import { useProjectStore } from "@/lib/stores/project-store";
+import { useLayoutStore } from "@/lib/stores/layout-store";
 import { getProject } from "@/lib/actions/projects";
 import type { Project } from "@/lib/actions/projects.types";
 import { getScenes, type Scene as DBScene } from "@/lib/actions/scenes";
@@ -224,6 +225,14 @@ export default function ProjectDetailPage() {
     () => normalizeSection(searchParams.get("section")),
     [searchParams]
   );
+
+  const setActiveProject = useLayoutStore((s) => s.setActiveProject);
+
+  // Sync projectId to layout store so the assistant panel knows which project is active
+  React.useEffect(() => {
+    setActiveProject(projectId);
+    return () => setActiveProject(null);
+  }, [projectId, setActiveProject]);
 
   const [activeSection, setActiveSection] = React.useState<ProjectSection>("dashboard");
   const [showWizard, setShowWizard] = React.useState(false);

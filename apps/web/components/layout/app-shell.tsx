@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { TimedSurvey } from "@/components/feedback/timed-survey";
+import { AssistantPanel } from "@/components/assistant/assistant-panel";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -23,6 +24,8 @@ export function AppShell({ children, user }: AppShellProps) {
       </main>
       {/* Timed feedback survey - shows after 5 minutes */}
       <TimedSurvey />
+      {/* Persistent assistant side panel */}
+      <AssistantPanel />
     </div>
   );
 }

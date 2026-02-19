@@ -249,7 +249,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from("ProjectAIChatMessage")
-    .select("id, role, content, createdAt")
+    .select("id, role, content, createdAt, metadata")
     .eq("projectId", projectId)
     .eq("userId", user.id)
     .order("createdAt", { ascending: true })
