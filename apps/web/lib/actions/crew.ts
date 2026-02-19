@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserId } from "@/lib/permissions/server";
+import type { ProjectRole } from "@/lib/permissions";
 
 export type DepartmentType =
   | "PRODUCTION"
@@ -244,6 +245,7 @@ export interface CrewMemberWithInviteStatus extends CrewMember {
   inviteStatus: CrewMemberInviteStatus;
   inviteId?: string;
   inviteExpiresAt?: string;
+  projectRole?: ProjectRole | null;
 }
 
 // Get all crew members with their invite status
@@ -288,6 +290,24 @@ export async function getCrewMembersWithInviteStatus(
     invites?.map((inv) => [inv.targetId, inv]) || []
   );
 
+  // Bulk-fetch ProjectMember records for all linked userIds
+  const linkedUserIds = crewMembers
+    .filter((m) => m.userId)
+    .map((m) => m.userId as string);
+
+  const projectRoleMap = new Map<string, ProjectRole>();
+  if (linkedUserIds.length > 0) {
+    const { data: projectMembers } = await supabase
+      .from("ProjectMember")
+      .select("userId, role")
+      .eq("projectId", projectId)
+      .in("userId", linkedUserIds);
+
+    projectMembers?.forEach((pm) => {
+      projectRoleMap.set(pm.userId, pm.role as ProjectRole);
+    });
+  }
+
   // Determine invite status for each crew member
   const result: CrewMemberWithInviteStatus[] = crewMembers.map((member) => {
     const invite = inviteMap.get(member.id);
@@ -313,6 +333,7 @@ export async function getCrewMembersWithInviteStatus(
       inviteStatus,
       inviteId: invite?.id,
       inviteExpiresAt: invite?.expiresAt,
+      projectRole: member.userId ? (projectRoleMap.get(member.userId) ?? null) : null,
     };
   });
 

@@ -2,12 +2,14 @@
 
 import * as React from "react";
 import { X, Send, Loader2, CheckCircle, MessageSquarePlus } from "lucide-react";
+import posthogLib from "posthog-js";
 import { usePostHog } from "posthog-js/react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const SURVEY_DELAY_MS = 5 * 60 * 1000; // 5 minutes
-const STORAGE_KEY = "timed-survey-shown";
+const SURVEY_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const STORAGE_KEY = "timed-survey-last-shown-at";
 const SESSION_START_KEY = "session-start-time";
 
 type FeedbackType = "feature" | "bug" | "general";
@@ -21,12 +23,16 @@ export function TimedSurvey() {
   const [submitted, setSubmitted] = React.useState(false);
   const [dismissed, setDismissed] = React.useState(false);
 
-  const surveyId = process.env.NEXT_PUBLIC_POSTHOG_EVERYUSER_SURVEY_ID;
+  const surveyId =
+    process.env.NEXT_PUBLIC_POSTHOG_TIMED_SURVEY_ID ||
+    process.env.NEXT_PUBLIC_POSTHOG_EVERYUSER_SURVEY_ID;
+  const ph = posthog ?? posthogLib;
 
   React.useEffect(() => {
-    // Check if survey was already shown
-    const alreadyShown = localStorage.getItem(STORAGE_KEY);
-    if (alreadyShown) {
+    // Check cooldown to avoid showing too frequently in the same browser.
+    const lastShownRaw = localStorage.getItem(STORAGE_KEY);
+    const lastShown = lastShownRaw ? parseInt(lastShownRaw, 10) : 0;
+    if (lastShown && Number.isFinite(lastShown) && Date.now() - lastShown < SURVEY_COOLDOWN_MS) {
       return;
     }
 
@@ -44,27 +50,33 @@ export function TimedSurvey() {
     if (remaining <= 0) {
       // Already past 5 minutes, show immediately
       setIsOpen(true);
-      localStorage.setItem(STORAGE_KEY, "true");
+      localStorage.setItem(STORAGE_KEY, Date.now().toString());
     } else {
       // Set timeout for remaining time
       const timeout = setTimeout(() => {
         setIsOpen(true);
-        localStorage.setItem(STORAGE_KEY, "true");
+        localStorage.setItem(STORAGE_KEY, Date.now().toString());
       }, remaining);
 
       return () => clearTimeout(timeout);
     }
   }, []);
 
-  // Track survey shown
   React.useEffect(() => {
-    if (isOpen && posthog && surveyId) {
-      posthog.capture("survey shown", {
+    if (!isOpen || !ph || typeof ph.capture !== "function") return;
+
+    ph.capture("feedback_opened", {
+      source: "timed_prompt",
+      feedback_type: "general",
+    });
+
+    if (surveyId) {
+      ph.capture("survey shown", {
         $survey_id: surveyId,
         survey_type: "timed_prompt",
       });
     }
-  }, [isOpen, posthog, surveyId]);
+  }, [isOpen, ph, surveyId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,15 +84,29 @@ export function TimedSurvey() {
 
     setIsSubmitting(true);
 
-    if (posthog && surveyId) {
-      posthog.capture("survey sent", {
-        $survey_id: surveyId,
-        $survey_response: message.trim(),
-        $survey_response_1: feedbackType,
+    if (ph && typeof ph.capture === "function") {
+      const trimmed = message.trim();
+
+      ph.capture("feedback_submitted", {
         feedback_type: feedbackType,
-        message: message.trim(),
-        survey_type: "timed_prompt",
+        message: trimmed,
+        source: "timed_prompt",
       });
+
+      if (surveyId) {
+        ph.capture("survey sent", {
+          $survey_id: surveyId,
+          $survey_response: trimmed,
+          $survey_response_1: feedbackType,
+          feedback_type: feedbackType,
+          message: trimmed,
+          survey_type: "timed_prompt",
+        });
+      } else {
+        console.warn(
+          "[TimedSurvey] Missing NEXT_PUBLIC_POSTHOG_TIMED_SURVEY_ID (or legacy NEXT_PUBLIC_POSTHOG_EVERYUSER_SURVEY_ID)"
+        );
+      }
     }
 
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -95,12 +121,20 @@ export function TimedSurvey() {
 
   const handleDismiss = () => {
     setDismissed(true);
-    if (posthog && surveyId) {
-      posthog.capture("survey dismissed", {
-        $survey_id: surveyId,
-        survey_type: "timed_prompt",
+
+    if (ph && typeof ph.capture === "function") {
+      ph.capture("feedback_dismissed", {
+        source: "timed_prompt",
+        feedback_type: feedbackType,
       });
+      if (surveyId) {
+        ph.capture("survey dismissed", {
+          $survey_id: surveyId,
+          survey_type: "timed_prompt",
+        });
+      }
     }
+
     setTimeout(() => {
       setIsOpen(false);
     }, 300);
@@ -123,7 +157,7 @@ export function TimedSurvey() {
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-lg mx-4 bg-background border border-border rounded-xl shadow-2xl animate-in zoom-in-95 fade-in duration-300">
+      <div className="relative w-full max-w-lg mx-4 bg-background border border-border rounded-lg shadow-soft-lg animate-in zoom-in-95 fade-in duration-300">
         {/* Close button */}
         <button
           onClick={handleDismiss}

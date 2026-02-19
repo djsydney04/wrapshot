@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, FileText, Sparkles, Check, AlertCircle, Zap } from "lucide-react";
+import { Loader2, FileText, Lightbulb, Check, AlertCircle, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BreakdownPreviewModal } from "./breakdown-preview-modal";
 import { AgentProgressCard } from "@/components/agents/agent-progress-card";
 import { useAgentJob, useStartAgentJob } from "@/lib/hooks/use-agent-job";
+import { useAgentProgressToast } from "@/lib/hooks/use-agent-progress-toast";
 import type { ExtractedScene, BreakdownResult } from "@/lib/actions/script-breakdown";
 import type { AgentJobResult } from "@/lib/agents/types";
 
@@ -36,8 +37,19 @@ export function ScriptBreakdownStep({
   const [activeJobId, setActiveJobId] = React.useState<string | null>(null);
 
   const { startJob, loading: startingJob } = useStartAgentJob();
-  const { job, isComplete: agentComplete, isFailed: agentFailed } = useAgentJob({
+  const {
+    job,
+    isRunning: agentRunning,
+    isComplete: agentComplete,
+    isFailed: agentFailed,
+  } = useAgentJob({
     jobId: activeJobId || undefined,
+  });
+  useAgentProgressToast({
+    job,
+    isRunning: agentRunning,
+    isComplete: agentComplete,
+    isFailed: agentFailed,
   });
 
   // Handle agent completion
@@ -66,11 +78,11 @@ export function ScriptBreakdownStep({
     setState("agent_running");
     setError(null);
 
-    const jobId = await startJob(projectId, scriptId, "script_analysis");
+    const { jobId, error: jobError } = await startJob(projectId, scriptId, "script_analysis");
     if (jobId) {
       setActiveJobId(jobId);
     } else {
-      setError("Failed to start analysis agent");
+      setError(jobError || "Failed to start analysis agent");
       setState("error");
     }
   };
@@ -224,7 +236,7 @@ export function ScriptBreakdownStep({
             {startingJob ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
-              <Sparkles className="h-4 w-4 mr-2" />
+              <Lightbulb className="h-4 w-4 mr-2" />
             )}
             Analyze Script with Wrapshot Intelligence
           </Button>

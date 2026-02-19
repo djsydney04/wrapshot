@@ -399,6 +399,21 @@ export const RECEIPT_STATUS_LABELS: Record<ReceiptStatus, string> = {
   REJECTED: "Rejected",
 };
 
+export type DepartmentBudgetStatus =
+  | "NOT_STARTED"
+  | "IN_PROGRESS"
+  | "SUBMITTED"
+  | "REVISION_REQUESTED"
+  | "APPROVED";
+
+export const DEPARTMENT_BUDGET_STATUS_LABELS: Record<DepartmentBudgetStatus, string> = {
+  NOT_STARTED: "Not Started",
+  IN_PROGRESS: "In Progress",
+  SUBMITTED: "Submitted for Review",
+  REVISION_REQUESTED: "Revision Requested",
+  APPROVED: "Approved",
+};
+
 // Standard film budget chart of accounts
 export const BUDGET_CHART_OF_ACCOUNTS = {
   "1000": { name: "Above-the-Line", subcategories: {

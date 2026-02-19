@@ -13,12 +13,14 @@
 5. [Building Your Cast](#building-your-cast)
 6. [Organizing Your Crew](#organizing-your-crew)
 7. [Scheduling & Stripeboard](#scheduling--stripeboard)
-8. [Scene Breakdown](#scene-breakdown)
-9. [Budget & Finance](#budget--finance)
-10. [Locations](#locations)
-11. [Gear & Equipment](#gear--equipment)
-12. [Team Collaboration](#team-collaboration)
-13. [Tips & Best Practices](#tips--best-practices)
+8. [Call Sheets & Distribution](#call-sheets--distribution)
+9. [Scene Breakdown](#scene-breakdown)
+10. [Budget & Finance](#budget--finance)
+11. [Locations](#locations)
+12. [Gear & Equipment](#gear--equipment)
+13. [Team Collaboration](#team-collaboration)
+14. [Smart Assistant](#smart-assistant)
+15. [Tips & Best Practices](#tips--best-practices)
 
 ---
 
@@ -67,6 +69,19 @@ When you create a new project, Wrapshot offers a guided **Setup Wizard** to help
 
 You can skip any step and complete it later.
 
+### Step 4: Use the Getting Started Checklist
+
+After setup, the **Overview** tab shows a Getting Started checklist so your team can track what
+is done and what still needs setup.
+
+- Upload script
+- Add scenes
+- Add cast members
+- Add crew members
+- Add shooting days
+
+Each checklist row links directly to the section where that task is completed.
+
 ---
 
 ## Uploading & Analyzing Your Script
@@ -87,20 +102,29 @@ Wrapshot Intelligence can automatically analyze your script to:
 3. Click **Upload Script** or drag-and-drop your PDF
 4. Wrapshot will automatically begin analysis
 
-### Reviewing AI Results
+### Reviewing Script Analysis Results Dashboard
 
-After analysis completes:
-- Review extracted scenes in the **Scenes** section
-- Check the **Scene Breakdown** for detected elements
-- Accept or dismiss AI suggestions as needed
-- Make manual adjustments where necessary
+After analysis completes, open the **Script Analysis Results** panel:
+1. Review generated scenes and delete any incorrect entries
+2. Review element categories and remove false positives
+3. Confirm or adjust cast names
+4. Accept or dismiss crew suggestions
+5. Use quick links in the panel to jump into full sections for deeper edits
 
 ### Script Versions
 
 Keep track of revisions by uploading new script versions:
 - Each version is color-coded (White, Blue, Pink, Yellow, etc.)
-- Compare versions to see what changed
+- Trigger script change analysis to see what changed
 - The active version is used for breakdown and scheduling
+
+### Reviewing Script Version Changes
+
+When a new script version is uploaded:
+1. Wait for the change analysis banner to appear
+2. Click **Review** to open version differences
+3. Confirm added, removed, and modified scenes
+4. Update schedule, breakdown, and budget based on the approved changes
 
 ---
 
@@ -281,6 +305,40 @@ Switch between views:
 
 ---
 
+## Call Sheets & Distribution
+
+### Creating a Call Sheet
+
+1. Go to your project and open the **Call Sheets** section
+2. Select a shooting day
+3. If no call sheet exists yet, click **Create**
+4. Fill in key details:
+   - General notes
+   - Safety notes
+   - Parking and meal notes
+   - Department and cast call times
+
+### Saving Draft vs Publishing
+
+- Click **Save** to keep a draft
+- Click **Publish** when the sheet is ready for the team
+- Published versions are tracked per shooting day
+
+### Exporting a PDF
+
+1. Open the call sheet for a shooting day
+2. Click **Download PDF**
+3. Wrapshot saves any pending edits, then generates the file
+
+### Distributing to Cast & Crew
+
+1. Open the call sheet and click **Distribute**
+2. Select cast and crew recipients (only members with email)
+3. Click **Send**
+4. Recipients receive the call sheet by email
+
+---
+
 ## Scene Breakdown
 
 ### What is Scene Breakdown?
@@ -388,6 +446,25 @@ Monitor your budget status:
 - **On Track** (yellow) - Close to estimates
 - **Over Budget** (red) - Exceeding estimates
 
+### Department Budget Workflow (New)
+
+Use this when department heads and finance need a structured approval flow:
+
+1. Finance assigns a department owner in the budget builder
+2. Department owner updates line items and allocation
+3. Department owner clicks **Submit** when ready
+4. Finance reviews and chooses:
+   - **Approve**
+   - **Request Revision**
+5. If needed, finance can reopen an approved department for further changes
+
+Department statuses move through:
+- **Not Started**
+- **In Progress**
+- **Submitted**
+- **Revision Requested**
+- **Approved**
+
 ---
 
 ## Locations
@@ -422,6 +499,20 @@ Add important notes about each location:
 ### Assigning Locations to Scenes
 
 When editing a scene, select its location from your location database.
+
+### Using Location Intelligence (New)
+
+For each selected location, Wrapshot Intelligence can generate:
+- Nearby support suggestions
+- Permit office guidance
+- Permit checklist items
+- Logistics risks and next actions
+
+How to use it:
+1. Open the **Locations** section and select a location
+2. Open the **Location Intelligence** panel
+3. Review suggestions and permit guidance
+4. Click **Refresh** after changing location notes to regenerate recommendations
 
 ---
 
@@ -483,6 +574,31 @@ View and manage team members in **Settings > Team**:
 ### Real-Time Collaboration
 
 Changes sync in real-time across all team members. When someone updates a scene or schedule, you'll see it immediately.
+
+---
+
+## Smart Assistant
+
+### What It Can Help With
+
+The Smart Assistant can answer project-specific questions about:
+- Scene status and unscheduled work
+- Permit follow-up and location risks
+- Schedule planning and sequencing
+- Cast/crew context from current project data
+
+### How to Use It
+
+1. Open the **Assistant** section in your project
+2. Type a question or pick a quick prompt
+3. Send with **Cmd/Ctrl + Enter** or click **Send**
+4. Review suggestions and apply changes in the linked project sections
+
+### Tips for Better Results
+
+- Ask specific questions ("What scenes are unscheduled for next week?")
+- Include constraints (days, locations, cast availability)
+- Follow up with focused refinement prompts
 
 ---
 
@@ -570,4 +686,4 @@ Yes! Wrapshot supports real-time collaboration. Changes sync instantly across al
 
 ---
 
-*This guide is updated regularly as new features are added. Last updated: February 2026*
+*This guide is updated regularly as new features are added. Last updated: February 2026 (feature workflow refresh).*

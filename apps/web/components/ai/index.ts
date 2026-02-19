@@ -1,4 +1,4 @@
-// AI Components - Centralized exports
+// Smart Components - Centralized exports
 
 // Indicators and loading states
 export { AIIndicator, AILoadingSkeleton, AITypingIndicator } from "./ai-indicator";

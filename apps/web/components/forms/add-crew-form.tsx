@@ -233,12 +233,12 @@ export function AddCrewForm({
           <DialogFooter>
             <Button
               type="button"
-              variant="outline"
+              variant="skeuo-outline"
               onClick={() => onOpenChange(false)}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" variant="skeuo" disabled={loading}>
               {loading ? "Adding..." : "Add Crew Member"}
             </Button>
           </DialogFooter>

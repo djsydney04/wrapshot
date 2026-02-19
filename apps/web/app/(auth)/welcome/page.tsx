@@ -10,45 +10,44 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 const features = [
   {
-    icon: Film,
-    title: "Replace Final Draft Breakdowns",
-    description: "Streamlined scene breakdowns and element tracking",
+    icon: FileText,
+    title: "AI Script Pipeline",
+    description: "Upload a PDF and auto-extract scenes, cast, elements, and synopses",
   },
   {
     icon: Calendar,
-    title: "Replace Excel Schedules",
-    description: "Smart scheduling with automatic conflict detection",
+    title: "Call Sheet Distribution",
+    description: "Create, publish, export PDF, and email cast and crew in one flow",
   },
   {
     icon: Users,
-    title: "Replace Email Chains",
-    description: "Centralized team communication and availability tracking",
+    title: "Analysis Results Dashboard",
+    description: "Review AI output, edit inline, and accept crew suggestions quickly",
   },
   {
-    icon: FileText,
-    title: "Replace PDF Call Sheets",
-    description: "One-click generation with instant notifications",
+    icon: Film,
+    title: "Department Budget Workflow",
+    description: "Assign owners, submit departmental budgets, and manage approvals",
   },
 ];
 
 const benefits = [
-  "Cut pre-production time in half",
-  "Eliminate scheduling conflicts",
-  "Keep everyone in sync, always",
+  "Launch projects with a guided setup checklist",
+  "Review script analysis before it hits your schedule",
+  "Publish and distribute call sheets in minutes",
 ];
 
 const testimonials = [
   {
-    quote: "Finally, one tool instead of five. Our pre-production is 3x faster.",
+    quote: "The script analysis dashboard saved us days in prep and cleanup.",
     author: "Sarah Chen",
     role: "Producer",
   },
   {
-    quote: "No more juggling spreadsheets and email. This is the future.",
+    quote: "Call sheet publishing and distribution now happens in one pass.",
     author: "Marcus Webb",
     role: "1st AD",
   },
@@ -58,7 +57,7 @@ export default function WelcomePage() {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Branding & Features */}
-      <div className="hidden lg:flex lg:w-1/2 bg-muted/30 flex-col justify-between p-12 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 bg-muted/25 flex-col justify-between p-12 relative overflow-hidden">
         {/* Background decoration */}
         <div className="absolute inset-0 opacity-[0.03]">
           <div className="absolute top-20 left-20 w-96 h-96 rounded-full bg-primary blur-3xl" />
@@ -82,7 +81,9 @@ export default function WelcomePage() {
               production platform
             </h1>
             <p className="mt-3 text-base text-muted-foreground max-w-md leading-relaxed">
-              Replace your spreadsheets, email chains, and production binders with one powerful workspace. From script to screen.
+              Plan from script to shoot day in one workspace. Use Wrapshot Intelligence to
+              break down scripts, review results, and move straight into schedule, budget, and
+              call sheets.
             </p>
           </div>
 
@@ -103,7 +104,7 @@ export default function WelcomePage() {
               return (
                 <div
                   key={feature.title}
-                  className="flex items-start gap-2.5 p-3 rounded-lg bg-background/50 border border-border/50"
+                  className="flex items-start gap-2.5 p-3 rounded-lg surface-pop"
                 >
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10">
                     <Icon className="h-3.5 w-3.5 text-primary" />
@@ -131,7 +132,7 @@ export default function WelcomePage() {
             {testimonials.map((testimonial, i) => (
               <div
                 key={i}
-                className="flex-1 p-3 rounded-lg bg-background/50 border border-border/50"
+                className="flex-1 p-3 rounded-lg surface-pop"
               >
                 <p className="text-xs italic text-muted-foreground leading-relaxed">
                   &ldquo;{testimonial.quote}&rdquo;
@@ -147,8 +148,8 @@ export default function WelcomePage() {
       </div>
 
       {/* Right Side - Auth Options */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-background">
-        <div className="w-full max-w-sm space-y-8">
+      <div className="relative flex-1 flex items-center justify-center p-8 bg-background">
+        <div className="w-full max-w-sm space-y-8 rounded-2xl p-6 surface-pop sm:p-8">
           {/* Mobile logo */}
           <div className="flex flex-col items-center lg:hidden">
             <h1 className="text-xl font-semibold">wrapshoot</h1>

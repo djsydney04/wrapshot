@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { KimiClient } from "@/lib/ai/kimi-client";
+import { buildAiCacheKey, getAiCachedResponse, setAiCachedResponse } from "@/lib/ai/cache";
 import {
   ELEMENT_SUGGESTION_PROMPT,
   ELEMENT_SUGGESTION_USER_TEMPLATE,
@@ -21,6 +22,13 @@ interface SuggestionResponse {
   suggestions: ElementSuggestion[];
 }
 
+type CachedElementSuggestion = ElementSuggestion & {
+  id: string;
+  status: "pending";
+};
+
+const ELEMENT_SUGGESTION_CACHE_TTL_SECONDS = 60 * 60 * 24 * 14;
+
 export async function POST(request: Request) {
   const startTime = Date.now();
 
@@ -36,14 +44,53 @@ export async function POST(request: Request) {
     }
 
     // 2. Parse input
-    const body = await request.json();
+    const body = (await request.json()) as {
+      sceneId?: string;
+      projectId?: string;
+      scriptText?: string;
+      existingElements?: Array<{ category: ElementCategory; name: string }>;
+      forceRefresh?: boolean;
+    };
     const { sceneId, projectId, scriptText, existingElements } = body;
+    const forceRefresh = Boolean(body.forceRefresh);
 
     if (!sceneId || !scriptText) {
       return NextResponse.json(
         { error: "sceneId and scriptText are required" },
         { status: 400 }
       );
+    }
+
+    const cacheKey = buildAiCacheKey({
+      scope: projectId || user.id,
+      sceneId,
+      scriptText,
+      existingElements: existingElements || [],
+    });
+
+    if (!forceRefresh) {
+      const cached = await getAiCachedResponse<CachedElementSuggestion[]>(supabase, {
+        endpoint: "/api/ai/suggestions/elements",
+        cacheKey,
+      });
+
+      if (cached) {
+        const processingTime = Date.now() - startTime;
+        await supabase.from("AIProcessingLog").insert({
+          projectId,
+          userId: user.id,
+          endpoint: "/api/ai/suggestions/elements",
+          processingTimeMs: processingTime,
+          success: true,
+          metadata: {
+            sceneId,
+            suggestionsCount: cached.length,
+            cacheHit: true,
+          },
+        });
+
+        return NextResponse.json({ data: cached, meta: { cached: true } });
+      }
     }
 
     // 3. Format existing elements for the prompt
@@ -72,13 +119,22 @@ export async function POST(request: Request) {
     const parsed = KimiClient.extractJson<SuggestionResponse>(response);
 
     // 7. Filter suggestions with low confidence
-    const suggestions = (parsed.suggestions || [])
+    const suggestions: CachedElementSuggestion[] = (parsed.suggestions || [])
       .filter((s) => s.confidence >= 0.5)
       .map((s) => ({
         ...s,
         id: crypto.randomUUID(),
         status: "pending" as const,
       }));
+
+    await setAiCachedResponse(supabase, {
+      endpoint: "/api/ai/suggestions/elements",
+      cacheKey,
+      projectId: projectId || undefined,
+      userId: user.id,
+      response: suggestions,
+      ttlSeconds: ELEMENT_SUGGESTION_CACHE_TTL_SECONDS,
+    });
 
     // 8. Log the processing (optional)
     const processingTime = Date.now() - startTime;
@@ -91,6 +147,7 @@ export async function POST(request: Request) {
       metadata: {
         sceneId,
         suggestionsCount: suggestions.length,
+        cacheHit: false,
       },
     });
 
@@ -108,7 +165,7 @@ export async function POST(request: Request) {
       await supabase.from("AISuggestion").insert(suggestionRecords);
     }
 
-    return NextResponse.json({ data: suggestions });
+    return NextResponse.json({ data: suggestions, meta: { cached: false } });
   } catch (error) {
     console.error("Element suggestion error:", error);
 

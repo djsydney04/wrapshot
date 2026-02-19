@@ -11,7 +11,7 @@ import {
   Users,
   UserCircle,
   Clapperboard,
-  Sparkles,
+  Lightbulb,
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import { AddCrewForm } from "@/components/forms/add-crew-form";
 import { AgentProgressCard } from "@/components/agents/agent-progress-card";
 import { useProjectStore } from "@/lib/stores/project-store";
 import { useAgentJob, useStartAgentJob } from "@/lib/hooks/use-agent-job";
+import { useAgentProgressToast } from "@/lib/hooks/use-agent-progress-toast";
 import { cn } from "@/lib/utils";
 import type { Project } from "@/lib/actions/projects.types";
 import type { AgentJobResult } from "@/lib/agents/types";
@@ -31,6 +32,7 @@ interface SetupWizardProps {
   project: Project;
   onComplete: () => void;
   onSkip: () => void;
+  onAnalysisComplete?: () => void | Promise<void>;
 }
 
 type WizardStep = "welcome" | "script" | "schedule" | "cast" | "crew" | "complete";
@@ -52,6 +54,7 @@ export function SetupWizard({
   project,
   onComplete,
   onSkip,
+  onAnalysisComplete,
 }: SetupWizardProps) {
   const [currentStep, setCurrentStep] = React.useState<WizardStep>("welcome");
   const [showAddDay, setShowAddDay] = React.useState(false);
@@ -70,8 +73,19 @@ export function SetupWizard({
 
   // Agent hooks
   const { startJob } = useStartAgentJob();
-  const { job, isComplete: agentComplete, isFailed: agentFailed } = useAgentJob({
+  const {
+    job,
+    isRunning: agentRunning,
+    isComplete: agentComplete,
+    isFailed: agentFailed,
+  } = useAgentJob({
     jobId: activeJobId || undefined,
+  });
+  useAgentProgressToast({
+    job,
+    isRunning: agentRunning,
+    isComplete: agentComplete,
+    isFailed: agentFailed,
   });
 
   const { addScript, getShootingDaysForProject, getCastForProject, getCrewForProject } =
@@ -89,16 +103,18 @@ export function SetupWizard({
       const result = job.result as AgentJobResult;
       setScenesImported(result.scenesCreated);
       setScriptState("complete");
+      void onAnalysisComplete?.();
     }
-  }, [agentComplete, job?.result]);
+  }, [agentComplete, job?.result, onAnalysisComplete]);
 
   // Handle agent failure
   React.useEffect(() => {
     if (agentFailed && job?.errorMessage) {
       setAnalysisError(job.errorMessage);
       setScriptState("error");
+      void onAnalysisComplete?.();
     }
-  }, [agentFailed, job?.errorMessage]);
+  }, [agentFailed, job?.errorMessage, onAnalysisComplete]);
 
   const handleNext = () => {
     const nextIndex = currentStepIndex + 1;
@@ -154,12 +170,12 @@ export function SetupWizard({
 
         // Auto-start the agent analysis
         setScriptState("analyzing");
-        const jobId = await startJob(projectId, newScriptId, "script_analysis");
+        const { jobId, error: jobError } = await startJob(projectId, newScriptId, "script_analysis");
 
         if (jobId) {
           setActiveJobId(jobId);
         } else {
-          setAnalysisError("Failed to start script analysis");
+          setAnalysisError(jobError || "Failed to start script analysis");
           setScriptState("error");
         }
       } else {
@@ -178,11 +194,11 @@ export function SetupWizard({
     setScriptState("analyzing");
     setAnalysisError(null);
 
-    const jobId = await startJob(projectId, uploadedScriptId, "script_analysis");
+    const { jobId, error: jobError } = await startJob(projectId, uploadedScriptId, "script_analysis");
     if (jobId) {
       setActiveJobId(jobId);
     } else {
-      setAnalysisError("Failed to start script analysis");
+      setAnalysisError(jobError || "Failed to start script analysis");
       setScriptState("error");
     }
   };
@@ -208,7 +224,7 @@ export function SetupWizard({
         );
 
       case "script":
-        // Combined script upload + AI analysis step
+        // Combined script upload + Smart analysis step
         return (
           <div className="py-4">
             {/* Initial upload state */}
@@ -216,7 +232,7 @@ export function SetupWizard({
               <>
                 <div className="text-center mb-6">
                   <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                    <Sparkles className="h-8 w-8 text-primary" />
+                    <Lightbulb className="h-8 w-8 text-primary" />
                   </div>
                   <h2 className="text-xl font-semibold mb-2">Upload Your Script</h2>
                   <p className="text-muted-foreground max-w-sm mx-auto">
@@ -437,7 +453,7 @@ export function SetupWizard({
               or come back to this guide anytime.
             </p>
             <div className="flex justify-center gap-3">
-              <Button onClick={onComplete}>
+              <Button variant="skeuo" onClick={onComplete}>
                 Start Working
               </Button>
             </div>
@@ -495,7 +511,7 @@ export function SetupWizard({
           {currentStep !== "script" && currentStep !== "welcome" && scriptState === "analyzing" && (
             <div className="mx-6 mt-4 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin text-primary" />
-              <span>AI is still analyzing your script in the background{job?.progressPercent ? ` (${job.progressPercent}%)` : ""}...</span>
+              <span>Smart is still analyzing your script in the background{job?.progressPercent ? ` (${job.progressPercent}%)` : ""}...</span>
             </div>
           )}
 
@@ -531,14 +547,14 @@ export function SetupWizard({
                   )}
                   {/* After complete, show continue */}
                   {scriptState === "complete" && (
-                    <Button onClick={handleNext}>
+                    <Button variant="skeuo" onClick={handleNext}>
                       Continue
                       <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>
                   )}
-                  {/* During analysis, let user continue while AI works in background */}
+                  {/* During analysis, let user continue while Smart works in background */}
                   {(scriptState === "uploading" || scriptState === "analyzing") && (
-                    <Button onClick={handleNext} variant={scriptState === "uploading" ? "ghost" : "default"} disabled={scriptState === "uploading"}>
+                    <Button onClick={handleNext} variant={scriptState === "uploading" ? "ghost" : "skeuo"} disabled={scriptState === "uploading"}>
                       {scriptState === "uploading" ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -546,7 +562,7 @@ export function SetupWizard({
                         </>
                       ) : (
                         <>
-                          Continue while AI works
+                          Continue while Smart works
                           <ChevronRight className="h-4 w-4 ml-1" />
                         </>
                       )}
@@ -554,7 +570,7 @@ export function SetupWizard({
                   )}
                 </div>
               ) : (
-                <Button onClick={handleNext}>
+                <Button variant="skeuo" onClick={handleNext}>
                   {currentStep === "welcome" ? "Get Started" : "Continue"}
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>

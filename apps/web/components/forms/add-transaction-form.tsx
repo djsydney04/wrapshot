@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ReceiptUpload, type ParsedReceiptData } from "@/components/ui/receipt-upload";
-import { Sparkles } from "lucide-react";
+import { Lightbulb } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -228,7 +228,7 @@ export function AddTransactionForm({
 
             {autoFilled && (
               <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm">
-                <Sparkles className="h-4 w-4 text-primary" />
+                <Lightbulb className="h-4 w-4 text-primary" />
                 <span>Form auto-filled from receipt</span>
               </div>
             )}

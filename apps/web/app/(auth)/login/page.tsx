@@ -48,7 +48,7 @@ export default function LoginPage() {
 
       {/* Form */}
       <form onSubmit={handleSignIn} className="space-y-4">
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium mb-1.5">
               Email
@@ -96,6 +96,7 @@ export default function LoginPage() {
         )}
 
         <Button
+          variant="skeuo"
           type="submit"
           disabled={loading}
           className="w-full"

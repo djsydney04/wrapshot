@@ -7,10 +7,13 @@ import {
   Send,
   Download,
   Loader2,
+  AlertTriangle,
   ChevronDown,
   ChevronRight,
   CheckCircle,
+  Sparkles,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +26,16 @@ import {
   publishCallSheet,
   type CallSheetFullData,
 } from "@/lib/actions/call-sheets";
+import {
+  getPostDependenciesForShootingDay,
+  syncPostBlockersToCallSheet,
+  type PostDependencyAlert,
+} from "@/lib/actions/post-production";
+import {
+  getArtDependenciesForShootingDay,
+  syncArtBlockersToCallSheet,
+} from "@/lib/actions/art-department";
+import type { DepartmentDayDependency } from "@/lib/actions/departments-readiness";
 import { updateCastCallTimes, updateDepartmentCallTimes } from "@/lib/actions/shooting-days";
 import { CallSheetPreview } from "./call-sheet-preview";
 import { DistributeDialog } from "./distribute-dialog";
@@ -40,7 +53,7 @@ interface CallSheetEditorProps {
 
 type CastCallTimeEdit = {
   castMemberId: string;
-  workStatus: string;
+  workStatus: "W" | "SW" | "WF" | "SWF" | "H" | "R" | "T" | "WD";
   pickupTime: string;
   muHairCall: string;
   onSetCall: string;
@@ -61,10 +74,18 @@ export function CallSheetEditor({
   onBack,
 }: CallSheetEditorProps) {
   const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [publishing, setPublishing] = React.useState(false);
+  const [downloadingPdf, setDownloadingPdf] = React.useState(false);
   const [showDistribute, setShowDistribute] = React.useState(false);
   const [fullData, setFullData] = React.useState<CallSheetFullData | null>(null);
+  const [loadingPostAlerts, setLoadingPostAlerts] = React.useState(false);
+  const [syncingPostAlerts, setSyncingPostAlerts] = React.useState(false);
+  const [postAlerts, setPostAlerts] = React.useState<PostDependencyAlert[]>([]);
+  const [loadingArtAlerts, setLoadingArtAlerts] = React.useState(false);
+  const [syncingArtAlerts, setSyncingArtAlerts] = React.useState(false);
+  const [artAlerts, setArtAlerts] = React.useState<DepartmentDayDependency[]>([]);
 
   // Editable notes fields
   const [nearestHospital, setNearestHospital] = React.useState("");
@@ -95,7 +116,8 @@ export function CallSheetEditor({
   React.useEffect(() => {
     async function load() {
       setLoading(true);
-      const { data } = await getFullCallSheetData(shootingDay.id, projectId);
+      setLoadError(null);
+      const { data, error } = await getFullCallSheetData(shootingDay.id, projectId);
       if (data) {
         setFullData(data);
         setNearestHospital(data.callSheet.nearestHospital || "");
@@ -108,7 +130,7 @@ export function CallSheetEditor({
         setCastCallTimes(
           data.castCallTimes.map((ct) => ({
             castMemberId: ct.castMemberId,
-            workStatus: ct.workStatus || "W",
+            workStatus: (ct.workStatus as CastCallTimeEdit["workStatus"]) || "W",
             pickupTime: ct.pickupTime || "",
             muHairCall: ct.muHairCall || "",
             onSetCall: ct.onSetCall || "",
@@ -124,18 +146,81 @@ export function CallSheetEditor({
             notes: dc.notes || "",
           }))
         );
+      } else {
+        setLoadError(error || "Failed to load call sheet data.");
       }
       setLoading(false);
     }
     load();
   }, [shootingDay.id, projectId]);
 
-  const handleSave = async () => {
-    if (!fullData) return;
-    setSaving(true);
+  const reloadCallSheetData = React.useCallback(async () => {
+    const { data, error } = await getFullCallSheetData(shootingDay.id, projectId);
+    if (data) {
+      setLoadError(null);
+      setFullData(data);
+      return data;
+    } else if (error) {
+      setLoadError(error);
+    }
+    return null;
+  }, [shootingDay.id, projectId]);
+
+  const loadPostAlerts = React.useCallback(async () => {
+    setLoadingPostAlerts(true);
     try {
+      const { alerts } = await getPostDependenciesForShootingDay(projectId, shootingDay.id);
+      setPostAlerts(alerts.filter((alert) => alert.severity === "BLOCKER"));
+    } catch (error) {
+      console.error("Failed to load post blockers for call sheet editor", error);
+      setPostAlerts([]);
+    } finally {
+      setLoadingPostAlerts(false);
+    }
+  }, [projectId, shootingDay.id]);
+
+  const loadArtAlerts = React.useCallback(async () => {
+    setLoadingArtAlerts(true);
+    try {
+      const { alerts } = await getArtDependenciesForShootingDay(projectId, shootingDay.id);
+      setArtAlerts(alerts.filter((alert) => alert.severity === "CRITICAL"));
+    } catch (error) {
+      console.error("Failed to load art blockers for call sheet editor", error);
+      setArtAlerts([]);
+    } finally {
+      setLoadingArtAlerts(false);
+    }
+  }, [projectId, shootingDay.id]);
+
+  React.useEffect(() => {
+    void loadPostAlerts();
+  }, [loadPostAlerts]);
+
+  React.useEffect(() => {
+    void loadArtAlerts();
+  }, [loadArtAlerts]);
+
+  const persistCallSheet = React.useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    if (!fullData) {
+      return { success: false, error: "Call sheet data is not loaded yet." };
+    }
+
+    try {
+      const invalidDeptCall = deptCallTimes.find(
+        (dt) =>
+          (dt.department.trim().length > 0 && dt.callTime.trim().length === 0) ||
+          (dt.department.trim().length === 0 && dt.callTime.trim().length > 0)
+      );
+
+      if (invalidDeptCall) {
+        return {
+          success: false,
+          error: "Each department call row must include both department and call time.",
+        };
+      }
+
       // Save call sheet notes
-      await updateCallSheet(fullData.callSheet.id, {
+      const callSheetResult = await updateCallSheet(fullData.callSheet.id, {
         nearestHospital: nearestHospital || null,
         safetyNotes: safetyNotes || null,
         parkingNotes: parkingNotes || null,
@@ -143,36 +228,74 @@ export function CallSheetEditor({
         advanceNotes: advanceNotes || null,
       });
 
+      if (callSheetResult.error) {
+        return { success: false, error: callSheetResult.error };
+      }
+
       // Save cast call times
-      if (castCallTimes.length > 0) {
-        await updateCastCallTimes(
-          shootingDay.id,
-          castCallTimes.map((ct) => ({
-            castMemberId: ct.castMemberId,
-            workStatus: ct.workStatus as any,
-            pickupTime: ct.pickupTime || undefined,
-            muHairCall: ct.muHairCall || undefined,
-            onSetCall: ct.onSetCall || undefined,
-            remarks: ct.remarks || undefined,
-          }))
-        );
+      const castResult = await updateCastCallTimes(
+        shootingDay.id,
+        castCallTimes.map((ct) => ({
+          castMemberId: ct.castMemberId,
+          workStatus: ct.workStatus,
+          pickupTime: ct.pickupTime || undefined,
+          muHairCall: ct.muHairCall || undefined,
+          onSetCall: ct.onSetCall || undefined,
+          remarks: ct.remarks || undefined,
+        }))
+      );
+
+      if (!castResult.success) {
+        return { success: false, error: castResult.error || "Failed to save cast call times." };
       }
 
       // Save department call times
-      if (deptCallTimes.length > 0) {
-        await updateDepartmentCallTimes(
-          shootingDay.id,
-          deptCallTimes.map((dt) => ({
-            department: dt.department,
+      const deptResult = await updateDepartmentCallTimes(
+        shootingDay.id,
+        deptCallTimes
+          .filter((dt) => dt.department.trim().length > 0 && dt.callTime.trim().length > 0)
+          .map((dt) => ({
+            department: dt.department.trim(),
             callTime: dt.callTime,
             notes: dt.notes || undefined,
           }))
-        );
+      );
+
+      if (!deptResult.success) {
+        return { success: false, error: deptResult.error || "Failed to save department call times." };
       }
 
-      // Reload data
-      const { data } = await getFullCallSheetData(shootingDay.id, projectId);
-      if (data) setFullData(data);
+      await reloadCallSheetData();
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to save call sheet.",
+      };
+    }
+  }, [
+    advanceNotes,
+    castCallTimes,
+    deptCallTimes,
+    fullData,
+    mealNotes,
+    nearestHospital,
+    parkingNotes,
+    reloadCallSheetData,
+    safetyNotes,
+    shootingDay.id,
+  ]);
+
+  const handleSave = async () => {
+    if (!fullData) return;
+    setSaving(true);
+    try {
+      const result = await persistCallSheet();
+      if (!result.success) {
+        toast.error(result.error || "Failed to save call sheet.");
+        return;
+      }
+      toast.success("Call sheet draft saved.");
     } finally {
       setSaving(false);
     }
@@ -182,18 +305,115 @@ export function CallSheetEditor({
     if (!fullData) return;
     setPublishing(true);
     try {
-      await handleSave();
-      await publishCallSheet(fullData.callSheet.id);
-      // Reload data
-      const { data } = await getFullCallSheetData(shootingDay.id, projectId);
-      if (data) setFullData(data);
+      const saveResult = await persistCallSheet();
+      if (!saveResult.success) {
+        toast.error(saveResult.error || "Failed to save call sheet before publishing.");
+        return;
+      }
+
+      const publishResult = await publishCallSheet(fullData.callSheet.id);
+      if (publishResult.error) {
+        toast.error(publishResult.error);
+        return;
+      }
+
+      await reloadCallSheetData();
+      toast.success("Call sheet published.");
     } finally {
       setPublishing(false);
     }
   };
 
   const handleDownloadPdf = async () => {
-    window.open(`/api/callsheets/${shootingDay.id}/pdf`, "_blank");
+    if (!fullData) return;
+
+    setDownloadingPdf(true);
+    try {
+      const saveResult = await persistCallSheet();
+      if (!saveResult.success) {
+        toast.error(saveResult.error || "Failed to save call sheet before exporting PDF.");
+        return;
+      }
+
+      const response = await fetch(`/api/callsheets/${shootingDay.id}/pdf`);
+      if (!response.ok) {
+        let message = `PDF export failed (${response.status})`;
+        try {
+          const errorData = await response.json();
+          if (errorData?.error) message = errorData.error;
+        } catch {
+          // Keep default message when response body is not JSON.
+        }
+        toast.error(message);
+        return;
+      }
+
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get("Content-Disposition") || "";
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/i);
+      const fallbackName = `${(fullData.project?.name || "Production")
+        .replace(/[^a-zA-Z0-9]/g, "_")}_Day${fullData.shootingDay.dayNumber}_CallSheet.pdf`;
+      const filename = filenameMatch?.[1] || fallbackName;
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename.endsWith(".pdf") ? filename : `${filename}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      toast.success("Call sheet PDF downloaded.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to export PDF.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
+  const handleSyncPostAlerts = async () => {
+    setSyncingPostAlerts(true);
+    try {
+      const result = await syncPostBlockersToCallSheet(shootingDay.id);
+      setAdvanceNotes(result.advanceNotes || "");
+      await Promise.all([reloadCallSheetData(), loadPostAlerts()]);
+
+      if (result.blockerCount > 0) {
+        toast.success(
+          `Synced ${result.blockerCount} post blocker${result.blockerCount === 1 ? "" : "s"} to advance notes.`
+        );
+      } else {
+        toast.success("No open post blockers. Auto-synced blocker notes were removed.");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to sync post blockers.");
+    } finally {
+      setSyncingPostAlerts(false);
+    }
+  };
+
+  const handleSyncArtAlerts = async () => {
+    setSyncingArtAlerts(true);
+    try {
+      const result = await syncArtBlockersToCallSheet(shootingDay.id);
+      const [latestCallSheet] = await Promise.all([reloadCallSheetData(), loadArtAlerts()]);
+      if (latestCallSheet?.callSheet.advanceNotes !== undefined) {
+        setAdvanceNotes(latestCallSheet.callSheet.advanceNotes || "");
+      }
+
+      if (result.blockerCount > 0) {
+        toast.success(
+          `Synced ${result.blockerCount} art blocker${result.blockerCount === 1 ? "" : "s"} to call sheet notes.`
+        );
+      } else {
+        toast.success("No open art blockers. Auto-synced blocker notes were removed.");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to sync art blockers.");
+    } finally {
+      setSyncingArtAlerts(false);
+    }
   };
 
   const updateCastCallTime = (index: number, field: keyof CastCallTimeEdit, value: string) => {
@@ -241,7 +461,7 @@ export function CallSheetEditor({
   if (!fullData) {
     return (
       <div className="text-center py-12 text-muted-foreground">
-        Failed to load call sheet data.
+        {loadError || "Failed to load call sheet data."}
       </div>
     );
   }
@@ -280,16 +500,35 @@ export function CallSheetEditor({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSave}
+            disabled={saving || publishing || downloadingPdf}
+          >
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
             Save Draft
           </Button>
-          <Button variant="outline" size="sm" onClick={handlePublish} disabled={publishing}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePublish}
+            disabled={publishing || saving || downloadingPdf}
+          >
             {publishing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle className="h-4 w-4 mr-1" />}
             Publish
           </Button>
-          <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
-            <Download className="h-4 w-4 mr-1" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadPdf}
+            disabled={downloadingPdf || saving || publishing}
+          >
+            {downloadingPdf ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+            ) : (
+              <Download className="h-4 w-4 mr-1" />
+            )}
             PDF
           </Button>
           <Button size="sm" onClick={() => setShowDistribute(true)}>
@@ -577,6 +816,84 @@ export function CallSheetEditor({
               onToggle={() => toggleSection("notes")}
             >
               <div className="space-y-4">
+                <div className="rounded-md border border-border bg-muted/20 p-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                      Art Blockers
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={handleSyncArtAlerts}
+                      disabled={syncingArtAlerts}
+                    >
+                      {syncingArtAlerts ? (
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                      )}
+                      Sync to Call Sheet
+                    </Button>
+                  </div>
+                  {loadingArtAlerts ? (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Loading art blockers...</span>
+                    </div>
+                  ) : artAlerts.length > 0 ? (
+                    <ul className="space-y-1 text-xs text-amber-700 dark:text-amber-300">
+                      {artAlerts.map((alert) => (
+                        <li key={alert.id} className="flex items-start gap-1.5">
+                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <span>{alert.message}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No open art blockers.</p>
+                  )}
+                </div>
+                <div className="rounded-md border border-border bg-muted/20 p-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                      Post Blockers
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={handleSyncPostAlerts}
+                      disabled={syncingPostAlerts}
+                    >
+                      {syncingPostAlerts ? (
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                      )}
+                      Sync to Advance Notes
+                    </Button>
+                  </div>
+                  {loadingPostAlerts ? (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Loading post blockers...</span>
+                    </div>
+                  ) : postAlerts.length > 0 ? (
+                    <ul className="space-y-1 text-xs text-amber-700 dark:text-amber-300">
+                      {postAlerts.map((alert) => (
+                        <li key={alert.id} className="flex items-start gap-1.5">
+                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <span>{alert.message}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No open post blockers.</p>
+                  )}
+                </div>
                 <div>
                   <label className="block text-xs text-muted-foreground mb-1">Safety Notes</label>
                   <Textarea

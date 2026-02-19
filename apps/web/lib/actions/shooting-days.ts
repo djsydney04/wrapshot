@@ -102,6 +102,23 @@ export async function createShootingDay(input: ShootingDayInput) {
     return { data: null, error: dayError.message };
   }
 
+  // Auto-create a call sheet for each new shooting day
+  const { error: callSheetError } = await supabase
+    .from("CallSheet")
+    .insert({ shootingDayId: shootingDay.id });
+
+  if (callSheetError) {
+    console.error("Error creating call sheet:", callSheetError);
+
+    // Roll back the shooting day so the user can retry cleanly.
+    await supabase.from("ShootingDay").delete().eq("id", shootingDay.id);
+
+    return {
+      data: null,
+      error: `Failed to create call sheet for new shooting day: ${callSheetError.message}`,
+    };
+  }
+
   // If scenes are provided, create the scene associations
   if (input.scenes && input.scenes.length > 0) {
     const sceneInserts = input.scenes.map((sceneId, index) => ({
@@ -362,10 +379,9 @@ export async function updateDepartmentCallTimes(
     .from("CallSheet")
     .select("id")
     .eq("shootingDayId", shootingDayId)
-    .single();
+    .maybeSingle();
 
-  if (fetchError && fetchError.code !== "PGRST116") {
-    // PGRST116 = no rows returned
+  if (fetchError) {
     console.error("Error fetching call sheet:", fetchError);
     return { success: false, error: fetchError.message };
   }
@@ -474,13 +490,9 @@ export async function getShootingDayDepartments(shootingDayId: string) {
     `
     )
     .eq("shootingDayId", shootingDayId)
-    .single();
+    .maybeSingle();
 
   if (fetchError) {
-    if (fetchError.code === "PGRST116") {
-      // No call sheet exists yet
-      return { data: [], error: null };
-    }
     console.error("Error fetching department calls:", fetchError);
     return { data: null, error: fetchError.message };
   }

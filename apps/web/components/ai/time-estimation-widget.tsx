@@ -3,7 +3,7 @@
 import * as React from "react";
 import {
   Clock,
-  Sparkles,
+  Lightbulb,
   RefreshCw,
   Loader2,
   ChevronDown,
@@ -58,7 +58,7 @@ export function TimeEstimationWidget({
   const { getTimeEstimateForScene, setTimeEstimate, setLoadingTimeEstimate } = useAIStore();
   const estimate = getTimeEstimateForScene(sceneId);
 
-  const fetchEstimate = async () => {
+  const fetchEstimate = async (forceRefresh = false) => {
     setIsLoading(true);
     setError(null);
     setLoadingTimeEstimate(sceneId, true);
@@ -80,6 +80,7 @@ export function TimeEstimationWidget({
           elements,
           synopsis,
           scriptText,
+          forceRefresh,
         }),
       });
 
@@ -142,11 +143,11 @@ export function TimeEstimationWidget({
         <Button
           variant="outline"
           size="sm"
-          onClick={fetchEstimate}
+          onClick={() => void fetchEstimate()}
           disabled={isLoading}
           className="gap-1.5 text-xs h-7"
         >
-          <Sparkles className="h-3 w-3 text-primary" />
+          <Lightbulb className="h-3 w-3 text-primary" />
           Estimate Time
         </Button>
         {error && <span className="text-xs text-destructive">{error}</span>}
@@ -179,7 +180,7 @@ export function TimeEstimationWidget({
             {formatHours(estimate.hours)}
           </span>
           <span className="inline-flex items-center gap-0.5 text-[10px] text-primary/70 ml-1">
-            <Sparkles className="h-2.5 w-2.5" />
+            <Lightbulb className="h-2.5 w-2.5" />
             Wrapshot Intelligence
           </span>
         </div>
@@ -201,7 +202,7 @@ export function TimeEstimationWidget({
         <Button
           variant="ghost"
           size="icon-sm"
-          onClick={fetchEstimate}
+          onClick={() => void fetchEstimate(true)}
           disabled={isLoading}
           className="h-6 w-6 ml-auto"
           title="Recalculate"

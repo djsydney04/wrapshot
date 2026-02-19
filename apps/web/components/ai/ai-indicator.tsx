@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Lightbulb, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WRAPSHOT_INTELLIGENCE_LABEL } from "@/lib/ai/config";
 
@@ -54,7 +54,7 @@ export function AIIndicator({
           className
         )}
       >
-        <Sparkles className={iconSizes[size]} />
+        <Lightbulb className={iconSizes[size]} />
       </span>
     );
   }
@@ -68,7 +68,7 @@ export function AIIndicator({
           className
         )}
       >
-        <Sparkles className={iconSizes[size]} />
+        <Lightbulb className={iconSizes[size]} />
         {label && <span>{label}</span>}
       </span>
     );
@@ -83,13 +83,13 @@ export function AIIndicator({
         className
       )}
     >
-      <Sparkles className={iconSizes[size]} />
+      <Lightbulb className={iconSizes[size]} />
       {label && <span>{label}</span>}
     </span>
   );
 }
 
-// Loading skeleton for AI-generated content
+// Loading skeleton for Smart-generated content
 interface AILoadingSkeletonProps {
   lines?: number;
   className?: string;

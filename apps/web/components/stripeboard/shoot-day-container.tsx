@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { Calendar, Clock, MapPin, Loader2 } from "lucide-react";
+import { Calendar, Clock, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SortableSceneStrip } from "./scene-strip";
 import { cn } from "@/lib/utils";
 import type { Scene } from "@/lib/actions/scenes";
 import type { ShootingDay } from "@/lib/types";
+import type { SceneStripSize } from "./scene-strip";
 
 interface ShootDayContainerProps {
   shootingDay: ShootingDay;
@@ -16,6 +17,7 @@ interface ShootDayContainerProps {
   selectedSceneId?: string | null;
   activeId?: string | null;
   isSaving?: boolean;
+  sceneSize?: SceneStripSize;
 }
 
 const STATUS_COLORS: Record<ShootingDay["status"], string> = {
@@ -33,6 +35,7 @@ export function ShootDayContainer({
   selectedSceneId,
   activeId,
   isSaving,
+  sceneSize = "comfortable",
 }: ShootDayContainerProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: `day-${shootingDay.id}`,
@@ -105,6 +108,7 @@ export function ShootDayContainer({
               onClick={() => onSceneClick?.(scene.id)}
               isSelected={selectedSceneId === scene.id}
               layout="strip"
+              sceneSize={sceneSize}
             />
           ))
         ) : (

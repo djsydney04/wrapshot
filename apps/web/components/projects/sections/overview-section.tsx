@@ -13,7 +13,7 @@ import {
   Plus,
   Check,
   X,
-  Sparkles,
+  Lightbulb,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
@@ -106,7 +106,7 @@ export function OverviewSection({
         <section className="rounded-lg border border-border bg-card">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
+              <Lightbulb className="h-4 w-4 text-primary" />
               <h3 className="font-medium">Getting Started</h3>
               <span className="text-xs text-muted-foreground">
                 {completedCount}/{setupSteps.length}

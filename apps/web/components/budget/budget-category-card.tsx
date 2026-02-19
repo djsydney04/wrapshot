@@ -8,6 +8,7 @@ import { GripVertical, ChevronDown, ChevronRight, Plus, Edit2, Trash2 } from "lu
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { deleteBudgetCategory, updateBudgetCategory } from "@/lib/actions/budget-categories";
+import { toast } from "sonner";
 import type { BudgetCategory, BudgetLineItem } from "@/lib/actions/budgets";
 import {
   SortableBudgetLineItemRow,
@@ -93,6 +94,11 @@ export function BudgetCategoryCard({
     category.allocatedBudget?.toString() ?? ""
   );
   const allocationSaveRef = React.useRef<NodeJS.Timeout | null>(null);
+  const refreshDebounceRef = React.useRef<NodeJS.Timeout | null>(null);
+  const statusResetRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [allocationStatus, setAllocationStatus] = React.useState<
+    "idle" | "saving" | "saved"
+  >("idle");
 
   // Sort line items by sortOrder
   const sortedLineItems = React.useMemo(() => {
@@ -115,8 +121,23 @@ export function BudgetCategoryCard({
       if (allocationSaveRef.current) {
         clearTimeout(allocationSaveRef.current);
       }
+      if (refreshDebounceRef.current) {
+        clearTimeout(refreshDebounceRef.current);
+      }
+      if (statusResetRef.current) {
+        clearTimeout(statusResetRef.current);
+      }
     };
   }, []);
+
+  const queueRefresh = () => {
+    if (refreshDebounceRef.current) {
+      clearTimeout(refreshDebounceRef.current);
+    }
+    refreshDebounceRef.current = setTimeout(() => {
+      onRefresh();
+    }, 700);
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -142,10 +163,20 @@ export function BudgetCategoryCard({
       const parsed = parseFloat(value);
       const allocatedBudgetValue = Number.isFinite(parsed) ? parsed : 0;
       try {
+        setAllocationStatus("saving");
         await updateBudgetCategory(category.id, { allocatedBudget: allocatedBudgetValue });
-        onRefresh();
+        setAllocationStatus("saved");
+        queueRefresh();
+        if (statusResetRef.current) {
+          clearTimeout(statusResetRef.current);
+        }
+        statusResetRef.current = setTimeout(() => {
+          setAllocationStatus("idle");
+        }, 1200);
       } catch (error) {
         console.error("Error updating allocation:", error);
+        setAllocationStatus("idle");
+        toast.error("Failed to save category allocation");
       }
     }, 400);
   };
@@ -156,9 +187,11 @@ export function BudgetCategoryCard({
 
     try {
       await deleteBudgetCategory(category.id);
+      toast.success("Category deleted");
       onDelete();
     } catch (error) {
       console.error("Error deleting category:", error);
+      toast.error("Failed to delete category");
     }
   };
 
@@ -214,19 +247,27 @@ export function BudgetCategoryCard({
         <div className="flex items-center gap-4 text-sm">
           <div className="text-right">
             <span className="text-muted-foreground text-xs mr-1">Alloc:</span>
-            {canEdit ? (
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={allocationValue}
-                onChange={(e) => handleAllocationChange(e.target.value)}
-                className="w-24 rounded border border-transparent bg-transparent text-right text-sm font-medium text-foreground placeholder:text-muted-foreground hover:border-input focus:border-input focus:outline-none"
-                placeholder="0.00"
-              />
-            ) : (
-              <span className="font-medium">{formatCurrency(allocatedBudget)}</span>
-            )}
+            <div className="inline-flex items-center gap-1">
+              {canEdit ? (
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={allocationValue}
+                  onChange={(e) => handleAllocationChange(e.target.value)}
+                  className="w-24 rounded border border-transparent bg-transparent text-right text-sm font-medium text-foreground placeholder:text-muted-foreground hover:border-input focus:border-input focus:outline-none"
+                  placeholder="0.00"
+                />
+              ) : (
+                <span className="font-medium">{formatCurrency(allocatedBudget)}</span>
+              )}
+              {allocationStatus === "saving" && (
+                <span className="text-[10px] text-muted-foreground">Saving...</span>
+              )}
+              {allocationStatus === "saved" && (
+                <span className="text-[10px] text-emerald-600">Saved</span>
+              )}
+            </div>
           </div>
           <div className="text-right">
             <span className="text-muted-foreground text-xs mr-1">Planned:</span>

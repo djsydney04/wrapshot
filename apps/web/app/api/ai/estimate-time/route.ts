@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { KimiClient } from "@/lib/ai/kimi-client";
+import { buildAiCacheKey, getAiCachedResponse, setAiCachedResponse } from "@/lib/ai/cache";
 import {
   TIME_ESTIMATION_PROMPT,
   TIME_ESTIMATION_USER_TEMPLATE,
@@ -21,6 +22,8 @@ interface TimeEstimateResponse {
   factors: TimeEstimateFactor[];
 }
 
+const TIME_ESTIMATE_CACHE_TTL_SECONDS = 60 * 60 * 24 * 14;
+
 export async function POST(request: Request) {
   const startTime = Date.now();
 
@@ -36,7 +39,21 @@ export async function POST(request: Request) {
     }
 
     // 2. Parse input
-    const body = await request.json();
+    const body = (await request.json()) as {
+      sceneId?: string;
+      projectId?: string;
+      sceneNumber?: string;
+      location?: string;
+      intExt?: string;
+      dayNight?: string;
+      pageCount?: number;
+      pageEighths?: number;
+      cast?: Array<{ characterName: string; actorName?: string }>;
+      elements?: Array<{ category: string; name: string }>;
+      synopsis?: string;
+      scriptText?: string;
+      forceRefresh?: boolean;
+    };
     const {
       sceneId,
       projectId,
@@ -50,6 +67,7 @@ export async function POST(request: Request) {
       elements,
       synopsis,
       scriptText,
+      forceRefresh,
     } = body;
 
     if (!sceneId) {
@@ -59,9 +77,86 @@ export async function POST(request: Request) {
       );
     }
 
+    const cacheKey = buildAiCacheKey({
+      scope: projectId || user.id,
+      sceneId,
+      sceneNumber: sceneNumber || null,
+      location: location || null,
+      intExt: intExt || null,
+      dayNight: dayNight || null,
+      pageCount: pageCount || 0,
+      pageEighths: pageEighths || 0,
+      cast: cast || [],
+      elements: elements || [],
+      synopsis: synopsis || null,
+      scriptText: scriptText || null,
+    });
+
+    if (!forceRefresh) {
+      const cached = await getAiCachedResponse<{
+        hours: number;
+        confidence: number;
+        factors: TimeEstimateFactor[];
+        updatedAt: string;
+      }>(supabase, {
+        endpoint: "/api/ai/estimate-time",
+        cacheKey,
+      });
+
+      if (cached) {
+        const processingTime = Date.now() - startTime;
+        await supabase.from("AIProcessingLog").insert({
+          projectId,
+          userId: user.id,
+          endpoint: "/api/ai/estimate-time",
+          processingTimeMs: processingTime,
+          success: true,
+          metadata: {
+            sceneId,
+            estimatedHours: cached.hours,
+            confidence: cached.confidence,
+            cacheHit: true,
+          },
+        });
+
+        return NextResponse.json({ data: cached, meta: { cached: true } });
+      }
+    }
+
     // 3. Format inputs for the prompt
-    const formattedCast = formatCastForPrompt(cast || []);
-    const formattedElements = formatElementsForPrompt(elements || []);
+    const safeCast = Array.isArray(cast)
+      ? cast
+          .filter(
+            (member): member is { characterName: string; actorName?: string } =>
+              typeof member?.characterName === "string" && member.characterName.length > 0
+          )
+          .map((member) => ({
+            characterName: member.characterName,
+            actorName: member.actorName,
+          }))
+      : [];
+    const safeElements = Array.isArray(elements)
+      ? elements
+          .filter(
+            (
+              element
+            ): element is {
+              category: string;
+              name: string;
+            } =>
+              typeof element?.category === "string" &&
+              element.category.length > 0 &&
+              typeof element?.name === "string" &&
+              element.name.length > 0
+          )
+          .map((element) => ({
+            category: element.category,
+            name: element.name,
+          }))
+      : [];
+
+    const formattedCast = formatCastForPrompt(safeCast);
+    const formattedElements = formatElementsForPrompt(safeElements);
 
     // 4. Build the user message
     const userMessage = buildPrompt(TIME_ESTIMATION_USER_TEMPLATE, {
@@ -103,6 +198,15 @@ export async function POST(request: Request) {
       updatedAt: new Date().toISOString(),
     };
 
+    await setAiCachedResponse(supabase, {
+      endpoint: "/api/ai/estimate-time",
+      cacheKey,
+      projectId: projectId || undefined,
+      userId: user.id,
+      response: estimate,
+      ttlSeconds: TIME_ESTIMATE_CACHE_TTL_SECONDS,
+    });
+
     // 7. Log the processing
     const processingTime = Date.now() - startTime;
     await supabase.from("AIProcessingLog").insert({
@@ -115,6 +219,7 @@ export async function POST(request: Request) {
         sceneId,
         estimatedHours: estimate.hours,
         confidence: estimate.confidence,
+        cacheHit: false,
       },
     });
 
@@ -130,7 +235,7 @@ export async function POST(request: Request) {
       });
     }
 
-    return NextResponse.json({ data: estimate });
+    return NextResponse.json({ data: estimate, meta: { cached: false } });
   } catch (error) {
     console.error("Time estimation error:", error);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles, RefreshCw, Loader2, Pencil, Check, X } from "lucide-react";
+import { Lightbulb, RefreshCw, Loader2, Pencil, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -151,7 +151,7 @@ export function SmartSynopsisField({
           disabled={!scriptText}
           className="w-full justify-center gap-2 border-dashed"
         >
-          <Sparkles className="h-4 w-4 text-primary" />
+          <Lightbulb className="h-4 w-4 text-primary" />
           Generate Synopsis
         </Button>
         {error && (
@@ -197,7 +197,7 @@ export function SmartSynopsisField({
           <span className="text-xs font-medium text-muted-foreground">Synopsis</span>
           {isAiGenerated && !isEditing && (
             <span className="inline-flex items-center gap-1 text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-              <Sparkles className="h-2.5 w-2.5" />
+              <Lightbulb className="h-2.5 w-2.5" />
               Wrapshot Intelligence
             </span>
           )}

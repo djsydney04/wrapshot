@@ -1,11 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { ShootingDay } from "@/lib/types";
 
 interface UseShootingDaysOptions {
   projectId?: string;
+}
+
+interface FetchShootingDaysOptions {
+  silent?: boolean;
 }
 
 // Type for Supabase response row
@@ -20,6 +24,10 @@ interface SupabaseShootingDayRow {
   estimatedWrap: string | null;
   notes: string | null;
   scenes?: { sceneId: string; sortOrder: number | null }[] | null;
+}
+
+interface ShootingDaySceneRealtimeRow {
+  shootingDayId?: string;
 }
 
 // Transform database row to match the mock data format
@@ -49,17 +57,30 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
   const [shootingDays, setShootingDays] = useState<ShootingDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const shootingDayIdsRef = useRef<Set<string>>(new Set());
+  const isFetchingRef = useRef(false);
+  const pendingSilentFetchRef = useRef(false);
+  const realtimeRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const supabase = useMemo(() => createClient(), []);
 
-  const supabase = createClient();
-
-  const fetchShootingDays = useCallback(async () => {
+  const fetchShootingDays = useCallback(async ({ silent = false }: FetchShootingDaysOptions = {}) => {
     if (!projectId) {
       setShootingDays([]);
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    if (isFetchingRef.current) {
+      if (silent) {
+        pendingSilentFetchRef.current = true;
+      }
+      return;
+    }
+
+    isFetchingRef.current = true;
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -78,16 +99,7 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
           notes,
           scenes:ShootingDayScene(
             sceneId,
-            sortOrder,
-            scene:Scene(
-              id,
-              sceneNumber,
-              synopsis,
-              intExt,
-              dayNight,
-              pageCount,
-              location:Location(name)
-            )
+            sortOrder
           )
         `
         )
@@ -105,16 +117,45 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
       console.error("Error fetching shooting days:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch shooting days");
     } finally {
-      setLoading(false);
+      isFetchingRef.current = false;
+      if (!silent) {
+        setLoading(false);
+      }
+
+      if (pendingSilentFetchRef.current) {
+        pendingSilentFetchRef.current = false;
+        void fetchShootingDays({ silent: true });
+      }
     }
   }, [projectId, supabase]);
 
-  // Initial fetch
-  useEffect(() => {
-    fetchShootingDays();
+  const queueRealtimeRefresh = useCallback(() => {
+    if (realtimeRefreshTimeoutRef.current) {
+      clearTimeout(realtimeRefreshTimeoutRef.current);
+    }
+    realtimeRefreshTimeoutRef.current = setTimeout(() => {
+      void fetchShootingDays({ silent: true });
+    }, 250);
   }, [fetchShootingDays]);
 
+  // Initial fetch
+  useEffect(() => {
+    void fetchShootingDays();
+  }, [fetchShootingDays]);
+
+  useEffect(() => {
+    return () => {
+      if (realtimeRefreshTimeoutRef.current) {
+        clearTimeout(realtimeRefreshTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Subscribe to realtime updates
+  useEffect(() => {
+    shootingDayIdsRef.current = new Set(shootingDays.map((day) => day.id));
+  }, [shootingDays]);
+
   useEffect(() => {
     if (!projectId) return;
 
@@ -129,8 +170,7 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
           filter: `projectId=eq.${projectId}`,
         },
         () => {
-          // Refetch on any change
-          fetchShootingDays();
+          queueRealtimeRefresh();
         }
       )
       .on(
@@ -139,9 +179,19 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
           event: "*",
           schema: "public",
           table: "ShootingDayScene",
-        },
-        () => {
-          fetchShootingDays();
+        }, (payload) => {
+          const newRow = payload.new as ShootingDaySceneRealtimeRow | null;
+          const oldRow = payload.old as ShootingDaySceneRealtimeRow | null;
+          const shootingDayId = newRow?.shootingDayId || oldRow?.shootingDayId;
+
+          if (
+            shootingDayId &&
+            !shootingDayIdsRef.current.has(shootingDayId)
+          ) {
+            return;
+          }
+
+          queueRealtimeRefresh();
         }
       )
       .subscribe();
@@ -149,13 +199,13 @@ export function useShootingDays({ projectId }: UseShootingDaysOptions = {}) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [projectId, supabase, fetchShootingDays]);
+  }, [projectId, queueRealtimeRefresh, supabase]);
 
   return {
     shootingDays,
     loading,
     error,
-    refetch: fetchShootingDays,
+    refetch: () => fetchShootingDays(),
   };
 }
 
@@ -164,8 +214,7 @@ export function useAllShootingDays() {
   const [shootingDays, setShootingDays] = useState<ShootingDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const fetchAllShootingDays = useCallback(async () => {
     setLoading(true);
@@ -187,16 +236,7 @@ export function useAllShootingDays() {
           notes,
           scenes:ShootingDayScene(
             sceneId,
-            sortOrder,
-            scene:Scene(
-              id,
-              sceneNumber,
-              synopsis,
-              intExt,
-              dayNight,
-              pageCount,
-              location:Location(name)
-            )
+            sortOrder
           )
         `
         )

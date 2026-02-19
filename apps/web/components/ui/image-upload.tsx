@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 export interface ImageUploadProps {
   value?: string | null;
   onChange: (url: string | null) => void;
-  bucket: "scene-photos" | "profile-photos" | "project-assets";
+  bucket: "scene-photos" | "profile-photos" | "project-assets" | "project-covers";
   folder?: string;
   className?: string;
   aspectRatio?: "square" | "video" | "wide";
@@ -211,7 +211,7 @@ export function ImageUpload({
 export interface MultiImageUploadProps {
   value: string[];
   onChange: (urls: string[]) => void;
-  bucket: "scene-photos" | "profile-photos" | "project-assets";
+  bucket: "scene-photos" | "profile-photos" | "project-assets" | "project-covers";
   folder?: string;
   maxImages?: number;
   className?: string;

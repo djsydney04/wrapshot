@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { KimiClient } from "@/lib/ai/kimi-client";
+import { buildAiCacheKey, getAiCachedResponse, setAiCachedResponse } from "@/lib/ai/cache";
 import {
   ELEMENT_RECOGNITION_PROMPT,
   ELEMENT_RECOGNITION_USER_TEMPLATE,
@@ -20,6 +21,8 @@ interface RecognitionResponse {
   elements: RecognizedElement[];
 }
 
+const RECOGNIZE_ELEMENTS_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30;
+
 export async function POST(request: Request) {
   const startTime = Date.now();
 
@@ -35,8 +38,14 @@ export async function POST(request: Request) {
     }
 
     // 2. Parse input
-    const body = await request.json();
+    const body = (await request.json()) as {
+      sceneId?: string;
+      projectId?: string;
+      scriptText?: string;
+      forceRefresh?: boolean;
+    };
     const { sceneId, projectId, scriptText } = body;
+    const forceRefresh = Boolean(body.forceRefresh);
 
     if (!scriptText) {
       return NextResponse.json(
@@ -47,6 +56,38 @@ export async function POST(request: Request) {
 
     // Limit script text length to prevent token overflow
     const truncatedText = scriptText.slice(0, 5000);
+
+    const cacheKey = buildAiCacheKey({
+      scope: projectId || user.id,
+      sceneId: sceneId || null,
+      scriptText: truncatedText,
+    });
+
+    if (!forceRefresh) {
+      const cached = await getAiCachedResponse<{ elements: RecognizedElement[] }>(supabase, {
+        endpoint: "/api/ai/recognize-elements",
+        cacheKey,
+      });
+
+      if (cached) {
+        const processingTime = Date.now() - startTime;
+        await supabase.from("AIProcessingLog").insert({
+          projectId,
+          userId: user.id,
+          endpoint: "/api/ai/recognize-elements",
+          processingTimeMs: processingTime,
+          success: true,
+          metadata: {
+            sceneId,
+            elementsFound: cached.elements.length,
+            textLength: truncatedText.length,
+            cacheHit: true,
+          },
+        });
+
+        return NextResponse.json({ data: cached, meta: { cached: true } });
+      }
+    }
 
     // 3. Build the user message
     const userMessage = buildPrompt(ELEMENT_RECOGNITION_USER_TEMPLATE, {
@@ -112,6 +153,17 @@ export async function POST(request: Request) {
     }
 
     // 7. Log the processing
+    const responseData = { elements: nonOverlapping };
+
+    await setAiCachedResponse(supabase, {
+      endpoint: "/api/ai/recognize-elements",
+      cacheKey,
+      projectId: projectId || undefined,
+      userId: user.id,
+      response: responseData,
+      ttlSeconds: RECOGNIZE_ELEMENTS_CACHE_TTL_SECONDS,
+    });
+
     const processingTime = Date.now() - startTime;
     await supabase.from("AIProcessingLog").insert({
       projectId,
@@ -123,10 +175,11 @@ export async function POST(request: Request) {
         sceneId,
         elementsFound: nonOverlapping.length,
         textLength: truncatedText.length,
+        cacheHit: false,
       },
     });
 
-    return NextResponse.json({ data: { elements: nonOverlapping } });
+    return NextResponse.json({ data: responseData, meta: { cached: false } });
   } catch (error) {
     console.error("Element recognition error:", error);
 

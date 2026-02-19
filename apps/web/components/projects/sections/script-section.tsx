@@ -22,6 +22,7 @@ import { ScriptDiffModal } from "@/components/ai/script-diff-modal";
 import { AnalysisResultsPanel } from "@/components/agents/analysis-results-panel";
 import { createScript } from "@/lib/actions/scripts";
 import { useStartAgentJob, useAgentJob } from "@/lib/hooks/use-agent-job";
+import { useAgentProgressToast } from "@/lib/hooks/use-agent-progress-toast";
 import { toast } from "sonner";
 import { STEP_DEFINITIONS } from "@/lib/agents/constants";
 import type { AgentJobStatus } from "@/lib/agents/types";
@@ -48,18 +49,24 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
   const [activeScriptId, setActiveScriptId] = React.useState<string | null>(null);
   const { startJob, loading: startingJob, error: startJobError } = useStartAgentJob();
   const { job, isRunning, isComplete, isFailed } = useAgentJob({ scriptId: activeScriptId || undefined });
+  useAgentProgressToast({ job, isRunning, isComplete, isFailed });
 
-  // Track completion to trigger parent refresh
-  const prevCompleteRef = React.useRef(false);
+  // Refresh parent data when a job reaches a terminal state.
+  const prevJobStatusRef = React.useRef<string | null>(null);
   React.useEffect(() => {
-    if (isComplete && !prevCompleteRef.current) {
-      toast.success("Script analysis complete!", {
-        description: `${job?.result?.scenesCreated ?? 0} scenes, ${job?.result?.elementsCreated ?? 0} elements, ${job?.result?.castCreated ?? 0} cast members created`,
-      });
+    if (!job?.id) return;
+
+    const currentStatus = job.status;
+    const previousStatus = prevJobStatusRef.current;
+    prevJobStatusRef.current = currentStatus;
+
+    if (!isComplete && !isFailed) return;
+    if (previousStatus === currentStatus) return;
+
+    if (currentStatus === "completed" || currentStatus === "failed" || currentStatus === "cancelled") {
       onAnalysisComplete?.();
     }
-    prevCompleteRef.current = isComplete;
-  }, [isComplete, job?.result, onAnalysisComplete]);
+  }, [job?.id, job?.status, isComplete, isFailed, onAnalysisComplete]);
 
   // Script change detection state
   const [scriptChanges, setScriptChanges] = React.useState<{
@@ -80,6 +87,14 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
       return vB - vA;
     });
   }, [scripts]);
+
+  React.useEffect(() => {
+    if (activeScriptId || sortedScripts.length === 0) return;
+    const latestScript = sortedScripts[0];
+    if (latestScript?.id) {
+      setActiveScriptId(latestScript.id);
+    }
+  }, [activeScriptId, sortedScripts]);
 
   const nextVersion = scripts.length > 0
     ? Math.max(...scripts.map((s) => {
@@ -125,16 +140,16 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
       // Notify parent to refresh script list
       onScriptUploaded?.();
 
-      // Start the AI agent pipeline
+      // Start the Smart agent pipeline
       setActiveScriptId(dbScript.id);
-      const jobId = await startJob(projectId, dbScript.id, "script_analysis");
+      const { jobId, error: jobError } = await startJob(projectId, dbScript.id, "script_analysis");
       if (jobId) {
         toast.info("Script analysis started", {
-          description: "AI is analyzing your script for scenes, cast, and elements",
+          description: "Smart is analyzing your script for scenes, cast, and elements",
         });
       } else {
         toast.error("Failed to start script analysis", {
-          description: startJobError || "Check that the AI service is configured correctly",
+          description: jobError || "Check that the Smart service is configured correctly",
         });
       }
 
@@ -190,9 +205,13 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
 
   const handleRetryAnalysis = async () => {
     if (!activeScriptId) return;
-    const jobId = await startJob(projectId, activeScriptId, "script_analysis");
+    const { jobId, error: jobError } = await startJob(projectId, activeScriptId, "script_analysis");
     if (jobId) {
       toast.info("Retrying script analysis...");
+    } else {
+      toast.error("Failed to start script analysis", {
+        description: jobError || "Check that the Smart service is configured correctly",
+      });
     }
   };
 
@@ -254,7 +273,7 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
         <div className="text-sm text-muted-foreground">
           {scripts.length} version{scripts.length !== 1 ? "s" : ""} uploaded
         </div>
-        <Button size="sm" onClick={() => setShowUpload(true)} disabled={isRunning}>
+        <Button variant="skeuo" size="sm" onClick={() => setShowUpload(true)} disabled={isRunning}>
           <Upload className="h-4 w-4 mr-1" />
           Upload New Version
         </Button>
@@ -354,7 +373,7 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
           <p className="text-sm text-muted-foreground mb-4">
             Upload your script to auto-generate scenes, cast, and elements
           </p>
-          <Button onClick={() => setShowUpload(true)}>
+          <Button variant="skeuo" onClick={() => setShowUpload(true)}>
             <Upload className="h-4 w-4 mr-1" />
             Upload Script
           </Button>
@@ -367,7 +386,7 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
           <DialogHeader>
             <DialogTitle>Upload Script</DialogTitle>
             <DialogDescription>
-              Upload a new version of your script (PDF, FDX, DOC, or JSON)
+              Upload a new PDF version of your script for Smart analysis
             </DialogDescription>
           </DialogHeader>
 
@@ -383,8 +402,8 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
                 }
                 bucket="scripts"
                 folder={projectId}
-                accept=".pdf,.fdx,.doc,.docx,.json"
-                placeholder="Drop your script file here (PDF, FDX, DOC, JSON)"
+                accept="application/pdf,.pdf"
+                placeholder="Drop your script PDF here"
                 fileName={uploadData.fileName}
               />
             </div>
@@ -413,10 +432,11 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
           </DialogBody>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUpload(false)}>
+            <Button variant="skeuo-outline" onClick={() => setShowUpload(false)}>
               Cancel
             </Button>
             <Button
+              variant="skeuo"
               onClick={handleUpload}
               disabled={!uploadData.fileUrl || loading || startingJob}
             >

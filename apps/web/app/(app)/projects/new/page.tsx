@@ -191,12 +191,12 @@ export default function NewProjectPage() {
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-xl px-6 py-12">
+        <div className="mx-auto max-w-xl px-6 py-8">
           {/* Step 1: Project Basics */}
           {step === 1 && (
             <div className="space-y-6">
               <div>
-                <h1 className="text-2xl font-semibold">Create a new project</h1>
+                <h1 className="text-xl font-semibold">Create a new project</h1>
                 <p className="text-muted-foreground mt-1">
                   Start by giving your project a name
                 </p>
@@ -232,7 +232,7 @@ export default function NewProjectPage() {
           {step === 2 && (
             <div className="space-y-6">
               <div>
-                <h1 className="text-2xl font-semibold">Project details</h1>
+                <h1 className="text-xl font-semibold">Project details</h1>
                 <p className="text-muted-foreground mt-1">
                   Add more details to help organize your production
                 </p>
@@ -342,7 +342,7 @@ export default function NewProjectPage() {
           {step === 3 && (
             <div className="space-y-6">
               <div>
-                <h1 className="text-2xl font-semibold">Add your crew</h1>
+                <h1 className="text-xl font-semibold">Add your crew</h1>
                 <p className="text-muted-foreground mt-1">
                   Invite team members to collaborate on this project
                 </p>
@@ -428,7 +428,7 @@ export default function NewProjectPage() {
           {step === 4 && (
             <div className="space-y-6">
               <div>
-                <h1 className="text-2xl font-semibold">Ready to create</h1>
+                <h1 className="text-xl font-semibold">Ready to create</h1>
                 <p className="text-muted-foreground mt-1">
                   Review your project details
                 </p>
@@ -460,6 +460,7 @@ export default function NewProjectPage() {
 
               <div className="space-y-2">
                 <Button
+                  variant="skeuo"
                   onClick={() => handleCreate(false)}
                   disabled={isSubmitting}
                   className="w-full"
@@ -478,15 +479,16 @@ export default function NewProjectPage() {
               </div>
 
               {showUpgradePrompt && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <div className="rounded-lg border border-[hsl(var(--feedback-warning-border))] bg-[hsl(var(--feedback-warning-bg))] p-4">
                   <div className="flex items-start gap-3">
-                    <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                    <AlertTriangle className="h-5 w-5 text-[hsl(var(--feedback-warning-fg))] shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <h3 className="font-medium text-amber-900">Project limit reached</h3>
-                      <p className="text-sm text-amber-800 mt-1">
+                      <h3 className="font-medium text-[hsl(var(--feedback-warning-fg))]">Project limit reached</h3>
+                      <p className="text-sm text-[hsl(var(--feedback-warning-fg))] mt-1">
                         {error || "You've reached the project limit for your plan."}
                       </p>
                       <Button
+                        variant="skeuo"
                         className="mt-3"
                         size="sm"
                         onClick={() => router.push("/settings/billing")}
@@ -499,8 +501,8 @@ export default function NewProjectPage() {
               )}
 
               {error && !showUpgradePrompt && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                  <p className="text-sm text-red-800">{error}</p>
+                <div className="rounded-lg border border-[hsl(var(--feedback-error-border))] bg-[hsl(var(--feedback-error-bg))] p-4">
+                  <p className="text-sm text-[hsl(var(--feedback-error-fg))]">{error}</p>
                 </div>
               )}
             </div>
@@ -527,7 +529,7 @@ export default function NewProjectPage() {
                   Skip
                 </Button>
               )}
-              <Button onClick={handleNext} disabled={!canProceed}>
+              <Button variant="skeuo" onClick={handleNext} disabled={!canProceed}>
                 Continue
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>

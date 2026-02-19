@@ -78,7 +78,7 @@ export function TourTooltip({
   return (
     <div
       ref={tooltipRef}
-      className="fixed z-[101] w-80 rounded-xl border border-border bg-card shadow-xl animate-in fade-in-0 zoom-in-95 duration-200"
+      className="fixed z-[101] w-80 rounded-lg border border-border bg-card shadow-soft animate-in fade-in-0 zoom-in-95 duration-200"
       style={{
         top: position.top,
         left: position.left,

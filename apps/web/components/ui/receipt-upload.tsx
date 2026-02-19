@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Upload, X, FileText, Loader2, Eye, Sparkles, AlertCircle, CheckCircle } from "lucide-react";
+import { Upload, X, FileText, Loader2, Eye, Lightbulb, AlertCircle, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
 import { createClient } from "@/lib/supabase/client";
@@ -203,7 +203,7 @@ export function ReceiptUpload({
                       {parseConfidence >= 0.8 ? (
                         <CheckCircle className="h-3 w-3" />
                       ) : parseConfidence >= 0.5 ? (
-                        <Sparkles className="h-3 w-3" />
+                        <Lightbulb className="h-3 w-3" />
                       ) : (
                         <AlertCircle className="h-3 w-3" />
                       )}
@@ -236,7 +236,7 @@ export function ReceiptUpload({
                   {isParsing ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Sparkles className="h-4 w-4" />
+                    <Lightbulb className="h-4 w-4" />
                   )}
                 </Button>
               )}
@@ -299,7 +299,7 @@ export function ReceiptUpload({
                 </div>
                 {onParsedData && (
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Sparkles className="h-3 w-3" />
+                    <Lightbulb className="h-3 w-3" />
                     Wrapshot Intelligence will auto-extract details
                   </p>
                 )}

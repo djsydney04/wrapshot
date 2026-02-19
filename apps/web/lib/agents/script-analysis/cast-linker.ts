@@ -5,7 +5,7 @@
  * and links them to scenes.
  */
 
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { nanoid } from 'nanoid';
 import type { AgentContext, AgentStepResult, LinkedCastMember } from '../types';
 import type { ProgressTracker } from '../orchestrator/progress-tracker';
@@ -20,7 +20,7 @@ export async function executeCastLinker(
   context: AgentContext,
   tracker: ProgressTracker
 ): Promise<AgentStepResult> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   if (context.extractedScenes.length === 0) {
     return {

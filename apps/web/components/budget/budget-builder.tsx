@@ -10,7 +10,6 @@ import {
   useSensors,
   DragEndEvent,
   DragStartEvent,
-  DragOverEvent,
   DragOverlay,
 } from "@dnd-kit/core";
 import {
@@ -19,12 +18,53 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable";
-import { Plus, Lock, FileSpreadsheet, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Plus,
+  Lock,
+  FileSpreadsheet,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  MoreHorizontal,
+  Send,
+  ShieldCheck,
+  RotateCcw,
+  MessageSquare,
+  UserPlus,
+  Receipt,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { BudgetCategory, BudgetLineItem } from "@/lib/actions/budgets";
-import { reorderBudgetCategories, updateBudgetCategory } from "@/lib/actions/budget-categories";
+import type { BudgetRequestPermissions } from "@/lib/actions/budget-requests";
+import {
+  reorderBudgetCategories,
+  assignDepartmentHead,
+  submitDepartmentBudget,
+  reviewDepartmentBudget,
+  reopenDepartmentBudget,
+} from "@/lib/actions/budget-categories";
 import { reorderLineItems, moveLineItemToCategory } from "@/lib/actions/budget-line-items";
+import { toast } from "sonner";
+import { DEPARTMENT_BUDGET_STATUS_LABELS, type DepartmentBudgetStatus } from "@/lib/types";
 import {
   SortableBudgetCategoryCard,
   CategoryOverlay,
@@ -32,6 +72,7 @@ import {
 import { LineItemOverlay } from "./budget-line-item-row";
 import { AddCategoryForm } from "./add-category-form";
 import { AddLineItemForm } from "./add-line-item-form";
+import { AddTransactionForm } from "@/components/forms/add-transaction-form";
 
 interface BudgetBuilderProps {
   budgetId: string;
@@ -39,57 +80,22 @@ interface BudgetBuilderProps {
   lineItems: BudgetLineItem[];
   onRefresh: () => void;
   canEdit: boolean;
+  budgetPermissions: BudgetRequestPermissions | null;
+  projectMembers: { userId: string; name: string; email: string }[];
+  budgetStatus: string;
 }
 
 type DragItem =
   | { type: "category"; category: BudgetCategory }
   | { type: "lineitem"; lineItem: BudgetLineItem };
 
-function DepartmentAllocationInput({
-  department,
-  onRefresh,
-}: {
-  department: BudgetCategory;
-  onRefresh: () => void;
-}) {
-  const [value, setValue] = React.useState<string>(
-    department.allocatedBudget?.toString() ?? ""
-  );
-
-  React.useEffect(() => {
-    setValue(department.allocatedBudget?.toString() ?? "");
-  }, [department.allocatedBudget]);
-
-  const handleSave = async () => {
-    const parsed = parseFloat(value);
-    const allocatedBudgetValue = Number.isFinite(parsed) ? parsed : 0;
-    try {
-      await updateBudgetCategory(department.id, {
-        allocatedBudget: allocatedBudgetValue,
-      });
-      onRefresh();
-    } catch (error) {
-      console.error("Error updating department allocation:", error);
-    }
-  };
-
-  return (
-    <input
-      type="number"
-      step="0.01"
-      min="0"
-      className="w-24 bg-transparent border border-border rounded px-2 py-1 text-right text-sm"
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={handleSave}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          e.currentTarget.blur();
-        }
-      }}
-    />
-  );
-}
+const STATUS_DOT_COLOR: Record<DepartmentBudgetStatus, string> = {
+  NOT_STARTED: "bg-neutral-300 dark:bg-neutral-600",
+  IN_PROGRESS: "bg-blue-500",
+  SUBMITTED: "bg-amber-500",
+  REVISION_REQUESTED: "bg-orange-500",
+  APPROVED: "bg-emerald-500",
+};
 
 export function BudgetBuilder({
   budgetId,
@@ -97,18 +103,27 @@ export function BudgetBuilder({
   lineItems,
   onRefresh,
   canEdit,
+  budgetPermissions,
+  projectMembers,
+  budgetStatus,
 }: BudgetBuilderProps) {
-  // Expanded state for categories
-  const [expandedCategories, setExpandedCategories] = React.useState<Set<string>>(() => {
-    // Start with all categories expanded
-    return new Set(categories.map((c) => c.id));
-  });
+  const isFinanceManager = Boolean(budgetPermissions?.canManageRequests);
+  const assignedDeptIds = React.useMemo(
+    () => new Set(budgetPermissions?.assignedDepartmentCategoryIds ?? []),
+    [budgetPermissions?.assignedDepartmentCategoryIds]
+  );
+
+  // Expanded state
+  const [expandedCategories, setExpandedCategories] = React.useState<Set<string>>(
+    () => new Set(categories.map((c) => c.id))
+  );
   const [expandedDepartments, setExpandedDepartments] = React.useState<Set<string>>(
     () => new Set(categories.filter((c) => !c.parentCategoryId).map((c) => c.id))
   );
 
   // Drag state
   const [activeItem, setActiveItem] = React.useState<DragItem | null>(null);
+  const [isApplyingChange, setIsApplyingChange] = React.useState(false);
 
   // Form states
   const [showCategoryForm, setShowCategoryForm] = React.useState(false);
@@ -118,18 +133,30 @@ export function BudgetBuilder({
   const [activeLineItemCategoryId, setActiveLineItemCategoryId] = React.useState<string | null>(null);
   const [editLineItem, setEditLineItem] = React.useState<BudgetLineItem | null>(null);
 
-  // Sort categories by sortOrder
-  const sortedCategories = React.useMemo(() => {
-    return [...categories].sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [categories]);
+  // Dialog states
+  const [assignDialogDept, setAssignDialogDept] = React.useState<BudgetCategory | null>(null);
+  const [assignUserId, setAssignUserId] = React.useState("");
+  const [assignLoading, setAssignLoading] = React.useState(false);
+  const [revisionDialogDept, setRevisionDialogDept] = React.useState<BudgetCategory | null>(null);
+  const [revisionNotes, setRevisionNotes] = React.useState("");
+  const [workflowLoading, setWorkflowLoading] = React.useState<string | null>(null);
+  const [showTransactionForm, setShowTransactionForm] = React.useState(false);
 
-  const categoriesById = React.useMemo(() => {
-    return new Map(categories.map((category) => [category.id, category]));
-  }, [categories]);
+  // Sorted/grouped categories
+  const sortedCategories = React.useMemo(
+    () => [...categories].sort((a, b) => a.sortOrder - b.sortOrder),
+    [categories]
+  );
 
-  const parentCategories = React.useMemo(() => {
-    return sortedCategories.filter((category) => !category.parentCategoryId);
-  }, [sortedCategories]);
+  const categoriesById = React.useMemo(
+    () => new Map(categories.map((c) => [c.id, c])),
+    [categories]
+  );
+
+  const parentCategories = React.useMemo(
+    () => sortedCategories.filter((c) => !c.parentCategoryId),
+    [sortedCategories]
+  );
 
   const childCategoriesByParent = React.useMemo(() => {
     const grouped = new Map<string, BudgetCategory[]>();
@@ -142,16 +169,18 @@ export function BudgetBuilder({
     return grouped;
   }, [sortedCategories]);
 
-  const orphanCategories = React.useMemo(() => {
-    return sortedCategories.filter(
-      (category) => category.parentCategoryId && !categoriesById.has(category.parentCategoryId)
-    );
-  }, [sortedCategories, categoriesById]);
+  const orphanCategories = React.useMemo(
+    () =>
+      sortedCategories.filter(
+        (c) => c.parentCategoryId && !categoriesById.has(c.parentCategoryId)
+      ),
+    [sortedCategories, categoriesById]
+  );
 
   React.useEffect(() => {
     setExpandedDepartments((prev) => {
       const next = new Set(prev);
-      parentCategories.forEach((category) => next.add(category.id));
+      parentCategories.forEach((c) => next.add(c.id));
       return next;
     });
   }, [parentCategories]);
@@ -159,12 +188,11 @@ export function BudgetBuilder({
   React.useEffect(() => {
     setExpandedCategories((prev) => {
       const next = new Set(prev);
-      categories.forEach((category) => next.add(category.id));
+      categories.forEach((c) => next.add(c.id));
       return next;
     });
   }, [categories]);
 
-  // Group line items by category
   const lineItemsByCategory = React.useMemo(() => {
     const grouped: Record<string, BudgetLineItem[]> = {};
     for (const category of categories) {
@@ -173,135 +201,150 @@ export function BudgetBuilder({
     return grouped;
   }, [categories, lineItems]);
 
-  // Sensors for drag and drop
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+  // Per-department editability
+  const canEditDepartment = React.useCallback(
+    (department: BudgetCategory): boolean => {
+      if (budgetStatus === "LOCKED") return false;
+      // Finance managers (or canEdit from parent which includes admin/coordinator check)
+      if (isFinanceManager || canEdit) {
+        return department.departmentStatus !== "APPROVED";
+      }
+      // Assigned department heads can edit when department is in editable status
+      if (assignedDeptIds.has(department.id)) {
+        return ["NOT_STARTED", "IN_PROGRESS", "REVISION_REQUESTED"].includes(
+          department.departmentStatus
+        );
+      }
+      return false;
+    },
+    [budgetStatus, isFinanceManager, canEdit, assignedDeptIds]
   );
 
-  // Handle drag start
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const activeId = active.id as string;
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
+  const handleDragStart = (event: DragStartEvent) => {
+    const activeId = event.active.id as string;
     if (activeId.startsWith("category-")) {
-      const categoryId = activeId.replace("category-", "");
-      const category = categories.find((c) => c.id === categoryId);
-      if (category) {
-        setActiveItem({ type: "category", category });
-      }
+      const category = categories.find((c) => c.id === activeId.replace("category-", ""));
+      if (category) setActiveItem({ type: "category", category });
     } else if (activeId.startsWith("lineitem-")) {
-      const lineItemId = activeId.replace("lineitem-", "");
-      const lineItem = lineItems.find((li) => li.id === lineItemId);
-      if (lineItem) {
-        setActiveItem({ type: "lineitem", lineItem });
-      }
+      const lineItem = lineItems.find((li) => li.id === activeId.replace("lineitem-", ""));
+      if (lineItem) setActiveItem({ type: "lineitem", lineItem });
     }
   };
 
-  // Handle drag end
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveItem(null);
-
     if (!over || active.id === over.id) return;
 
     const activeId = active.id as string;
     const overId = over.id as string;
 
-    // Handle category reordering within the same parent (or top-level)
     if (activeId.startsWith("category-") && overId.startsWith("category-")) {
       const activeCategoryId = activeId.replace("category-", "");
       const overCategoryId = overId.replace("category-", "");
-
       const activeCategory = categoriesById.get(activeCategoryId);
       const overCategory = categoriesById.get(overCategoryId);
-
       if (!activeCategory || !overCategory) return;
+      if (activeCategory.parentCategoryId !== overCategory.parentCategoryId) return;
 
-      if (activeCategory.parentCategoryId !== overCategory.parentCategoryId) {
-        return;
-      }
-
-      const siblingCategories = activeCategory.parentCategoryId
+      const siblings = activeCategory.parentCategoryId
         ? childCategoriesByParent.get(activeCategory.parentCategoryId) || []
         : parentCategories;
-      const sortedSiblings = [...siblingCategories].sort((a, b) => a.sortOrder - b.sortOrder);
-      const oldIndex = sortedSiblings.findIndex((c) => c.id === activeCategoryId);
-      const newIndex = sortedSiblings.findIndex((c) => c.id === overCategoryId);
+      const sorted = [...siblings].sort((a, b) => a.sortOrder - b.sortOrder);
+      const oldIdx = sorted.findIndex((c) => c.id === activeCategoryId);
+      const newIdx = sorted.findIndex((c) => c.id === overCategoryId);
 
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const newOrder = arrayMove(sortedSiblings, oldIndex, newIndex);
-        await reorderBudgetCategories(budgetId, newOrder.map((c) => c.id));
-        onRefresh();
+      if (oldIdx !== -1 && newIdx !== -1) {
+        const newOrder = arrayMove(sorted, oldIdx, newIdx);
+        try {
+          setIsApplyingChange(true);
+          await reorderBudgetCategories(budgetId, newOrder.map((c) => c.id));
+          toast.success("Category order updated");
+          onRefresh();
+        } catch {
+          toast.error("Failed to reorder categories");
+        } finally {
+          setIsApplyingChange(false);
+        }
       }
     }
 
-    // Handle line item reordering within same category
     if (activeId.startsWith("lineitem-") && overId.startsWith("lineitem-")) {
       const activeLineItemId = activeId.replace("lineitem-", "");
       const overLineItemId = overId.replace("lineitem-", "");
-
       const activeLineItem = lineItems.find((li) => li.id === activeLineItemId);
       const overLineItem = lineItems.find((li) => li.id === overLineItemId);
 
       if (activeLineItem && overLineItem) {
         if (activeLineItem.categoryId === overLineItem.categoryId) {
-          // Reorder within same category
-          const categoryItems = lineItemsByCategory[activeLineItem.categoryId] || [];
-          const sortedItems = [...categoryItems].sort((a, b) => a.sortOrder - b.sortOrder);
-          const oldIndex = sortedItems.findIndex((li) => li.id === activeLineItemId);
-          const newIndex = sortedItems.findIndex((li) => li.id === overLineItemId);
-
-          if (oldIndex !== -1 && newIndex !== -1) {
-            const newOrder = arrayMove(sortedItems, oldIndex, newIndex);
-            await reorderLineItems(activeLineItem.categoryId, newOrder.map((li) => li.id));
-            onRefresh();
+          const items = lineItemsByCategory[activeLineItem.categoryId] || [];
+          const sorted = [...items].sort((a, b) => a.sortOrder - b.sortOrder);
+          const oldIdx = sorted.findIndex((li) => li.id === activeLineItemId);
+          const newIdx = sorted.findIndex((li) => li.id === overLineItemId);
+          if (oldIdx !== -1 && newIdx !== -1) {
+            const newOrder = arrayMove(sorted, oldIdx, newIdx);
+            try {
+              setIsApplyingChange(true);
+              await reorderLineItems(activeLineItem.categoryId, newOrder.map((li) => li.id));
+              toast.success("Line item order updated");
+              onRefresh();
+            } catch {
+              toast.error("Failed to reorder line items");
+            } finally {
+              setIsApplyingChange(false);
+            }
           }
         } else {
-          // Move to different category
-          const targetCategoryItems = lineItemsByCategory[overLineItem.categoryId] || [];
-          const sortedTargetItems = [...targetCategoryItems].sort((a, b) => a.sortOrder - b.sortOrder);
-          const overIndex = sortedTargetItems.findIndex((li) => li.id === overLineItemId);
-          await moveLineItemToCategory(activeLineItemId, overLineItem.categoryId, overIndex);
-          onRefresh();
+          const targetItems = lineItemsByCategory[overLineItem.categoryId] || [];
+          const sorted = [...targetItems].sort((a, b) => a.sortOrder - b.sortOrder);
+          const overIdx = sorted.findIndex((li) => li.id === overLineItemId);
+          try {
+            setIsApplyingChange(true);
+            await moveLineItemToCategory(activeLineItemId, overLineItem.categoryId, overIdx);
+            toast.success("Line item moved");
+            onRefresh();
+          } catch {
+            toast.error("Failed to move line item");
+          } finally {
+            setIsApplyingChange(false);
+          }
         }
       }
     }
 
-    // Handle line item dropped on category header
     if (activeId.startsWith("lineitem-") && overId.startsWith("category-")) {
       const activeLineItemId = activeId.replace("lineitem-", "");
       const targetCategoryId = overId.replace("category-", "");
-
       const activeLineItem = lineItems.find((li) => li.id === activeLineItemId);
       if (activeLineItem && activeLineItem.categoryId !== targetCategoryId) {
-        const targetCategoryItems = lineItemsByCategory[targetCategoryId] || [];
-        await moveLineItemToCategory(activeLineItemId, targetCategoryId, targetCategoryItems.length);
-        onRefresh();
+        const targetItems = lineItemsByCategory[targetCategoryId] || [];
+        try {
+          setIsApplyingChange(true);
+          await moveLineItemToCategory(activeLineItemId, targetCategoryId, targetItems.length);
+          toast.success("Line item moved");
+          onRefresh();
+        } catch {
+          toast.error("Failed to move line item");
+        } finally {
+          setIsApplyingChange(false);
+        }
       }
     }
   };
 
-  const handleDragCancel = () => {
-    setActiveItem(null);
-  };
+  const handleDragCancel = () => setActiveItem(null);
 
-  // Toggle category expansion
   const toggleCategory = (categoryId: string) => {
     setExpandedCategories((prev) => {
       const next = new Set(prev);
-      if (next.has(categoryId)) {
-        next.delete(categoryId);
-      } else {
-        next.add(categoryId);
-      }
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
       return next;
     });
   };
@@ -309,30 +352,24 @@ export function BudgetBuilder({
   const toggleDepartment = (categoryId: string) => {
     setExpandedDepartments((prev) => {
       const next = new Set(prev);
-      if (next.has(categoryId)) {
-        next.delete(categoryId);
-      } else {
-        next.add(categoryId);
-      }
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
       return next;
     });
   };
 
-  // Handle category edit
   const handleEditCategory = (category: BudgetCategory) => {
     setEditCategory(category);
     setDefaultParentCategoryId(null);
     setShowCategoryForm(true);
   };
 
-  // Handle add line item
   const handleAddLineItem = (categoryId: string) => {
     setActiveLineItemCategoryId(categoryId);
     setEditLineItem(null);
     setShowLineItemForm(true);
   };
 
-  // Handle category form close
   const handleCategoryFormClose = (open: boolean) => {
     setShowCategoryForm(open);
     if (!open) {
@@ -341,7 +378,6 @@ export function BudgetBuilder({
     }
   };
 
-  // Handle line item form close
   const handleLineItemFormClose = (open: boolean) => {
     setShowLineItemForm(open);
     if (!open) {
@@ -350,30 +386,107 @@ export function BudgetBuilder({
     }
   };
 
-  // Calculate totals
-  const { totalEstimated, totalActual, totalAllocated } = React.useMemo(() => {
+  // Workflow actions
+  const handleAssignHead = async () => {
+    if (!assignDialogDept) return;
+    setAssignLoading(true);
+    try {
+      await assignDepartmentHead(assignDialogDept.id, assignUserId || null);
+      toast.success(assignUserId ? "Department head assigned" : "Department head unassigned");
+      setAssignDialogDept(null);
+      onRefresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to assign");
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const handleSubmitDept = async (dept: BudgetCategory) => {
+    setWorkflowLoading(dept.id);
+    try {
+      await submitDepartmentBudget(dept.id);
+      toast.success("Department submitted for review");
+      onRefresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to submit");
+    } finally {
+      setWorkflowLoading(null);
+    }
+  };
+
+  const handleApproveDept = async (dept: BudgetCategory) => {
+    setWorkflowLoading(dept.id);
+    try {
+      await reviewDepartmentBudget(dept.id, "APPROVE");
+      toast.success("Department approved");
+      onRefresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to approve");
+    } finally {
+      setWorkflowLoading(null);
+    }
+  };
+
+  const handleRequestRevision = async () => {
+    if (!revisionDialogDept) return;
+    setWorkflowLoading(revisionDialogDept.id);
+    try {
+      await reviewDepartmentBudget(revisionDialogDept.id, "REQUEST_REVISION", revisionNotes);
+      toast.success("Revision requested");
+      setRevisionDialogDept(null);
+      setRevisionNotes("");
+      onRefresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to request revision");
+    } finally {
+      setWorkflowLoading(null);
+    }
+  };
+
+  const handleReopenDept = async (dept: BudgetCategory) => {
+    setWorkflowLoading(dept.id);
+    try {
+      await reopenDepartmentBudget(dept.id);
+      toast.success("Department reopened for edits");
+      onRefresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to reopen");
+    } finally {
+      setWorkflowLoading(null);
+    }
+  };
+
+  // Totals
+  const { totalEstimated, totalActual } = React.useMemo(() => {
     const estimated = lineItems.reduce((sum, li) => sum + li.estimatedTotal, 0);
     const actual = lineItems.reduce((sum, li) => sum + li.actualCost, 0);
-    const allocated = categories.reduce((sum, cat) => sum + (cat.allocatedBudget || 0), 0);
-    return { totalEstimated: estimated, totalActual: actual, totalAllocated: allocated };
-  }, [lineItems, categories]);
+    return { totalEstimated: estimated, totalActual: actual };
+  }, [lineItems]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
-  };
 
-  // Get active line item's category items for overlay
-  const getActiveLineItemCategoryItems = () => {
-    if (activeItem?.type === "lineitem") {
-      return lineItemsByCategory[activeItem.lineItem.categoryId] || [];
-    }
-    return [];
-  };
+  const anyCanEdit = canEdit || assignedDeptIds.size > 0;
+
+  // Sub-categories for the transaction form (exclude top-level departments)
+  const subCategories = React.useMemo(
+    () => categories.filter((c) => c.parentCategoryId),
+    [categories]
+  );
+
+  const memberOptions = [
+    { value: "", label: "Unassigned" },
+    ...projectMembers.map((m) => ({
+      value: m.userId,
+      label: m.name || m.email,
+    })),
+  ];
 
   return (
     <div className="space-y-4">
@@ -381,43 +494,57 @@ export function BudgetBuilder({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h2 className="text-lg font-semibold">Budget Builder</h2>
-          {!canEdit && (
+          {isApplyingChange && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Saving...
+            </div>
+          )}
+          {budgetStatus === "LOCKED" && (
             <div className="flex items-center gap-1.5 text-sm text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-2 py-1 rounded-md">
               <Lock className="h-3.5 w-3.5" />
               Read-only
             </div>
           )}
         </div>
-        {canEdit && (
-          <Button
-            onClick={() => {
-              setEditCategory(null);
-              setDefaultParentCategoryId(null);
-              setShowCategoryForm(true);
-            }}
-            size="sm"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add Department
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {anyCanEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowTransactionForm(true)}
+            >
+              <Receipt className="h-4 w-4 mr-1" />
+              Log Expense
+            </Button>
+          )}
+          {isFinanceManager && budgetStatus !== "LOCKED" && (
+            <Button
+              onClick={() => {
+                setEditCategory(null);
+                setDefaultParentCategoryId(null);
+                setShowCategoryForm(true);
+              }}
+              size="sm"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Department
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Totals Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-xl border border-border bg-muted/30">
-        <div>
-          <span className="text-sm text-muted-foreground">Total Allocated</span>
-          <p className="text-2xl font-semibold">{formatCurrency(totalAllocated)}</p>
+      {/* Totals */}
+      <div className="flex items-center gap-6 rounded-xl border border-border bg-muted/30 px-4 py-3">
+        <div className="flex-1">
+          <span className="text-xs text-muted-foreground">Estimated</span>
+          <p className="text-xl font-semibold">{formatCurrency(totalEstimated)}</p>
         </div>
-        <div>
-          <span className="text-sm text-muted-foreground">Total Estimated</span>
-          <p className="text-2xl font-semibold">{formatCurrency(totalEstimated)}</p>
-        </div>
-        <div>
-          <span className="text-sm text-muted-foreground">Total Actual</span>
+        <div className="flex-1">
+          <span className="text-xs text-muted-foreground">Actual</span>
           <p
             className={cn(
-              "text-2xl font-semibold",
+              "text-xl font-semibold",
               totalActual > totalEstimated ? "text-red-600" : "text-emerald-600"
             )}
           >
@@ -435,110 +562,188 @@ export function BudgetBuilder({
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <div className="space-y-4">
+          <div className="space-y-3">
             {parentCategories.map((department) => {
-              const childCategories = childCategoriesByParent.get(department.id) || [];
-              const departmentLineItems = childCategories.flatMap(
-                (category) => lineItemsByCategory[category.id] || []
+              const childCats = childCategoriesByParent.get(department.id) || [];
+              const deptLineItems = childCats.flatMap(
+                (cat) => lineItemsByCategory[cat.id] || []
               );
-              const departmentEstimated = departmentLineItems.reduce(
+              const deptEstimated = deptLineItems.reduce(
                 (sum, li) => sum + li.estimatedTotal,
                 0
               );
-              const departmentActual = departmentLineItems.reduce(
-                (sum, li) => sum + li.actualCost,
-                0
-              );
-              const departmentAllocated =
-                (department.allocatedBudget || 0) ||
-                childCategories.reduce((sum, cat) => sum + (cat.allocatedBudget || 0), 0);
-              const departmentVariance = departmentAllocated - departmentActual;
-              const categoryIds = childCategories.map((c) => `category-${c.id}`);
+              const categoryIds = childCats.map((c) => `category-${c.id}`);
+              const deptCanEdit = canEditDepartment(department);
+              const isAssignedHead = assignedDeptIds.has(department.id);
+              const isLoading = workflowLoading === department.id;
+
+              const canSubmit =
+                (isAssignedHead || isFinanceManager) &&
+                ["NOT_STARTED", "IN_PROGRESS", "REVISION_REQUESTED"].includes(
+                  department.departmentStatus
+                );
+              const canReview =
+                isFinanceManager && department.departmentStatus === "SUBMITTED";
+              const canReopen =
+                isFinanceManager && department.departmentStatus === "APPROVED";
+              const hasActions =
+                deptCanEdit || canSubmit || canReview || canReopen || isFinanceManager;
+
+              const assigneeName = department.assignedUserId
+                ? projectMembers.find((m) => m.userId === department.assignedUserId)?.name ||
+                  "Assigned"
+                : null;
 
               return (
                 <div key={department.id} className="rounded-xl border border-border bg-card">
-                  <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-border bg-muted/20">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
+                  {/* Department header */}
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <button
+                      type="button"
+                      className="flex flex-1 items-center gap-3 min-w-0 text-left"
                       onClick={() => toggleDepartment(department.id)}
                     >
                       {expandedDepartments.has(department.id) ? (
-                        <ChevronDown className="h-4 w-4" />
+                        <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
                       ) : (
-                        <ChevronRight className="h-4 w-4" />
+                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                       )}
-                    </Button>
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span className="flex h-6 px-2 items-center justify-center rounded bg-muted text-xs font-semibold">
-                        {department.code}
-                      </span>
+                      <span
+                        className={cn("h-2.5 w-2.5 rounded-full shrink-0", STATUS_DOT_COLOR[department.departmentStatus])}
+                        title={DEPARTMENT_BUDGET_STATUS_LABELS[department.departmentStatus]}
+                      />
                       <span className="font-semibold truncate">{department.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {childCategories.length} category{childCategories.length !== 1 ? "ies" : "y"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm">
-                      <div className="text-right">
-                        <span className="text-muted-foreground text-xs mr-1">Alloc:</span>
-                        {canEdit ? (
-                          <DepartmentAllocationInput
-                            department={department}
-                            onRefresh={onRefresh}
-                          />
-                        ) : (
-                          <span className="font-medium">{formatCurrency(departmentAllocated)}</span>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <span className="text-muted-foreground text-xs mr-1">Est:</span>
-                        <span className="font-medium">{formatCurrency(departmentEstimated)}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-muted-foreground text-xs mr-1">Actual:</span>
-                        <span className="font-medium">{formatCurrency(departmentActual)}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-muted-foreground text-xs mr-1">Var:</span>
-                        <span
-                          className={cn(
-                            "font-medium",
-                            departmentVariance < 0 ? "text-red-600" : "text-emerald-600"
-                          )}
-                        >
-                          {formatCurrency(departmentVariance)}
+                      {assigneeName && (
+                        <span className="text-xs text-muted-foreground truncate hidden sm:inline">
+                          {assigneeName}
                         </span>
-                      </div>
-                    </div>
-                    {canEdit && (
+                      )}
+                      <span className="ml-auto text-sm font-medium tabular-nums shrink-0">
+                        {formatCurrency(deptEstimated)}
+                      </span>
+                    </button>
+
+                    {/* Direct add category button */}
+                    {deptCanEdit && (
                       <Button
-                        size="sm"
-                        variant="outline"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="h-7 w-7 shrink-0"
+                        title="Add category"
                         onClick={() => {
                           setEditCategory(null);
                           setDefaultParentCategoryId(department.id);
                           setShowCategoryForm(true);
                         }}
                       >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Category
+                        <Plus className="h-4 w-4" />
                       </Button>
+                    )}
+
+                    {hasActions && budgetStatus !== "LOCKED" && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon-sm" className="h-7 w-7 shrink-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52">
+                          {deptCanEdit && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditCategory(null);
+                                setDefaultParentCategoryId(department.id);
+                                setShowCategoryForm(true);
+                              }}
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Add Category
+                            </DropdownMenuItem>
+                          )}
+                          {isFinanceManager && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setAssignUserId(department.assignedUserId ?? "");
+                                setAssignDialogDept(department);
+                              }}
+                            >
+                              <UserPlus className="mr-2 h-4 w-4" />
+                              Assign Department Head
+                            </DropdownMenuItem>
+                          )}
+                          {(deptCanEdit || canSubmit || canReview || canReopen) && isFinanceManager && (
+                            <DropdownMenuSeparator />
+                          )}
+                          {canSubmit && (
+                            <DropdownMenuItem
+                              onClick={() => void handleSubmitDept(department)}
+                              disabled={isLoading}
+                            >
+                              <Send className="mr-2 h-4 w-4" />
+                              Submit for Review
+                            </DropdownMenuItem>
+                          )}
+                          {canReview && (
+                            <>
+                              <DropdownMenuItem
+                                onClick={() => void handleApproveDept(department)}
+                                disabled={isLoading}
+                              >
+                                <ShieldCheck className="mr-2 h-4 w-4" />
+                                Approve
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setRevisionNotes("");
+                                  setRevisionDialogDept(department);
+                                }}
+                              >
+                                <MessageSquare className="mr-2 h-4 w-4" />
+                                Request Revision
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {canReopen && (
+                            <DropdownMenuItem
+                              onClick={() => void handleReopenDept(department)}
+                              disabled={isLoading}
+                            >
+                              <RotateCcw className="mr-2 h-4 w-4" />
+                              Reopen for Edits
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </div>
 
+                  {/* Revision notes banner */}
+                  {department.departmentStatus === "REVISION_REQUESTED" &&
+                    department.reviewNotes && (
+                      <div className="mx-4 mt-1 mb-2 flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 p-2.5 text-sm dark:border-orange-900/50 dark:bg-orange-900/10">
+                        <MessageSquare className="h-3.5 w-3.5 text-orange-500 mt-0.5 shrink-0" />
+                        <p className="text-orange-800 dark:text-orange-300">
+                          {department.reviewNotes}
+                        </p>
+                      </div>
+                    )}
+
+                  {/* Expanded content */}
                   {expandedDepartments.has(department.id) && (
-                    <div className="p-4 space-y-3">
-                      {childCategories.length > 0 ? (
-                        <SortableContext items={categoryIds} strategy={verticalListSortingStrategy}>
+                    <div className="px-4 pb-4 pt-2 space-y-3">
+                      {childCats.length > 0 ? (
+                        <SortableContext
+                          items={categoryIds}
+                          strategy={verticalListSortingStrategy}
+                        >
                           <div className="space-y-3">
-                            {childCategories.map((category) => (
+                            {childCats.map((category) => (
                               <SortableBudgetCategoryCard
                                 key={category.id}
                                 category={category}
                                 lineItems={lineItemsByCategory[category.id] || []}
                                 isExpanded={expandedCategories.has(category.id)}
-                                canEdit={canEdit}
+                                canEdit={deptCanEdit}
                                 onToggle={() => toggleCategory(category.id)}
                                 onEdit={() => handleEditCategory(category)}
                                 onDelete={onRefresh}
@@ -550,7 +755,8 @@ export function BudgetBuilder({
                         </SortableContext>
                       ) : (
                         <div className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                          No categories yet for this department.
+                          No categories yet.
+                          {deptCanEdit && " Click + to add one."}
                         </div>
                       )}
                     </div>
@@ -571,7 +777,7 @@ export function BudgetBuilder({
                       category={category}
                       lineItems={lineItemsByCategory[category.id] || []}
                       isExpanded={expandedCategories.has(category.id)}
-                      canEdit={canEdit}
+                      canEdit={isFinanceManager && budgetStatus !== "LOCKED"}
                       onToggle={() => toggleCategory(category.id)}
                       onEdit={() => handleEditCategory(category)}
                       onDelete={onRefresh}
@@ -600,7 +806,7 @@ export function BudgetBuilder({
         <div className="border border-dashed border-border rounded-xl px-4 py-12 text-center">
           <FileSpreadsheet className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
           <p className="text-muted-foreground">No categories yet</p>
-          {canEdit && (
+          {anyCanEdit && (
             <p className="text-sm text-muted-foreground mt-1">
               Click &quot;Add Department&quot; to start building your budget
             </p>
@@ -629,6 +835,102 @@ export function BudgetBuilder({
           editLineItem={editLineItem}
         />
       )}
+
+      {/* Assign Department Head Dialog */}
+      <Dialog
+        open={assignDialogDept !== null}
+        onOpenChange={(open) => {
+          if (!open) setAssignDialogDept(null);
+        }}
+      >
+        <DialogContent onClose={() => setAssignDialogDept(null)}>
+          <DialogHeader>
+            <DialogTitle>Assign Department Head</DialogTitle>
+            <DialogDescription>
+              Choose a team member to lead {assignDialogDept?.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            <Select
+              value={assignUserId}
+              onChange={(e) => setAssignUserId(e.target.value)}
+              options={memberOptions}
+              disabled={assignLoading}
+            />
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAssignDialogDept(null)}
+              disabled={assignLoading}
+            >
+              Cancel
+            </Button>
+            <Button onClick={() => void handleAssignHead()} disabled={assignLoading}>
+              {assignLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Save"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Request Revision Dialog */}
+      <Dialog
+        open={revisionDialogDept !== null}
+        onOpenChange={(open) => {
+          if (!open) setRevisionDialogDept(null);
+        }}
+      >
+        <DialogContent onClose={() => setRevisionDialogDept(null)}>
+          <DialogHeader>
+            <DialogTitle>Request Revision</DialogTitle>
+            <DialogDescription>
+              Add notes for the department head of {revisionDialogDept?.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            <Textarea
+              value={revisionNotes}
+              onChange={(e) => setRevisionNotes(e.target.value)}
+              placeholder="What needs to be changed..."
+              rows={3}
+              disabled={workflowLoading !== null}
+            />
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRevisionDialogDept(null)}
+              disabled={workflowLoading !== null}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleRequestRevision()}
+              disabled={workflowLoading !== null}
+            >
+              {workflowLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Send"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Log Expense / Transaction Form */}
+      <AddTransactionForm
+        budgetId={budgetId}
+        categories={subCategories}
+        lineItems={lineItems}
+        open={showTransactionForm}
+        onOpenChange={setShowTransactionForm}
+        onSuccess={onRefresh}
+      />
     </div>
   );
 }

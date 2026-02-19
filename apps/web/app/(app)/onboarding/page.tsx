@@ -159,7 +159,7 @@ export default function OnboardingPage() {
           <div className="space-y-8">
             <div>
               <p className="text-sm text-muted-foreground mb-1">Step 1 of 4</p>
-              <h1 className="text-2xl font-semibold tracking-tight">
+              <h1 className="text-xl font-semibold tracking-tight">
                 Let&apos;s set up your profile
               </h1>
             </div>
@@ -236,7 +236,7 @@ export default function OnboardingPage() {
           <div className="space-y-8">
             <div>
               <p className="text-sm text-muted-foreground mb-1">Step 2 of 4</p>
-              <h1 className="text-2xl font-semibold tracking-tight">
+              <h1 className="text-xl font-semibold tracking-tight">
                 What are you working on?
               </h1>
               <p className="text-muted-foreground mt-2">
@@ -278,7 +278,7 @@ export default function OnboardingPage() {
           <div className="space-y-8">
             <div>
               <p className="text-sm text-muted-foreground mb-1">Step 3 of 4</p>
-              <h1 className="text-2xl font-semibold tracking-tight">
+              <h1 className="text-xl font-semibold tracking-tight">
                 Invite your team
               </h1>
               <p className="text-muted-foreground mt-2">
@@ -347,7 +347,7 @@ export default function OnboardingPage() {
           <div className="space-y-8">
             <div>
               <p className="text-sm text-muted-foreground mb-1">Step 4 of 4</p>
-              <h1 className="text-2xl font-semibold tracking-tight">
+              <h1 className="text-xl font-semibold tracking-tight">
                 How did you find us?
               </h1>
               <p className="text-muted-foreground mt-2">

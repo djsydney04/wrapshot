@@ -91,7 +91,7 @@ function DropdownMenuContent({ children, align = "end", className }: DropdownMen
   return (
     <div
       className={cn(
-        "absolute z-50 min-w-[8rem] overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md",
+        "absolute z-50 min-w-[8rem] overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-soft",
         "animate-in fade-in-0 zoom-in-95",
         align === "start" && "left-0",
         align === "center" && "left-1/2 -translate-x-1/2",
@@ -115,6 +115,7 @@ function DropdownMenuItem({ children, className, onClick, ...props }: DropdownMe
         "relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none",
         "hover:bg-accent hover:text-accent-foreground",
         "focus:bg-accent focus:text-accent-foreground",
+        "disabled:pointer-events-none disabled:opacity-50",
         className
       )}
       onClick={(e) => {

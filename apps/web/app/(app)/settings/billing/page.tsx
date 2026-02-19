@@ -9,7 +9,7 @@ import {
   CreditCard,
   Download,
   Zap,
-  Sparkles,
+  Lightbulb,
   Crown,
   Loader2,
   AlertCircle,
@@ -35,8 +35,8 @@ const tierConfig: Record<string, {
   popular?: boolean;
 }> = {
   FREE: { icon: Zap, color: "text-muted-foreground", bg: "bg-muted" },
-  PRO: { icon: Sparkles, color: "text-blue-600", bg: "bg-blue-50", popular: true },
-  STUDIO: { icon: Crown, color: "text-amber-600", bg: "bg-amber-50" },
+  PRO: { icon: Lightbulb, color: "text-[hsl(var(--badge-blue-fg))]", bg: "bg-[hsl(var(--badge-blue))]", popular: true },
+  STUDIO: { icon: Crown, color: "text-[hsl(var(--badge-amber-fg))]", bg: "bg-[hsl(var(--badge-amber))]" },
 };
 
 function BillingContent() {
@@ -178,8 +178,8 @@ function BillingContent() {
           className={cn(
             "flex items-center gap-2 p-3 rounded-lg mb-4",
             message.type === "success"
-              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-              : "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+              ? "bg-[hsl(var(--feedback-success-bg))] text-[hsl(var(--feedback-success-fg))]"
+              : "bg-[hsl(var(--feedback-error-bg))] text-[hsl(var(--feedback-error-fg))]"
           )}
         >
           {message.type === "success" ? (
@@ -198,12 +198,12 @@ function BillingContent() {
             <div className="flex items-center gap-4">
               <div className={cn(
                 "flex h-10 w-10 items-center justify-center rounded-lg",
-                currentPlan === "STUDIO" ? "bg-amber-50" : currentPlan === "PRO" ? "bg-blue-50" : "bg-muted"
+                currentPlan === "STUDIO" ? "bg-[hsl(var(--badge-amber))]" : currentPlan === "PRO" ? "bg-[hsl(var(--badge-blue))]" : "bg-muted"
               )}>
                 {currentPlan === "STUDIO" ? (
-                  <Crown className="h-5 w-5 text-amber-600" />
+                  <Crown className="h-5 w-5 text-[hsl(var(--badge-amber-fg))]" />
                 ) : currentPlan === "PRO" ? (
-                  <Sparkles className="h-5 w-5 text-blue-600" />
+                  <Lightbulb className="h-5 w-5 text-[hsl(var(--badge-blue-fg))]" />
                 ) : (
                   <Zap className="h-5 w-5 text-muted-foreground" />
                 )}
@@ -214,12 +214,12 @@ function BillingContent() {
                     {currentTier?.name ?? "Free"} Plan
                   </h3>
                   {subscription?.status === "TRIALING" && trialDaysLeft !== null && (
-                    <Badge variant="secondary" className="bg-amber-50 text-amber-600 border-0">
+                    <Badge variant="secondary" className="bg-[hsl(var(--badge-amber))] text-[hsl(var(--badge-amber-fg))] border-0">
                       {trialDaysLeft} days left in trial
                     </Badge>
                   )}
                   {subscription?.cancelAtPeriodEnd && (
-                    <Badge variant="secondary" className="bg-red-50 text-red-600 border-0">
+                    <Badge variant="secondary" className="bg-[hsl(var(--badge-red))] text-[hsl(var(--badge-red-fg))] border-0">
                       Canceling
                     </Badge>
                   )}
@@ -251,7 +251,7 @@ function BillingContent() {
         {tiersLoading ? (
           <div className="grid md:grid-cols-3 gap-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse bg-muted h-64 rounded-xl" />
+              <div key={i} className="animate-pulse bg-muted h-64 rounded-lg" />
             ))}
           </div>
         ) : (
@@ -273,7 +273,7 @@ function BillingContent() {
                 <div
                   key={tier.id}
                   className={cn(
-                    "relative p-5 rounded-xl border-2 transition-all",
+                    "relative p-5 rounded-lg border-2 transition-all",
                     isCurrent
                       ? "border-foreground bg-muted/30"
                       : "border-border bg-card hover:border-muted-foreground/30"
@@ -301,7 +301,7 @@ function BillingContent() {
                   <ul className="space-y-1.5 mb-4">
                     {features.slice(0, 5).map((feature) => (
                       <li key={feature} className="flex items-center gap-2 text-sm">
-                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                        <Check className="h-3.5 w-3.5 text-[hsl(var(--badge-green-fg))]" />
                         {feature}
                       </li>
                     ))}
@@ -382,7 +382,7 @@ function BillingContent() {
                     </p>
                   </div>
                 </div>
-                <Badge variant="secondary" className="bg-emerald-50 text-emerald-600 border-0">
+                <Badge variant="secondary" className="bg-[hsl(var(--badge-emerald))] text-[hsl(var(--badge-emerald-fg))] border-0">
                   {subscription.invoiceCount} {subscription.invoiceCount === 1 ? "invoice" : "invoices"}
                 </Badge>
               </div>
@@ -414,7 +414,7 @@ function BillingWrapper() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return <div className="animate-pulse bg-muted h-48 rounded-xl" />;
+    return <div className="animate-pulse bg-muted h-48 rounded-lg" />;
   }
 
   if (!user) {
@@ -438,7 +438,7 @@ export default function BillingSettingsPage() {
       description="Manage your subscription and payment methods"
       breadcrumbs={[{ label: "Projects", href: "/" }, { label: "Settings", href: "/settings" }, { label: "Billing" }]}
     >
-      <React.Suspense fallback={<div className="animate-pulse bg-muted h-48 rounded-xl" />}>
+      <React.Suspense fallback={<div className="animate-pulse bg-muted h-48 rounded-lg" />}>
         <BillingWrapper />
       </React.Suspense>
     </SettingsLayout>

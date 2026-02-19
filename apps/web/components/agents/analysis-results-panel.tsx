@@ -352,7 +352,7 @@ export function AnalysisResultsPanel({
         <div>
           <h3 className="font-semibold text-base">Script Analysis Results</h3>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Here&apos;s what the AI found. Review below, then edit in each
+            Here&apos;s what smart analysis found. Review below, then edit in each
             section.
           </p>
         </div>
@@ -469,8 +469,8 @@ export function AnalysisResultsPanel({
           icon={<Box className="h-4 w-4" />}
           title="Elements"
           count={elements.length}
-          navigateLabel="Open in Scenes"
-          onNavigate={() => onNavigate("scenes")}
+          navigateLabel="Open in Elements"
+          onNavigate={() => onNavigate("gear")}
         >
           <div className="space-y-2">
             {Array.from(elementsByCategory.entries()).map(

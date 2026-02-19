@@ -56,7 +56,7 @@ export default function SignUpPage() {
 
         <div className="space-y-3">
           <Button
-            variant="outline"
+            variant="skeuo-outline"
             className="w-full"
             onClick={() => {
               setMessage(null);
@@ -131,6 +131,7 @@ export default function SignUpPage() {
         )}
 
         <Button
+          variant="skeuo"
           type="submit"
           disabled={loading}
           className="w-full"

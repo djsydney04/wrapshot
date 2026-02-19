@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Sparkles, Loader2 } from "lucide-react";
+import { Plus, Lightbulb, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -112,7 +112,7 @@ export function ElementHoverCard({
                 </span>
               </div>
               <div className="flex items-center gap-1 text-xs text-primary shrink-0">
-                <Sparkles className="h-3 w-3" />
+                <Lightbulb className="h-3 w-3" />
                 Wrapshot Intelligence
               </div>
             </div>

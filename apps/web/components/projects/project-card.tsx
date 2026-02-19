@@ -87,7 +87,7 @@ export function ProjectCard({ project, className, onDeleted }: ProjectCardProps)
 
   return (
     <>
-      <Link href={`/projects/${project.id}`}>
+      <Link href={`/projects/${project.id}?section=dashboard`}>
         <div
           className={cn(
             "group relative rounded-lg border border-border bg-card p-4 transition-all duration-150",
@@ -100,8 +100,19 @@ export function ProjectCard({ project, className, onDeleted }: ProjectCardProps)
           {/* Header */}
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                <Film className="h-5 w-5 text-muted-foreground" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted overflow-hidden">
+                {project.coverImageUrl ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={project.coverImageUrl}
+                      alt={`${project.name} cover`}
+                      className="h-full w-full object-cover"
+                    />
+                  </>
+                ) : (
+                  <Film className="h-5 w-5 text-muted-foreground" />
+                )}
               </div>
               <div>
                 <h3 className="font-medium text-foreground group-hover:text-foreground">
@@ -133,7 +144,9 @@ export function ProjectCard({ project, className, onDeleted }: ProjectCardProps)
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem
-                    onClick={() => router.push(`/projects/${project.id}`)}
+                    onClick={() =>
+                      router.push(`/projects/${project.id}?section=dashboard`)
+                    }
                   >
                     <ExternalLink className="mr-2 h-4 w-4" />
                     Open
@@ -253,12 +266,12 @@ export function ProjectCard({ project, className, onDeleted }: ProjectCardProps)
 // Empty state component
 export function ProjectsEmptyState() {
   return (
-    <div className="flex items-center justify-center min-h-[500px]">
+    <div className="flex items-center justify-center min-h-[360px]">
       <div className="text-center max-w-md">
-        <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-muted mb-6">
-          <Film className="h-10 w-10 text-muted-foreground" />
+        <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-6">
+          <Film className="h-8 w-8 text-muted-foreground" />
         </div>
-        <h2 className="text-2xl font-semibold mb-2">
+        <h2 className="text-xl font-semibold mb-2">
           No projects yet
         </h2>
         <p className="text-muted-foreground mb-6">

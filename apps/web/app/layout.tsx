@@ -1,8 +1,27 @@
 import type { Metadata } from "next";
+import { JetBrains_Mono, Manrope, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { CommandPalette } from "@/components/command-palette";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
 import { Toaster } from "sonner";
+
+const manrope = Manrope({
+  subsets: ["latin"],
+  variable: "--font-manrope",
+  display: "swap",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space-grotesk",
+  display: "swap",
+});
+
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: {
@@ -24,20 +43,18 @@ export const metadata: Metadata = {
     siteName: "wrapshoot",
     images: [
       {
-        url: "https://hhmdkkkpaukfcwfmdxyl.supabase.co/storage/v1/object/public/logo/logo.svg",
-        width: 512,
-        height: 512,
-        alt: "wrapshoot logo",
+        url: "https://hhmdkkkpaukfcwfmdxyl.supabase.co/storage/v1/object/public/logo/sharephoto.png",
+        alt: "wrapshoot share preview",
       },
     ],
     locale: "en_US",
     type: "website",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "wrapshoot - Film Production Scheduling",
     description: "Production management for modern filmmakers",
-    images: ["https://hhmdkkkpaukfcwfmdxyl.supabase.co/storage/v1/object/public/logo/logo.svg"],
+    images: ["https://hhmdkkkpaukfcwfmdxyl.supabase.co/storage/v1/object/public/logo/sharephoto.png"],
   },
   manifest: "/manifest.json",
 };
@@ -49,7 +66,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="font-sans antialiased">
+      <body
+        className={`${manrope.variable} ${spaceGrotesk.variable} ${jetBrainsMono.variable} font-sans antialiased`}
+      >
         <PostHogProvider>
           {children}
           <CommandPalette />

@@ -125,7 +125,7 @@ export function ScenesSection({
             })}
           </div>
 
-          <Button size="sm" onClick={() => setShowAddScene(true)}>
+          <Button variant="skeuo" size="sm" onClick={() => setShowAddScene(true)}>
             <Plus className="h-4 w-4" />
             Add Scene
           </Button>
@@ -173,7 +173,7 @@ export function ScenesSection({
           <p className="text-sm text-muted-foreground mb-4">
             Add your first scene to start building your shot list
           </p>
-          <Button onClick={() => setShowAddScene(true)}>
+          <Button variant="skeuo" onClick={() => setShowAddScene(true)}>
             <Plus className="h-4 w-4" />
             Add First Scene
           </Button>

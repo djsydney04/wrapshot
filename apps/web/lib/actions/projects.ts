@@ -10,6 +10,23 @@ import type {
   Project,
 } from "./projects.types";
 
+interface ProjectIdRow {
+  projectId: string | null;
+}
+
+function countRowsByProjectId(
+  rows: ProjectIdRow[] | null | undefined
+): Map<string, number> {
+  const counts = new Map<string, number>();
+
+  for (const row of rows ?? []) {
+    if (!row.projectId) continue;
+    counts.set(row.projectId, (counts.get(row.projectId) || 0) + 1);
+  }
+
+  return counts;
+}
+
 // Create a new project
 export async function createProject(
   data: CreateProjectData
@@ -50,6 +67,7 @@ export async function createProject(
       status: data.status || "DEVELOPMENT",
       startDate: data.startDate || null,
       endDate: data.endDate || null,
+      coverImageUrl: data.coverImageUrl || null,
     })
     .select()
     .single();
@@ -112,14 +130,6 @@ export async function getProjects(): Promise<Project[]> {
     throw new Error("Not authenticated");
   }
 
-  // Debug: Check what org the user belongs to and how many projects exist
-  const { data: debugData } = await supabase.rpc("debug_user_projects", {
-    user_id: userId,
-  });
-  if (debugData) {
-    console.log("[getProjects] Debug info:", debugData);
-  }
-
   // Get projects the user is a member of
   const { data, error } = await supabase
     .from("ProjectMember")
@@ -133,6 +143,7 @@ export async function getProjects(): Promise<Project[]> {
         status,
         startDate,
         endDate,
+        coverImageUrl,
         createdAt,
         updatedAt
       )
@@ -142,11 +153,8 @@ export async function getProjects(): Promise<Project[]> {
 
   if (error) {
     console.error("[getProjects] Error fetching projects:", error);
-    console.error("[getProjects] userId:", userId);
     return [];
   }
-
-  console.log("[getProjects] Found memberships:", data?.length ?? 0);
 
   // Type for the joined project data
   type ProjectData = {
@@ -157,6 +165,7 @@ export async function getProjects(): Promise<Project[]> {
     status: ProjectStatus;
     startDate: string | null;
     endDate: string | null;
+    coverImageUrl: string | null;
     createdAt: string;
     updatedAt: string;
   };
@@ -166,38 +175,52 @@ export async function getProjects(): Promise<Project[]> {
     .map((d) => d.project as unknown as ProjectData | null)
     .filter((p): p is ProjectData => p !== null);
 
-  const projects = await Promise.all(
-    projectData.map(async (project) => {
-      // Get counts for each project
-      const [scenesResult, daysResult, castResult, locationsResult] =
-        await Promise.all([
-          supabase
-            .from("Scene")
-            .select("id", { count: "exact", head: true })
-            .eq("projectId", project.id),
-          supabase
-            .from("ShootingDay")
-            .select("id", { count: "exact", head: true })
-            .eq("projectId", project.id),
-          supabase
-            .from("CastMember")
-            .select("id", { count: "exact", head: true })
-            .eq("projectId", project.id),
-          supabase
-            .from("Location")
-            .select("id", { count: "exact", head: true })
-            .eq("projectId", project.id),
-        ]);
+  if (projectData.length === 0) {
+    return [];
+  }
 
-      return {
-        ...project,
-        scenesCount: scenesResult.count || 0,
-        shootingDaysCount: daysResult.count || 0,
-        castCount: castResult.count || 0,
-        locationsCount: locationsResult.count || 0,
-      } as Project;
-    })
+  const projectIds = projectData.map((project) => project.id);
+  const [
+    { data: sceneRows, error: scenesError },
+    { data: dayRows, error: daysError },
+    { data: castRows, error: castError },
+    { data: locationRows, error: locationsError },
+  ] = await Promise.all([
+    supabase.from("Scene").select("projectId").in("projectId", projectIds),
+    supabase.from("ShootingDay").select("projectId").in("projectId", projectIds),
+    supabase.from("CastMember").select("projectId").in("projectId", projectIds),
+    supabase.from("Location").select("projectId").in("projectId", projectIds),
+  ]);
+
+  if (scenesError) {
+    console.error("[getProjects] Error fetching scene counts:", scenesError);
+  }
+  if (daysError) {
+    console.error("[getProjects] Error fetching shooting day counts:", daysError);
+  }
+  if (castError) {
+    console.error("[getProjects] Error fetching cast counts:", castError);
+  }
+  if (locationsError) {
+    console.error("[getProjects] Error fetching location counts:", locationsError);
+  }
+
+  const scenesCountByProjectId = countRowsByProjectId(sceneRows as ProjectIdRow[] | null);
+  const daysCountByProjectId = countRowsByProjectId(dayRows as ProjectIdRow[] | null);
+  const castCountByProjectId = countRowsByProjectId(castRows as ProjectIdRow[] | null);
+  const locationsCountByProjectId = countRowsByProjectId(
+    locationRows as ProjectIdRow[] | null
   );
+
+  const projects = projectData.map((project) => {
+    return {
+      ...project,
+      scenesCount: scenesCountByProjectId.get(project.id) || 0,
+      shootingDaysCount: daysCountByProjectId.get(project.id) || 0,
+      castCount: castCountByProjectId.get(project.id) || 0,
+      locationsCount: locationsCountByProjectId.get(project.id) || 0,
+    } as Project;
+  });
 
   return projects;
 }
@@ -296,6 +319,7 @@ export async function updateProject(
       ...(data.status && { status: data.status }),
       ...(data.startDate !== undefined && { startDate: data.startDate }),
       ...(data.endDate !== undefined && { endDate: data.endDate }),
+      ...(data.coverImageUrl !== undefined && { coverImageUrl: data.coverImageUrl }),
       updatedAt: new Date().toISOString(),
     })
     .eq("id", projectId)

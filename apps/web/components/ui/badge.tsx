@@ -17,39 +17,39 @@ const badgeVariants = cva(
           "border border-current bg-transparent",
         // Film production status variants
         development:
-          "bg-blue-100 text-blue-700",
+          "bg-[hsl(var(--badge-blue))] text-[hsl(var(--badge-blue-fg))]",
         "pre-production":
-          "bg-yellow-100 text-yellow-700",
+          "bg-[hsl(var(--badge-yellow))] text-[hsl(var(--badge-yellow-fg))]",
         production:
-          "bg-green-100 text-green-700",
+          "bg-[hsl(var(--badge-green))] text-[hsl(var(--badge-green-fg))]",
         "post-production":
-          "bg-purple-100 text-purple-700",
+          "bg-[hsl(var(--badge-purple))] text-[hsl(var(--badge-purple-fg))]",
         completed:
-          "bg-gray-100 text-gray-700",
+          "bg-[hsl(var(--badge-gray))] text-[hsl(var(--badge-gray-fg))]",
         "on-hold":
-          "bg-orange-100 text-orange-700",
+          "bg-[hsl(var(--badge-orange))] text-[hsl(var(--badge-orange-fg))]",
         // Scene status
         scheduled:
-          "bg-blue-100 text-blue-700",
+          "bg-[hsl(var(--badge-blue))] text-[hsl(var(--badge-blue-fg))]",
         "partially-shot":
-          "bg-yellow-100 text-yellow-700",
+          "bg-[hsl(var(--badge-yellow))] text-[hsl(var(--badge-yellow-fg))]",
         wrapped:
-          "bg-green-100 text-green-700",
+          "bg-[hsl(var(--badge-green))] text-[hsl(var(--badge-green-fg))]",
         cut:
-          "bg-red-100 text-red-700",
+          "bg-[hsl(var(--badge-red))] text-[hsl(var(--badge-red-fg))]",
         // INT/EXT
         int:
-          "bg-indigo-100 text-indigo-700",
+          "bg-[hsl(var(--badge-indigo))] text-[hsl(var(--badge-indigo-fg))]",
         ext:
-          "bg-amber-100 text-amber-700",
+          "bg-[hsl(var(--badge-amber))] text-[hsl(var(--badge-amber-fg))]",
         // Day/Night
         day:
-          "bg-yellow-50 text-yellow-700",
+          "bg-[hsl(var(--badge-yellow))] text-[hsl(var(--badge-yellow-fg))]",
         night:
-          "bg-slate-700 text-slate-100",
+          "bg-[hsl(var(--badge-slate))] text-[hsl(var(--badge-slate-fg))]",
         // Status
         success:
-          "bg-green-100 text-green-700",
+          "bg-[hsl(var(--badge-green))] text-[hsl(var(--badge-green-fg))]",
       },
     },
     defaultVariants: {

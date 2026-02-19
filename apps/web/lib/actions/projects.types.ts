@@ -17,6 +17,7 @@ export interface CreateProjectData {
   status?: ProjectStatus;
   startDate?: string;
   endDate?: string;
+  coverImageUrl?: string | null;
   crewInvites?: CrewInvite[];
 }
 
@@ -28,6 +29,7 @@ export interface Project {
   status: ProjectStatus;
   startDate: string | null;
   endDate: string | null;
+  coverImageUrl: string | null;
   createdAt: string;
   updatedAt: string;
   // Computed counts

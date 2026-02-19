@@ -5,7 +5,13 @@
  */
 
 import { KimiClient } from '@/lib/ai/kimi-client';
-import { getFireworksApiKey } from '@/lib/ai/config';
+import { getScriptAnalysisApiKey } from '@/lib/ai/config';
+import {
+  adjustChunkLocalPage,
+  dedupeBySceneNumberAndSet,
+  normalizeSceneNumber,
+  sortByScriptPageOrder,
+} from '@/lib/scripts/scene-order';
 import { JsonParser } from '../utils/json-parser';
 import { RetryHandler } from '../utils/retry-handler';
 import { LLM_CONFIG } from '../constants';
@@ -44,7 +50,9 @@ Return a JSON object with this structure:
 
 Important:
 - Scene numbers should match exactly as written in the script
+- If the script does not print scene numbers, assign sequential scene numbers in appearance order
 - Include all scenes, even very short ones
+- Preserve the same scene order as it appears in the script text
 - For pageLengthEighths, estimate based on the text length (8 eighths = 1 full page)
 - Only include characters who have dialogue or are specifically mentioned in action
 - Use UPPERCASE for all character names
@@ -64,11 +72,11 @@ export async function executeSceneExtractor(
   context: AgentContext,
   tracker: ProgressTracker
 ): Promise<AgentStepResult> {
-  const apiKey = getFireworksApiKey();
+  const apiKey = getScriptAnalysisApiKey();
   if (!apiKey) {
     return {
       success: false,
-      error: 'Fireworks API key not configured',
+      error: 'No script analysis LLM API key configured',
     };
   }
 
@@ -140,13 +148,20 @@ export async function executeSceneExtractor(
       }
 
       const chunkScenes = parseResult.data.scenes;
+      const chunkPageStart = typeof chunk.pageStart === 'number' ? chunk.pageStart : 1;
 
       // Normalize and validate scenes
       for (const scene of chunkScenes) {
         // Ensure required fields
-        if (!scene.sceneNumber || !scene.setName) {
+        if (!scene.setName || !String(scene.setName).trim()) {
           continue;
         }
+
+        scene.sceneNumber = normalizeSceneNumber(
+          scene.sceneNumber,
+          allScenes.length + 1
+        );
+        scene.setName = String(scene.setName).trim();
 
         // Normalize intExt
         scene.intExt = normalizeIntExt(scene.intExt);
@@ -158,6 +173,14 @@ export async function executeSceneExtractor(
         scene.characters = (scene.characters || [])
           .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
           .map(c => c.toUpperCase().trim());
+
+        const adjustedPageStart = adjustChunkLocalPage(scene.scriptPageStart, chunkPageStart);
+        const adjustedPageEnd = adjustChunkLocalPage(scene.scriptPageEnd, chunkPageStart);
+        scene.scriptPageStart = adjustedPageStart || chunkPageStart;
+        scene.scriptPageEnd =
+          (adjustedPageEnd && adjustedPageStart
+            ? Math.max(adjustedPageStart, adjustedPageEnd)
+            : adjustedPageEnd) || scene.scriptPageStart;
 
         // Update known characters
         for (const charName of scene.characters) {
@@ -207,26 +230,23 @@ export async function executeSceneExtractor(
     };
   }
 
-  // Sort scenes by scene number
-  allScenes.sort((a, b) => {
-    const aNum = parseSceneNumber(a.sceneNumber);
-    const bNum = parseSceneNumber(b.sceneNumber);
-    return aNum - bNum;
-  });
+  const orderedScenes = sortByScriptPageOrder(allScenes, (scene) => scene.scriptPageStart);
+  const dedupedScenes = dedupeBySceneNumberAndSet(
+    orderedScenes,
+    (scene) => scene.sceneNumber,
+    (scene) => scene.setName
+  );
 
-  // Remove duplicates (same scene number)
-  allScenes = deduplicateScenes(allScenes);
+  context.extractedScenes = dedupedScenes;
 
-  context.extractedScenes = allScenes;
+  await tracker.updateProgress(totalChunks, totalChunks, `Extracted ${dedupedScenes.length} scenes`);
 
-  await tracker.updateProgress(totalChunks, totalChunks, `Extracted ${allScenes.length} scenes`);
-
-  console.log(`[SceneExtractor] Total: ${allScenes.length} scenes, ${context.knownCharacters.length} characters`);
+  console.log(`[SceneExtractor] Total: ${dedupedScenes.length} scenes, ${context.knownCharacters.length} characters`);
 
   return {
     success: true,
     data: {
-      scenesExtracted: allScenes.length,
+      scenesExtracted: dedupedScenes.length,
       charactersFound: context.knownCharacters.length,
       locationsFound: context.knownLocations.length,
     },
@@ -285,16 +305,4 @@ function parseSceneNumber(sceneNumber: string): number {
     return parseInt(match[1]);
   }
   return 0;
-}
-
-function deduplicateScenes(scenes: ExtractedScene[]): ExtractedScene[] {
-  const seen = new Set<string>();
-  return scenes.filter(scene => {
-    const key = `${scene.sceneNumber}-${scene.setName}`;
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
 }

@@ -76,7 +76,8 @@ Add these to `apps/web/.env.local`:
 # PostHog Analytics
 NEXT_PUBLIC_POSTHOG_KEY=phc_xxxxxxxxxxxxx      # Your PostHog project API key
 NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com  # PostHog host (US or EU)
-NEXT_PUBLIC_POSTHOG_SURVEY_ID=019xxxxx-xxxx-xxxx   # Feedback survey ID
+NEXT_PUBLIC_POSTHOG_FEEDBACK_SURVEY_ID=019xxxxx-xxxx-xxxx   # Feedback button survey ID
+NEXT_PUBLIC_POSTHOG_TIMED_SURVEY_ID=019xxxxx-xxxx-xxxx      # Timed prompt survey ID
 ```
 
 ### PostHog Initialization
@@ -303,7 +304,7 @@ A feedback survey automatically appears after 5 minutes of app usage:
 
 - **Trigger**: 5 minutes after first page load (tracked via localStorage)
 - **Shown once**: Uses `timed-survey-shown` localStorage key
-- **Survey ID**: `NEXT_PUBLIC_POSTHOG_EVERYUSER_SURVEY_ID`
+- **Survey ID**: `NEXT_PUBLIC_POSTHOG_TIMED_SURVEY_ID`
 - **Component**: `components/feedback/timed-survey.tsx`
 - **Loaded in**: `AppShell` component
 

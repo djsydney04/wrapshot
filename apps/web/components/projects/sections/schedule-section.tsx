@@ -2,30 +2,20 @@
 
 import * as React from "react";
 import {
-  addMonths,
-  subMonths,
-  addWeeks,
-  subWeeks,
-  startOfMonth,
-  endOfMonth,
-  startOfWeek,
-  endOfWeek,
-  eachDayOfInterval,
   format,
-  isSameMonth,
   isSameDay,
-  isToday,
 } from "date-fns";
 import {
   Plus,
   Calendar as CalendarIcon,
   Trash2,
+  Lightbulb,
+  Loader2,
   LayoutList,
+  Columns3,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  Clock,
-  MapPin,
   CalendarRange,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,6 +23,8 @@ import { AddShootingDayForm } from "@/components/forms/add-shooting-day-form";
 import { DraggableWeekCalendar } from "@/components/calendar/draggable-week-calendar";
 import { DraggableCalendar } from "@/components/calendar/draggable-calendar";
 import { ShootingDayDetailPanel } from "@/components/schedule/shooting-day-detail-panel";
+import { DailyFilmSchedule } from "@/components/schedule/daily-film-schedule";
+import { StripeboardSection } from "./stripeboard-section";
 import { useProjectStore } from "@/lib/stores/project-store";
 import {
   deleteShootingDay as deleteShootingDayAction,
@@ -47,9 +39,12 @@ import {
   removeSceneFromShootingDay,
 } from "@/lib/actions/scenes";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import type { ShootingDay, Scene, Location, CastMember } from "@/lib/types";
+import type { Scene as StripeboardScene } from "@/lib/actions/scenes";
+import type { CastMemberWithInviteStatus } from "@/lib/actions/cast";
 
-type ViewMode = "week" | "month" | "list";
+type ViewMode = "week" | "month" | "list" | "stripeboard";
 
 interface ScheduleSectionProps {
   projectId: string;
@@ -57,6 +52,8 @@ interface ScheduleSectionProps {
   scenes: Scene[];
   locations?: Location[];
   cast?: CastMember[];
+  stripeboardScenes?: StripeboardScene[];
+  stripeboardCast?: CastMemberWithInviteStatus[];
   useMockData?: boolean;
 }
 
@@ -66,6 +63,8 @@ export function ScheduleSection({
   scenes,
   locations = [],
   cast = [],
+  stripeboardScenes = [],
+  stripeboardCast = [],
   useMockData = false,
 }: ScheduleSectionProps) {
   const [showAddDay, setShowAddDay] = React.useState(false);
@@ -73,8 +72,9 @@ export function ScheduleSection({
   const [selectedDay, setSelectedDay] = React.useState<ShootingDay | null>(null);
   const [showDetailPanel, setShowDetailPanel] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<ViewMode>("month");
-  const [currentDate, setCurrentDate] = React.useState(new Date());
   const [deleting, setDeleting] = React.useState(false);
+  const [isAiBuilding, setIsAiBuilding] = React.useState(false);
+  const [aiAssumptions, setAiAssumptions] = React.useState<string[]>([]);
   const [defaultStartTime, setDefaultStartTime] = React.useState<string | undefined>();
   const [defaultEndTime, setDefaultEndTime] = React.useState<string | undefined>();
 
@@ -97,6 +97,26 @@ export function ScheduleSection({
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
   }, [localShootingDays]);
+
+  const featuredDay = React.useMemo(() => {
+    if (selectedDay) {
+      return localShootingDays.find((day) => day.id === selectedDay.id) ?? selectedDay;
+    }
+
+    if (sortedDays.length === 0) {
+      return null;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return sortedDays.find((day) => new Date(day.date).getTime() >= today.getTime()) || sortedDays[0];
+  }, [selectedDay, localShootingDays, sortedDays]);
+
+  const featuredDayIndex = React.useMemo(() => {
+    if (!featuredDay) return -1;
+    return sortedDays.findIndex((day) => day.id === featuredDay.id);
+  }, [featuredDay, sortedDays]);
 
   // Handler for rescheduling shooting days via drag and drop
   const handleReschedule = async (shootingDayId: string, newDate: string) => {
@@ -343,6 +363,83 @@ export function ScheduleSection({
     setShowAddDay(true);
   };
 
+  const handleAiBuildSchedule = async () => {
+    if (isAiBuilding) return;
+
+    if (scenes.length === 0) {
+      toast.error("No scenes available to schedule yet");
+      return;
+    }
+
+    if (
+      localShootingDays.length > 0 &&
+      !confirm(
+        "Smart build will replace the current shooting-day schedule for this project. Continue?"
+      )
+    ) {
+      return;
+    }
+
+    setIsAiBuilding(true);
+    setAiAssumptions([]);
+
+    try {
+      const response = await fetch("/api/ai/schedule/build", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          replaceExisting: true,
+          maxScenesPerDay: 8,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        error?: string;
+        data?: {
+          shootingDays?: ShootingDay[];
+          assumptions?: string[];
+          stats?: {
+            daysCreated: number;
+            scenesAssigned: number;
+            scenesUnscheduled: number;
+          };
+        };
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to build schedule");
+      }
+
+      const plannedDays = payload.data?.shootingDays || [];
+      setLocalShootingDays(plannedDays);
+      setAiAssumptions(payload.data?.assumptions || []);
+
+      if (plannedDays.length > 0) {
+        setSelectedDay(plannedDays[0]);
+        setSelectedDate(new Date(plannedDays[0].date));
+      } else {
+        setSelectedDay(null);
+        setSelectedDate(null);
+      }
+
+      const stats = payload.data?.stats;
+      if (stats) {
+        toast.success(
+          `Smart schedule created: ${stats.daysCreated} days, ${stats.scenesAssigned} scenes assigned`
+        );
+      } else {
+        toast.success("Smart schedule built successfully");
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to build Smart schedule";
+      toast.error(message);
+    } finally {
+      setIsAiBuilding(false);
+    }
+  };
+
   const getSceneNumbers = (sceneIds: string[]) => {
     return sceneIds
       .map((id) => scenes.find((s) => s.id === id)?.sceneNumber)
@@ -365,25 +462,16 @@ export function ScheduleSection({
     return variants[status] || variants.TENTATIVE;
   };
 
-  // Navigation handlers for list view
-  const navigatePrev = () => {
-    if (viewMode === "week") {
-      setCurrentDate((prev) => subWeeks(prev, 1));
-    } else {
-      setCurrentDate((prev) => subMonths(prev, 1));
-    }
+  const selectDayContext = (day: ShootingDay) => {
+    setSelectedDay(day);
+    setSelectedDate(new Date(day.date));
   };
 
-  const navigateNext = () => {
-    if (viewMode === "week") {
-      setCurrentDate((prev) => addWeeks(prev, 1));
-    } else {
-      setCurrentDate((prev) => addMonths(prev, 1));
-    }
-  };
-
-  const goToToday = () => {
-    setCurrentDate(new Date());
+  const navigateDayContext = (direction: -1 | 1) => {
+    if (featuredDayIndex < 0) return;
+    const nextIndex = featuredDayIndex + direction;
+    if (nextIndex < 0 || nextIndex >= sortedDays.length) return;
+    selectDayContext(sortedDays[nextIndex]);
   };
 
   return (
@@ -438,158 +526,280 @@ export function ScheduleSection({
                 <LayoutList className="h-3.5 w-3.5" />
                 List
               </button>
+              <button
+                onClick={() => setViewMode("stripeboard")}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  viewMode === "stripeboard"
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Columns3 className="h-3.5 w-3.5" />
+                Stripeboard
+              </button>
             </div>
 
-            <Button size="sm" onClick={() => setShowAddDay(true)}>
+            <Button size="sm" variant="skeuo" onClick={() => setShowAddDay(true)}>
               <Plus className="h-4 w-4" />
               Add Day
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void handleAiBuildSchedule()}
+              disabled={isAiBuilding || scenes.length === 0}
+            >
+              {isAiBuilding ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Lightbulb className="h-4 w-4 text-primary" />
+              )}
+              Smart Build Schedule
             </Button>
           </div>
         </div>
 
-        {/* Draggable Week Calendar */}
-        {viewMode === "week" && (
-          <DraggableWeekCalendar
-            shootingDays={localShootingDays}
-            scenes={scenes}
-            cast={cast}
-            locations={locations}
-            onDayClick={handleDayClick}
-            onAddClick={handleAddClick}
-            onReschedule={handleReschedule}
-            onAddSceneToDay={handleAddSceneToDay}
-            onRemoveSceneFromDay={handleRemoveSceneFromDay}
-            onUpdateSceneOrder={handleUpdateSceneOrder}
-            selectedDate={selectedDate || undefined}
-          />
+        {aiAssumptions.length > 0 && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+            <p className="text-xs font-medium text-primary">Smart assumptions</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {aiAssumptions.slice(0, 2).join(" ")}
+            </p>
+          </div>
         )}
 
-        {/* Draggable Month Calendar */}
-        {viewMode === "month" && (
-          <DraggableCalendar
-            shootingDays={localShootingDays}
-            scenes={scenes}
-            cast={cast}
-            locations={locations}
-            onDayClick={handleDayClick}
-            onAddClick={handleAddClick}
-            onReschedule={handleReschedule}
-            selectedDate={selectedDate || undefined}
-          />
-        )}
+        <div
+          className={cn(
+            "grid gap-4",
+            viewMode === "stripeboard"
+              ? "grid-cols-1"
+              : "xl:grid-cols-[minmax(0,1fr)_340px]"
+          )}
+        >
+          <div className="min-w-0">
+            {/* Draggable Week Calendar */}
+            {viewMode === "week" && (
+              <DraggableWeekCalendar
+                shootingDays={localShootingDays}
+                scenes={scenes}
+                cast={cast}
+                locations={locations}
+                onDayClick={handleDayClick}
+                onAddClick={handleAddClick}
+                onReschedule={handleReschedule}
+                onAddSceneToDay={handleAddSceneToDay}
+                onRemoveSceneFromDay={handleRemoveSceneFromDay}
+                onUpdateSceneOrder={handleUpdateSceneOrder}
+                selectedDate={selectedDate || undefined}
+              />
+            )}
 
-        {/* List View */}
-        {viewMode === "list" && (
-          <>
-            {sortedDays.length > 0 ? (
-              <div className="border border-border rounded-lg overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/30">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                        Day
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                        Date
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                        Call
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                        Wrap
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                        Scenes
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                        Status
-                      </th>
-                      <th className="px-4 py-3 w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {sortedDays.map((day) => (
-                      <tr
-                        key={day.id}
-                        className="hover:bg-muted/40 transition-colors cursor-pointer group"
-                        onClick={() => {
-                          setSelectedDate(new Date(day.date));
-                          setSelectedDay(day);
-                          setShowDetailPanel(true);
-                        }}
-                      >
-                        <td className="px-4 py-3 font-medium">
-                          Day {day.dayNumber}
-                          {day.unit !== "MAIN" && (
-                            <span className="ml-1.5 text-xs text-muted-foreground">
-                              ({day.unit})
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {format(new Date(day.date), "EEE, MMM d")}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">
-                          {day.generalCall}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">
-                          {day.wrapTime || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">
-                          {day.scenes.length > 0
-                            ? getSceneNumbers(day.scenes)
-                            : "—"}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={cn(
-                              "px-2 py-0.5 rounded-full text-xs font-medium",
-                              getStatusBadge(day.status)
-                            )}
-                          >
-                            {day.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-                            disabled={deleting}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (
-                                confirm(
-                                  "Are you sure you want to delete this shooting day?"
-                                )
-                              ) {
-                                handleDelete(day.id);
-                              }
+            {/* Draggable Month Calendar */}
+            {viewMode === "month" && (
+              <DraggableCalendar
+                shootingDays={localShootingDays}
+                scenes={scenes}
+                cast={cast}
+                locations={locations}
+                onDayClick={handleDayClick}
+                onAddClick={handleAddClick}
+                onReschedule={handleReschedule}
+                selectedDate={selectedDate || undefined}
+              />
+            )}
+
+            {/* List View */}
+            {viewMode === "list" && (
+              <>
+                {sortedDays.length > 0 ? (
+                  <div className="border border-border rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/30">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                            Day
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                            Date
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                            Call
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                            Wrap
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                            Scenes
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                            Status
+                          </th>
+                          <th className="px-4 py-3 w-10"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {sortedDays.map((day) => (
+                          <tr
+                            key={day.id}
+                            className="hover:bg-muted/40 transition-colors cursor-pointer group"
+                            onClick={() => {
+                              setSelectedDate(new Date(day.date));
+                              setSelectedDay(day);
+                              setShowDetailPanel(true);
                             }}
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="border border-dashed border-border rounded-lg px-4 py-12 text-center">
-                <CalendarIcon className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                <h3 className="font-medium mb-1">No shooting days scheduled</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Add shooting days to build your production schedule
-                </p>
-                <Button onClick={() => setShowAddDay(true)}>
-                  <Plus className="h-4 w-4" />
-                  Schedule First Day
-                </Button>
-              </div>
+                            <td className="px-4 py-3 font-medium">
+                              Day {day.dayNumber}
+                              {day.unit !== "MAIN" && (
+                                <span className="ml-1.5 text-xs text-muted-foreground">
+                                  ({day.unit})
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              {format(new Date(day.date), "EEE, MMM d")}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-muted-foreground">
+                              {day.generalCall}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-muted-foreground">
+                              {day.wrapTime || "—"}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-muted-foreground">
+                              {day.scenes.length > 0
+                                ? getSceneNumbers(day.scenes)
+                                : "—"}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span
+                                className={cn(
+                                  "px-2 py-0.5 rounded-full text-xs font-medium",
+                                  getStatusBadge(day.status)
+                                )}
+                              >
+                                {day.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                                disabled={deleting}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (
+                                    confirm(
+                                      "Are you sure you want to delete this shooting day?"
+                                    )
+                                  ) {
+                                    handleDelete(day.id);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="border border-dashed border-border rounded-lg px-4 py-12 text-center">
+                    <CalendarIcon className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                    <h3 className="font-medium mb-1">No shooting days scheduled</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Add shooting days to build your production schedule
+                    </p>
+                    <Button variant="skeuo" onClick={() => setShowAddDay(true)}>
+                      <Plus className="h-4 w-4" />
+                      Schedule First Day
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
+
+            {viewMode === "stripeboard" && (
+              <StripeboardSection
+                projectId={projectId}
+                scenes={stripeboardScenes}
+                cast={stripeboardCast}
+                shootingDays={localShootingDays}
+              />
+            )}
+          </div>
+
+          {viewMode !== "stripeboard" && (
+          <aside className="min-w-0">
+            <div className="rounded-lg border border-border bg-muted/20 p-3 xl:sticky xl:top-4">
+              <div className="flex items-start justify-between gap-2 pb-3 border-b border-border/70">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    {viewMode} view context
+                  </p>
+                  {featuredDay ? (
+                    <p className="text-sm font-medium mt-0.5">
+                      Day {featuredDay.dayNumber} ·{" "}
+                      {format(new Date(featuredDay.date), "EEE, MMM d")}
+                    </p>
+                  ) : (
+                    <p className="text-sm font-medium mt-0.5">No shooting days yet</p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    className="h-7 w-7"
+                    disabled={featuredDayIndex <= 0}
+                    onClick={() => navigateDayContext(-1)}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    className="h-7 w-7"
+                    disabled={featuredDayIndex < 0 || featuredDayIndex >= sortedDays.length - 1}
+                    onClick={() => navigateDayContext(1)}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <DailyFilmSchedule
+                shootingDay={featuredDay}
+                sceneCount={featuredDay?.scenes.length || 0}
+                title={featuredDay ? "Day Run-of-Day" : "Daily Film Schedule Template"}
+                description={
+                  featuredDay
+                    ? "Synced to the selected day in your current schedule view."
+                    : "Add or select a shooting day to sync this timeline."
+                }
+                className="mt-3 border-0 bg-transparent p-0"
+              />
+
+              <Button
+                variant="outline"
+                className="w-full mt-3"
+                disabled={!featuredDay}
+                onClick={() => {
+                  if (!featuredDay) return;
+                  selectDayContext(featuredDay);
+                  setShowDetailPanel(true);
+                }}
+              >
+                Open Day Details
+              </Button>
+            </div>
+          </aside>
+          )}
+        </div>
       </div>
 
       {/* Shooting Day Detail Panel */}

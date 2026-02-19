@@ -5,8 +5,9 @@
  * from extracted data.
  */
 
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { nanoid } from 'nanoid';
+import { normalizeElementCategoryForStorage } from '@/lib/constants/elements';
 import type { AgentContext, AgentStepResult, ExtractedScene, ExtractedElement } from '../types';
 import type { ProgressTracker } from '../orchestrator/progress-tracker';
 
@@ -16,6 +17,7 @@ interface SceneRecord {
   sceneNumber: string;
   intExt: string;
   dayNight: string;
+  locationId: string | null;
   setName: string;
   synopsis: string | null;
   scriptPageStart: number | null;
@@ -50,11 +52,56 @@ interface SceneCastMemberRecord {
   createdAt: string;
 }
 
+type DbDayNight =
+  | 'DAY'
+  | 'NIGHT'
+  | 'DAWN'
+  | 'DUSK'
+  | 'MORNING'
+  | 'AFTERNOON'
+  | 'EVENING';
+
+function normalizeIntExtForDb(value: string): 'INT' | 'EXT' | 'BOTH' {
+  const upper = String(value || '').toUpperCase().trim();
+  if (upper === 'EXT') return 'EXT';
+  if (upper === 'BOTH' || upper === 'I/E' || upper.includes('/')) return 'BOTH';
+  return 'INT';
+}
+
+function normalizeDayNightForDb(value: string): DbDayNight {
+  const upper = String(value || '').toUpperCase().trim();
+
+  if (upper.includes('NIGHT')) return 'NIGHT';
+  if (upper.includes('DAWN')) return 'DAWN';
+  if (upper.includes('DUSK')) return 'DUSK';
+  if (upper.includes('MORNING')) return 'MORNING';
+  if (upper.includes('AFTERNOON')) return 'AFTERNOON';
+  if (upper.includes('EVENING')) return 'EVENING';
+
+  // "CONTINUOUS" is returned by the extractor but not supported by the DB enum.
+  return 'DAY';
+}
+
+function normalizeSceneNumberKey(value: string): string {
+  return String(value || '')
+    .trim()
+    .replace(/^SCENE\s+/i, '')
+    .toUpperCase();
+}
+
+function normalizeElementNameKey(value: string): string {
+  return String(value || '').trim().toLowerCase();
+}
+
+function buildElementKey(category: string, name: string): string {
+  return `${normalizeElementCategoryForStorage(category)}-${normalizeElementNameKey(name)}`;
+}
+
 export async function executeSceneCreator(
   context: AgentContext,
   tracker: ProgressTracker
 ): Promise<AgentStepResult> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   if (context.extractedScenes.length === 0) {
     return {
@@ -74,71 +121,132 @@ export async function executeSceneCreator(
   // Get existing scenes to avoid duplicates
   const { data: existingScenes } = await supabase
     .from('Scene')
-    .select('sceneNumber')
+    .select('id, sceneNumber, sortOrder')
     .eq('projectId', context.projectId);
 
   const existingSceneNumbers = new Set(
-    (existingScenes || []).map(s => s.sceneNumber)
+    (existingScenes || []).map(s => normalizeSceneNumberKey(s.sceneNumber))
   );
 
   // Filter out scenes that already exist
   const newScenes = context.extractedScenes.filter(
-    scene => !existingSceneNumbers.has(scene.sceneNumber)
+    scene => !existingSceneNumbers.has(normalizeSceneNumberKey(scene.sceneNumber))
   );
 
-  if (newScenes.length === 0) {
-    console.log('[SceneCreator] All scenes already exist');
-    return {
-      success: true,
-      data: { scenesCreated: 0, reason: 'All scenes already exist' },
-    };
+  const maxSortOrder = (existingScenes || []).reduce((max, scene) => {
+    const sortOrder = typeof scene.sortOrder === 'number' ? scene.sortOrder : 0;
+    return Math.max(max, sortOrder);
+  }, -1);
+
+  await tracker.updateProgress(
+    1,
+    4,
+    newScenes.length > 0
+      ? `Creating ${newScenes.length} scenes`
+      : 'No new scenes to create; linking elements and cast to existing scenes'
+  );
+
+  const sceneIdMap = new Map<string, string>(); // normalized sceneNumber -> sceneId
+  for (const existingScene of existingScenes || []) {
+    sceneIdMap.set(normalizeSceneNumberKey(existingScene.sceneNumber), existingScene.id);
   }
 
-  await tracker.updateProgress(1, 4, `Creating ${newScenes.length} scenes`);
+  // Build or create locations from scene set names so location tracking stays in sync.
+  const sceneLocationByNumber = new Map<string, string | null>();
+  if (newScenes.length > 0) {
+    const { data: existingLocations } = await supabase
+      .from('Location')
+      .select('id, name')
+      .eq('projectId', context.projectId);
+
+    const locationIdByName = new Map<string, string>();
+    for (const location of existingLocations || []) {
+      locationIdByName.set(location.name.trim().toLowerCase(), location.id);
+    }
+
+    for (const scene of newScenes) {
+      const normalizedSetName = scene.setName?.trim();
+      if (!normalizedSetName) {
+        sceneLocationByNumber.set(scene.sceneNumber, null);
+        continue;
+      }
+
+      const key = normalizedSetName.toLowerCase();
+      const existingLocationId = locationIdByName.get(key);
+      if (existingLocationId) {
+        sceneLocationByNumber.set(scene.sceneNumber, existingLocationId);
+        continue;
+      }
+
+      const { data: createdLocation, error: createLocationError } = await supabase
+        .from('Location')
+        .insert({
+          projectId: context.projectId,
+          name: normalizedSetName,
+          interiorExterior: normalizeIntExtForDb(scene.intExt),
+        })
+        .select('id, name')
+        .single();
+
+      if (createLocationError || !createdLocation) {
+        console.warn('[SceneCreator] Failed to auto-create location:', createLocationError?.message);
+        sceneLocationByNumber.set(scene.sceneNumber, null);
+        continue;
+      }
+
+      locationIdByName.set(createdLocation.name.trim().toLowerCase(), createdLocation.id);
+      sceneLocationByNumber.set(scene.sceneNumber, createdLocation.id);
+    }
+  }
 
   // Create scene records
   const sceneRecords: SceneRecord[] = [];
-  const sceneIdMap = new Map<string, string>(); // sceneNumber -> sceneId
 
   for (let i = 0; i < newScenes.length; i++) {
     const scene = newScenes[i];
     const sceneId = nanoid();
-    sceneIdMap.set(scene.sceneNumber, sceneId);
+    sceneIdMap.set(normalizeSceneNumberKey(scene.sceneNumber), sceneId);
 
     sceneRecords.push({
       id: sceneId,
       projectId: context.projectId,
       sceneNumber: scene.sceneNumber,
-      intExt: scene.intExt,
-      dayNight: scene.timeOfDay,
+      intExt: normalizeIntExtForDb(scene.intExt),
+      dayNight: normalizeDayNightForDb(scene.timeOfDay),
+      locationId: sceneLocationByNumber.get(scene.sceneNumber) || null,
       setName: scene.setName,
       synopsis: scene.synopsis || null,
       scriptPageStart: scene.scriptPageStart || null,
       scriptPageEnd: scene.scriptPageEnd || null,
       pageEighths: scene.pageLengthEighths || null,
       estimatedHours: scene.estimatedHours || null,
-      sortOrder: i,
+      sortOrder: maxSortOrder + i + 1,
       status: 'NOT_SCHEDULED',
       breakdownStatus: 'COMPLETED',
       createdAt: new Date().toISOString(),
     });
   }
 
-  // Insert scenes
-  const { error: sceneError } = await supabase
-    .from('Scene')
-    .insert(sceneRecords);
+  if (sceneRecords.length > 0) {
+    // Insert scenes
+    const { error: sceneError } = await supabase
+      .from('Scene')
+      .insert(sceneRecords);
 
-  if (sceneError) {
-    console.error('[SceneCreator] Error creating scenes:', sceneError);
-    return {
-      success: false,
-      error: `Failed to create scenes: ${sceneError.message}`,
-    };
+    if (sceneError) {
+      console.error('[SceneCreator] Error creating scenes:', sceneError);
+      return {
+        success: false,
+        error: `Failed to create scenes: ${sceneError.message}`,
+      };
+    }
+
+    console.log(`[SceneCreator] Created ${sceneRecords.length} scenes`);
+  } else {
+    console.log('[SceneCreator] All scenes already exist; skipping scene creation');
   }
 
   context.createdSceneIds = sceneRecords.map(s => s.id);
-  console.log(`[SceneCreator] Created ${sceneRecords.length} scenes`);
 
   await tracker.updateProgress(2, 4, 'Creating elements');
 
@@ -153,28 +261,28 @@ export async function executeSceneCreator(
       .eq('projectId', context.projectId);
 
     const existingElementKeys = new Set(
-      (existingElements || []).map(e => `${e.category}-${e.name.toLowerCase()}`)
+      (existingElements || []).map(e => buildElementKey(e.category, e.name))
     );
 
     // Build map of existing elements
     for (const el of existingElements || []) {
-      elementIdMap.set(`${el.category}-${el.name.toLowerCase()}`, el.id);
+      elementIdMap.set(buildElementKey(el.category, el.name), el.id);
     }
 
     // Filter new elements
     const newElements = context.extractedElements.filter(
-      el => !existingElementKeys.has(`${el.category}-${el.name.toLowerCase()}`)
+      el => !existingElementKeys.has(buildElementKey(el.category, el.name))
     );
 
     if (newElements.length > 0) {
       const elementRecords: ElementRecord[] = newElements.map(element => {
         const elementId = nanoid();
-        elementIdMap.set(`${element.category}-${element.name.toLowerCase()}`, elementId);
+        elementIdMap.set(buildElementKey(element.category, element.name), elementId);
         return {
           id: elementId,
           projectId: context.projectId,
-          category: element.category,
-          name: element.name,
+          category: normalizeElementCategoryForStorage(element.category),
+          name: String(element.name || '').trim(),
           description: element.description || null,
           createdAt: new Date().toISOString(),
         };
@@ -197,11 +305,11 @@ export async function executeSceneCreator(
     const sceneElementRecords: SceneElementRecord[] = [];
 
     for (const element of context.extractedElements) {
-      const elementId = elementIdMap.get(`${element.category}-${element.name.toLowerCase()}`);
+      const elementId = elementIdMap.get(buildElementKey(element.category, element.name));
       if (!elementId) continue;
 
       for (const sceneNumber of element.sceneNumbers) {
-        const sceneId = sceneIdMap.get(sceneNumber);
+        const sceneId = sceneIdMap.get(normalizeSceneNumberKey(sceneNumber));
         if (!sceneId) continue;
 
         sceneElementRecords.push({
@@ -232,7 +340,7 @@ export async function executeSceneCreator(
   const sceneCastRecords: SceneCastMemberRecord[] = [];
 
   for (const scene of newScenes) {
-    const sceneId = sceneIdMap.get(scene.sceneNumber);
+    const sceneId = sceneIdMap.get(normalizeSceneNumberKey(scene.sceneNumber));
     if (!sceneId) continue;
 
     for (const charName of scene.characters) {

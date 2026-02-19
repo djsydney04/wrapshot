@@ -249,12 +249,12 @@ export function AddGearForm({
           <DialogFooter>
             <Button
               type="button"
-              variant="outline"
+              variant="skeuo-outline"
               onClick={() => onOpenChange(false)}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" variant="skeuo" disabled={loading}>
               {loading ? (isEditing ? "Saving..." : "Adding...") : (isEditing ? "Save Changes" : "Add Item")}
             </Button>
           </DialogFooter>

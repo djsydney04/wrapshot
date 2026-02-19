@@ -6,15 +6,15 @@ import type { AgentJobStatus } from './types';
 
 // Chunking configuration
 export const CHUNK_CONFIG = {
-  MAX_CHARS_PER_CHUNK: 30000,
-  MIN_CHARS_PER_CHUNK: 5000,
+  MAX_CHARS_PER_CHUNK: 14000,
+  MIN_CHARS_PER_CHUNK: 2500,
   OVERLAP_CHARS: 500, // Overlap for context continuity
-  SCENE_HEADER_PATTERN: /^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/im,
+  SCENE_HEADER_PATTERN: /^(INT|EXT|INT\/EXT|I\/E)\.?/im,
 };
 
 // LLM configuration
 export const LLM_CONFIG = {
-  MODEL: 'accounts/fireworks/models/kimi-k2-5-instruct',
+  MODEL: process.env.CEREBRAS_MODEL || 'zai-glm-4.7',
   MAX_TOKENS_SCENE_EXTRACTION: 8000,
   MAX_TOKENS_ELEMENT_EXTRACTION: 4000,
   MAX_TOKENS_SYNOPSIS: 2000,

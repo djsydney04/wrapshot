@@ -41,13 +41,14 @@ function calculateLineItemTotals(
 }
 
 // Helper to get budget ID from category and check editability
+// Also checks department-level status for department heads
 async function getBudgetIdAndCheckEditable(
   supabase: Awaited<ReturnType<typeof createClient>>,
   categoryId: string
 ): Promise<string> {
   const { data: category, error: catError } = await supabase
     .from("BudgetCategory")
-    .select("budgetId")
+    .select("budgetId, parentCategoryId, departmentStatus, assignedUserId")
     .eq("id", categoryId)
     .single();
 
@@ -57,7 +58,7 @@ async function getBudgetIdAndCheckEditable(
 
   const { data: budget, error: budgetError } = await supabase
     .from("Budget")
-    .select("status")
+    .select("status, projectId")
     .eq("id", category.budgetId)
     .single();
 
@@ -65,8 +66,36 @@ async function getBudgetIdAndCheckEditable(
     throw new Error("Budget not found");
   }
 
-  if (budget.status === "LOCKED" || budget.status === "APPROVED") {
-    throw new Error("Cannot modify a locked or approved budget");
+  if (budget.status === "LOCKED") {
+    throw new Error("Cannot modify a locked budget");
+  }
+
+  // Find the top-level department category to check department status
+  let departmentCategory = category;
+  if (category.parentCategoryId) {
+    const { data: parent } = await supabase
+      .from("BudgetCategory")
+      .select("budgetId, parentCategoryId, departmentStatus, assignedUserId")
+      .eq("id", category.parentCategoryId)
+      .single();
+
+    if (parent) {
+      departmentCategory = parent;
+    }
+  }
+
+  // If department is submitted or approved, only finance managers can edit
+  if (
+    departmentCategory.departmentStatus === "SUBMITTED" ||
+    departmentCategory.departmentStatus === "APPROVED"
+  ) {
+    // Allow budget-level APPROVED check to still block (existing behavior)
+    if (budget.status === "APPROVED") {
+      throw new Error("Cannot modify an approved budget");
+    }
+    // For submitted/approved departments, the RLS policy will enforce
+    // that only finance managers can write — so we let it through here
+    // and rely on RLS for the final check.
   }
 
   return category.budgetId;

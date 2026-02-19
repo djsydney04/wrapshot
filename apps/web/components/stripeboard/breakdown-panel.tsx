@@ -9,11 +9,13 @@ import {
   MapPin,
   FileText,
   Loader2,
+  Maximize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { Scene } from "@/lib/actions/scenes";
 import { SmartSynopsisField } from "@/components/ai/smart-synopsis-field";
@@ -46,6 +48,7 @@ export function BreakdownPanel({
   const [sceneElements, setSceneElements] = React.useState<SceneElementItem[]>([]);
   const [locations, setLocations] = React.useState<Location[]>([]);
   const [castMembers, setCastMembers] = React.useState<CastMember[]>([]);
+  const [isExpanded, setIsExpanded] = React.useState(false);
 
   // Reset when scene changes
   React.useEffect(() => {
@@ -120,31 +123,10 @@ export function BreakdownPanel({
 
   const stripColor = getStripColor(scene.intExt, scene.dayNight);
 
-  return (
-    <div className="flex flex-col h-full border border-border rounded-lg bg-card overflow-hidden">
-      {/* Header */}
-      <div className={cn("px-4 py-3 flex items-center justify-between", stripColor)}>
-        <div className="flex items-center gap-2">
-          <span className="font-mono font-bold text-lg">{scene.sceneNumber}</span>
-          <Badge variant={scene.intExt === "INT" ? "int" : "ext"} className="text-[10px]">
-            {scene.intExt}
-          </Badge>
-          <Badge
-            variant={
-              ["DAY", "MORNING", "AFTERNOON"].includes(scene.dayNight) ? "day" : "night"
-            }
-            className="text-[10px]"
-          >
-            {scene.dayNight}
-          </Badge>
-        </div>
-        <Button variant="ghost" size="icon-sm" onClick={onClose}>
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-auto p-4 space-y-4">
+  const renderContent = (expanded: boolean) => (
+    <div className={cn("space-y-4", expanded ? "grid grid-cols-2 gap-6 space-y-0" : "")}>
+      {/* Left column (or full width when compact) */}
+      <div className="space-y-4">
         {/* Set Name */}
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-1 block">
@@ -191,7 +173,7 @@ export function BreakdownPanel({
           </div>
         </div>
 
-        {/* AI Time Estimation Widget */}
+        {/* Smart Time Estimation Widget */}
         <TimeEstimationWidget
           sceneId={scene.id}
           projectId={projectId}
@@ -209,7 +191,7 @@ export function BreakdownPanel({
           onEstimateChange={(hours) => handleChange("estimatedHours", hours)}
         />
 
-        {/* Synopsis with AI generation */}
+        {/* Synopsis with Smart generation */}
         <SmartSynopsisField
           sceneId={scene.id}
           projectId={projectId}
@@ -256,7 +238,7 @@ export function BreakdownPanel({
             value={editedScene.notes || ""}
             onChange={(e) => handleChange("notes", e.target.value)}
             placeholder="Production notes..."
-            className="text-sm min-h-[60px] resize-none"
+            className={cn("text-sm resize-none", expanded ? "min-h-[120px]" : "min-h-[60px]")}
           />
         </div>
 
@@ -265,7 +247,7 @@ export function BreakdownPanel({
           <label className="text-xs font-medium text-muted-foreground mb-2 block">
             Breakdown Status
           </label>
-          <div className="flex gap-2">
+          <div className={cn("flex gap-2", expanded ? "" : "flex-wrap")}>
             {(["PENDING", "IN_PROGRESS", "COMPLETED", "NEEDS_REVIEW"] as const).map((status) => (
               <Button
                 key={status}
@@ -279,7 +261,10 @@ export function BreakdownPanel({
             ))}
           </div>
         </div>
+      </div>
 
+      {/* Right column (or inline when compact) */}
+      <div className="space-y-4">
         {/* Element Breakdown */}
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-2 block">
@@ -303,17 +288,99 @@ export function BreakdownPanel({
           )}
         </div>
       </div>
-
-      {/* Footer */}
-      {isDirty && (
-        <div className="px-4 py-3 border-t border-border bg-muted/50">
-          <Button onClick={handleSave} className="w-full" size="sm">
-            <Save className="h-4 w-4 mr-1" />
-            Save Changes
-          </Button>
-        </div>
-      )}
     </div>
+  );
+
+  return (
+    <>
+      <div className="flex flex-col h-full border border-border rounded-lg bg-card overflow-hidden">
+        {/* Header */}
+        <div className={cn("px-4 py-3 flex items-center justify-between flex-shrink-0", stripColor)}>
+          <div className="flex items-center gap-2">
+            <span className="font-mono font-bold text-lg">{scene.sceneNumber}</span>
+            <Badge variant={scene.intExt === "INT" ? "int" : "ext"} className="text-[10px]">
+              {scene.intExt}
+            </Badge>
+            <Badge
+              variant={
+                ["DAY", "MORNING", "AFTERNOON"].includes(scene.dayNight) ? "day" : "night"
+              }
+              className="text-[10px]"
+            >
+              {scene.dayNight}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon-sm" onClick={() => setIsExpanded(true)} title="Expand scene">
+              <Maximize2 className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon-sm" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-4">
+          {renderContent(false)}
+        </div>
+
+        {/* Footer */}
+        {isDirty && (
+          <div className="px-4 py-3 border-t border-border bg-muted/50 flex-shrink-0">
+            <Button onClick={handleSave} className="w-full" size="sm">
+              <Save className="h-4 w-4 mr-1" />
+              Save Changes
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Expanded Dialog */}
+      <Dialog open={isExpanded} onOpenChange={setIsExpanded}>
+        <DialogContent className="max-w-4xl w-[calc(100%-2rem)]" onClose={() => setIsExpanded(false)}>
+          {/* Dialog Header */}
+          <div className={cn("px-6 py-4 flex items-center justify-between rounded-t-lg", stripColor)}>
+            <div className="flex items-center gap-3">
+              <span className="font-mono font-bold text-xl">{scene.sceneNumber}</span>
+              <Badge variant={scene.intExt === "INT" ? "int" : "ext"}>
+                {scene.intExt}
+              </Badge>
+              <Badge
+                variant={
+                  ["DAY", "MORNING", "AFTERNOON"].includes(scene.dayNight) ? "day" : "night"
+                }
+              >
+                {scene.dayNight}
+              </Badge>
+              {editedScene.setName || scene.location?.name ? (
+                <span className="text-sm text-muted-foreground">
+                  {editedScene.setName || scene.location?.name}
+                </span>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Dialog Content */}
+          <div className="p-6 overflow-auto max-h-[calc(85vh-8rem)]">
+            {renderContent(true)}
+          </div>
+
+          {/* Dialog Footer */}
+          {isDirty && (
+            <div className="px-6 py-4 border-t border-border bg-muted/50 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsExpanded(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} size="sm">
+                <Save className="h-4 w-4 mr-1" />
+                Save Changes
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

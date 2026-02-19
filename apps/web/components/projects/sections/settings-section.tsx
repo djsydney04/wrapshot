@@ -14,7 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { deleteProject } from "@/lib/actions/projects";
+import { ImageUpload } from "@/components/ui/image-upload";
+import { deleteProject, updateProject } from "@/lib/actions/projects";
 import type { Project } from "@/lib/actions/projects.types";
 
 interface SettingsSectionProps {
@@ -27,6 +28,11 @@ export function SettingsSection({ projectId, project }: SettingsSectionProps) {
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = React.useState("");
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [isSavingCover, setIsSavingCover] = React.useState(false);
+  const [coverImageUrl, setCoverImageUrl] = React.useState<string | null>(
+    project.coverImageUrl
+  );
+  const [coverError, setCoverError] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   const canDelete = deleteConfirmation === project.name;
@@ -44,6 +50,27 @@ export function SettingsSection({ projectId, project }: SettingsSectionProps) {
       console.error("Error deleting project:", err);
       setError(err instanceof Error ? err.message : "Failed to delete project");
       setIsDeleting(false);
+    }
+  };
+
+  const handleCoverChange = async (nextCoverImageUrl: string | null) => {
+    const previousCoverImageUrl = coverImageUrl;
+    setCoverImageUrl(nextCoverImageUrl);
+    setIsSavingCover(true);
+    setCoverError(null);
+
+    try {
+      const updated = await updateProject(projectId, {
+        coverImageUrl: nextCoverImageUrl,
+      });
+      setCoverImageUrl(updated.coverImageUrl);
+      router.refresh();
+    } catch (err) {
+      console.error("Error updating project cover:", err);
+      setCoverImageUrl(previousCoverImageUrl);
+      setCoverError(err instanceof Error ? err.message : "Failed to update cover image");
+    } finally {
+      setIsSavingCover(false);
     }
   };
 
@@ -78,6 +105,27 @@ export function SettingsSection({ projectId, project }: SettingsSectionProps) {
           <div>
             <Label className="text-sm text-muted-foreground">Created</Label>
             <p className="text-sm">{new Date(project.createdAt).toLocaleDateString()}</p>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm text-muted-foreground">Project Cover</Label>
+            <ImageUpload
+              value={coverImageUrl}
+              onChange={(url) => {
+                void handleCoverChange(url);
+              }}
+              bucket="project-covers"
+              folder={projectId}
+              aspectRatio="video"
+              placeholder="Upload a poster or still for this project"
+              disabled={isSavingCover}
+            />
+            {isSavingCover && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Saving project cover...
+              </p>
+            )}
+            {coverError && <p className="text-xs text-red-600">{coverError}</p>}
           </div>
         </div>
       </div>

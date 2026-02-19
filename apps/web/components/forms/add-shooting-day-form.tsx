@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { useProjectStore } from "@/lib/stores/project-store";
 import { createShootingDay, updateShootingDay } from "@/lib/actions/shooting-days";
+import { deriveLunchTime } from "@/lib/schedule/film-day";
 import type { ShootingDay } from "@/lib/types";
 import { trackShootingDayCreated } from "@/lib/analytics/posthog";
 
@@ -59,57 +60,63 @@ export function AddShootingDayForm({
 
   const isEditMode = !!editingDay;
 
-  const getInitialFormData = () => ({
-    date: editingDay
-      ? editingDay.date
-      : defaultDate
-      ? format(defaultDate, "yyyy-MM-dd")
-      : "",
-    unit: (editingDay?.unit || "MAIN") as "MAIN" | "SECOND",
-    status: (editingDay?.status || "TENTATIVE") as
-      | "TENTATIVE"
-      | "SCHEDULED"
-      | "CONFIRMED"
-      | "COMPLETED"
-      | "CANCELLED",
-    generalCall: editingDay?.generalCall || defaultStartTime || "07:00",
-    wrapTime: editingDay?.wrapTime || editingDay?.expectedWrap || defaultEndTime || "19:00",
-    crewCall: editingDay?.crewCall || "06:30",
-    talentCall: editingDay?.talentCall || "08:00",
-    lunchTime: editingDay?.lunchTime || "12:30",
-    notes: editingDay?.notes || "",
-    selectedScenes: editingDay?.scenes || ([] as string[]),
-  });
+  const buildFormData = React.useCallback(() => {
+    const generalCall = editingDay?.generalCall || defaultStartTime || "07:00";
+    const crewCall = editingDay?.crewCall || "06:30";
 
-  const [formData, setFormData] = React.useState(getInitialFormData);
+    return {
+      date: editingDay
+        ? editingDay.date
+        : defaultDate
+        ? format(defaultDate, "yyyy-MM-dd")
+        : "",
+      unit: (editingDay?.unit || "MAIN") as "MAIN" | "SECOND",
+      status: (editingDay?.status || "TENTATIVE") as
+        | "TENTATIVE"
+        | "SCHEDULED"
+        | "CONFIRMED"
+        | "COMPLETED"
+        | "CANCELLED",
+      generalCall,
+      wrapTime:
+        editingDay?.wrapTime || editingDay?.expectedWrap || defaultEndTime || "19:00",
+      crewCall,
+      talentCall: editingDay?.talentCall || "08:00",
+      lunchTime:
+        editingDay?.lunchTime || deriveLunchTime(crewCall, generalCall),
+      notes: editingDay?.notes || "",
+      selectedScenes: editingDay?.scenes || ([] as string[]),
+    };
+  }, [editingDay, defaultDate, defaultStartTime, defaultEndTime]);
+
+  const [formData, setFormData] = React.useState(() => buildFormData());
+  const [lunchTimeManuallyEdited, setLunchTimeManuallyEdited] = React.useState(
+    Boolean(editingDay?.lunchTime)
+  );
 
   // Reset form when dialog opens or when editing day/default values change
   React.useEffect(() => {
     if (open) {
-      setFormData({
-        date: editingDay
-          ? editingDay.date
-          : defaultDate
-          ? format(defaultDate, "yyyy-MM-dd")
-          : "",
-        unit: (editingDay?.unit || "MAIN") as "MAIN" | "SECOND",
-        status: (editingDay?.status || "TENTATIVE") as
-          | "TENTATIVE"
-          | "SCHEDULED"
-          | "CONFIRMED"
-          | "COMPLETED"
-          | "CANCELLED",
-        generalCall: editingDay?.generalCall || defaultStartTime || "07:00",
-        wrapTime: editingDay?.wrapTime || editingDay?.expectedWrap || defaultEndTime || "19:00",
-        crewCall: editingDay?.crewCall || "06:30",
-        talentCall: editingDay?.talentCall || "08:00",
-        lunchTime: editingDay?.lunchTime || "12:30",
-        notes: editingDay?.notes || "",
-        selectedScenes: editingDay?.scenes || ([] as string[]),
-      });
+      setFormData(buildFormData());
+      setLunchTimeManuallyEdited(Boolean(editingDay?.lunchTime));
       setError(null);
     }
-  }, [open, editingDay, defaultDate, defaultStartTime, defaultEndTime]);
+  }, [open, editingDay, buildFormData]);
+
+  React.useEffect(() => {
+    if (!open || lunchTimeManuallyEdited) return;
+
+    const suggestedLunch = deriveLunchTime(formData.crewCall, formData.generalCall);
+    if (suggestedLunch === formData.lunchTime) return;
+
+    setFormData((prev) => ({ ...prev, lunchTime: suggestedLunch }));
+  }, [
+    open,
+    lunchTimeManuallyEdited,
+    formData.crewCall,
+    formData.generalCall,
+    formData.lunchTime,
+  ]);
 
   // Check if a shooting day already exists for the given date and unit
   const checkForExistingDay = React.useCallback((date: string, unit: string): ShootingDay | undefined => {
@@ -246,10 +253,11 @@ export function AddShootingDayForm({
         wrapTime: "19:00",
         crewCall: "06:30",
         talentCall: "08:00",
-        lunchTime: "12:30",
+        lunchTime: deriveLunchTime("06:30", "07:00"),
         notes: "",
         selectedScenes: [],
       });
+      setLunchTimeManuallyEdited(false);
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
@@ -464,10 +472,14 @@ export function AddShootingDayForm({
                   <Input
                     type="time"
                     value={formData.lunchTime}
-                    onChange={(e) =>
-                      setFormData({ ...formData, lunchTime: e.target.value })
-                    }
+                    onChange={(e) => {
+                      setLunchTimeManuallyEdited(true);
+                      setFormData({ ...formData, lunchTime: e.target.value });
+                    }}
                   />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Target meal by 6 hours after crew call.
+                  </p>
                 </div>
               </div>
             </div>
@@ -546,12 +558,12 @@ export function AddShootingDayForm({
           <DialogFooter>
             <Button
               type="button"
-              variant="outline"
+              variant="skeuo-outline"
               onClick={() => onOpenChange(false)}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" variant="skeuo" disabled={loading}>
               {loading
                 ? isEditMode
                   ? "Saving..."

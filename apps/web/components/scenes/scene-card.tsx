@@ -8,6 +8,7 @@ import {
   FileText,
   Clock,
   Users,
+  Package,
   Image as ImageIcon,
   Trash2,
   Edit,
@@ -37,6 +38,7 @@ export function SceneCard({
 }: SceneCardProps) {
   // Get cast count from joined data or fallback to filtering
   const sceneCastCount = scene.cast?.length || 0;
+  const sceneElements = scene.elementDetails || [];
 
   if (compact) {
     return (
@@ -69,6 +71,20 @@ export function SceneCard({
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground line-clamp-2">{scene.synopsis || "No synopsis"}</p>
+          {sceneElements.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {sceneElements.slice(0, 2).map((element) => (
+                <Badge key={element.id} variant="secondary" className="text-[10px] px-1 py-0">
+                  {element.name}
+                </Badge>
+              ))}
+              {sceneElements.length > 2 && (
+                <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                  +{sceneElements.length - 2}
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -143,7 +159,27 @@ export function SceneCard({
                 {sceneCastCount}
               </span>
             )}
+            {sceneElements.length > 0 && (
+              <span className="flex items-center gap-1">
+                <Package className="h-3 w-3" />
+                {sceneElements.length}
+              </span>
+            )}
           </div>
+          {sceneElements.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {sceneElements.slice(0, 4).map((element) => (
+                <Badge key={element.id} variant="secondary" className="text-[10px]">
+                  {element.name}
+                </Badge>
+              ))}
+              {sceneElements.length > 4 && (
+                <Badge variant="secondary" className="text-[10px]">
+                  +{sceneElements.length - 4} more
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Actions */}

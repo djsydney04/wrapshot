@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, X, ChevronRight, Sparkles } from "lucide-react";
+import { AlertCircle, X, ChevronRight, Lightbulb } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -59,7 +59,7 @@ export function ScriptChangeBanner({
       )}
     >
       <div className="flex items-center gap-2">
-        <Sparkles className={cn("h-5 w-5", iconColor)} />
+        <Lightbulb className={cn("h-5 w-5", iconColor)} />
         <AlertCircle className={cn("h-5 w-5", iconColor)} />
       </div>
 

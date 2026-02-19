@@ -20,6 +20,7 @@ export interface SceneInput {
   synopsis?: string;
   intExt?: IntExt;
   dayNight?: DayNight;
+  setName?: string;
   locationId?: string;
   pageCount?: number;
   scriptDay?: string;
@@ -61,9 +62,195 @@ export interface Scene {
   breakdownStatus?: BreakdownStatus;
   scriptText?: string | null;
   elements?: string[];
+  elementDetails?: SceneElementDetail[];
   // Joined data
   location?: { id: string; name: string } | null;
   cast?: { id: string; castMemberId: string; castMember: { id: string; characterName: string; actorName: string | null } }[];
+}
+
+export interface SceneElementDetail {
+  id: string;
+  elementId: string;
+  quantity: number;
+  notes: string | null;
+  name: string;
+  category: string;
+  description: string | null;
+  taskType: "FIND" | "PICK_UP" | "SOURCE" | "PREP" | "OTHER" | null;
+  assignedToCrewId: string | null;
+  assignedCrew?: {
+    id: string;
+    name: string;
+    role: string;
+    department: string;
+  } | null;
+}
+
+interface SceneRow extends Omit<Scene, "elements" | "elementDetails"> {
+  elementDetails?: Array<{
+    id: string;
+    elementId: string;
+    quantity: number;
+    notes: string | null;
+    element:
+      | {
+          id: string;
+          name: string;
+          category: string;
+          description: string | null;
+          taskType?: "FIND" | "PICK_UP" | "SOURCE" | "PREP" | "OTHER" | null;
+          assignedToCrewId?: string | null;
+          assignedCrew?: {
+            id: string;
+            name: string;
+            role: string;
+            department: string;
+          } | null;
+        }
+      | Array<{
+          id: string;
+          name: string;
+          category: string;
+          description: string | null;
+          taskType?: "FIND" | "PICK_UP" | "SOURCE" | "PREP" | "OTHER" | null;
+          assignedToCrewId?: string | null;
+          assignedCrew?: {
+            id: string;
+            name: string;
+            role: string;
+            department: string;
+          } | null;
+        }>
+      | null;
+  }>;
+}
+
+const SCENE_SELECT_CORE = `
+  *,
+  location:Location(id, name),
+  cast:SceneCastMember(
+    id,
+    castMemberId,
+    castMember:CastMember(id, characterName, actorName)
+  )
+`;
+
+const SCENE_SELECT_WITH_ELEMENT_ASSIGNMENTS = `
+  ${SCENE_SELECT_CORE},
+  elementDetails:SceneElement(
+    id,
+    elementId,
+    quantity,
+    notes,
+    element:Element(
+      id,
+      name,
+      category,
+      description,
+      taskType,
+      assignedToCrewId,
+      assignedCrew:CrewMember(id, name, role, department)
+    )
+  )
+`;
+
+const SCENE_SELECT_WITH_ELEMENTS = `
+  ${SCENE_SELECT_CORE},
+  elementDetails:SceneElement(
+    id,
+    elementId,
+    quantity,
+    notes,
+    element:Element(
+      id,
+      name,
+      category,
+      description
+    )
+  )
+`;
+
+const SCENE_SELECT_MINIMAL = SCENE_SELECT_CORE;
+
+function normalizeRelation<T>(relation: T | T[] | null | undefined): T | null {
+  if (!relation) return null;
+  return Array.isArray(relation) ? relation[0] || null : relation;
+}
+
+function isSchemaCompatibilityError(errorMessage: string): boolean {
+  const lowered = errorMessage.toLowerCase();
+  return (
+    lowered.includes("column") ||
+    lowered.includes("relationship") ||
+    lowered.includes("schema cache") ||
+    lowered.includes("could not find") ||
+    lowered.includes("does not exist")
+  );
+}
+
+async function queryScenesWithFallback(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  queryBuilder: (
+    select: string
+  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  context: "getScenes" | "getScene"
+) {
+  const selectAttempts = [
+    SCENE_SELECT_WITH_ELEMENT_ASSIGNMENTS,
+    SCENE_SELECT_WITH_ELEMENTS,
+    SCENE_SELECT_MINIMAL,
+  ];
+
+  let lastError: { message: string } | null = null;
+
+  for (let index = 0; index < selectAttempts.length; index++) {
+    const select = selectAttempts[index];
+    const { data, error } = await queryBuilder(select);
+
+    if (!error) {
+      if (index > 0) {
+        console.warn(
+          `[${context}] Falling back to scene query shape #${index + 1} due to schema mismatch.`
+        );
+      }
+      return { data, error: null };
+    }
+
+    lastError = error;
+    if (!isSchemaCompatibilityError(error.message)) {
+      return { data: null, error };
+    }
+  }
+
+  return { data: null, error: lastError };
+}
+
+function mapSceneRow(scene: SceneRow): Scene {
+  const details = (scene.elementDetails || [])
+    .map((detail) => {
+      const element = Array.isArray(detail.element) ? detail.element[0] : detail.element;
+      if (!element) return null;
+
+      return {
+        id: detail.id,
+        elementId: detail.elementId,
+        quantity: detail.quantity,
+        notes: detail.notes,
+        name: element.name,
+        category: element.category,
+        description: element.description,
+        taskType: element.taskType ?? null,
+        assignedToCrewId: element.assignedToCrewId ?? null,
+        assignedCrew: normalizeRelation(element.assignedCrew) || null,
+      } as SceneElementDetail;
+    })
+    .filter(Boolean) as SceneElementDetail[];
+
+  return {
+    ...scene,
+    elementDetails: details,
+    elements: details.map((detail) => detail.name),
+  };
 }
 
 // Fetch all scenes for a project
@@ -75,26 +262,24 @@ export async function getScenes(projectId: string) {
     return { data: null, error: "Not authenticated" };
   }
 
-  const { data, error } = await supabase
-    .from("Scene")
-    .select(`
-      *,
-      location:Location(id, name),
-      cast:SceneCastMember(
-        id,
-        castMemberId,
-        castMember:CastMember(id, characterName, actorName)
-      )
-    `)
-    .eq("projectId", projectId)
-    .order("sortOrder", { ascending: true });
+  const { data, error } = await queryScenesWithFallback(
+    supabase,
+    (select) =>
+      supabase
+        .from("Scene")
+        .select(select)
+        .eq("projectId", projectId)
+        .order("sortOrder", { ascending: true }),
+    "getScenes"
+  );
 
   if (error) {
     console.error("Error fetching scenes:", error);
     return { data: null, error: error.message };
   }
 
-  return { data: data as Scene[], error: null };
+  const mapped = ((data || []) as SceneRow[]).map((scene) => mapSceneRow(scene));
+  return { data: mapped, error: null };
 }
 
 // Get a single scene
@@ -106,26 +291,19 @@ export async function getScene(sceneId: string) {
     return { data: null, error: "Not authenticated" };
   }
 
-  const { data, error } = await supabase
-    .from("Scene")
-    .select(`
-      *,
-      location:Location(id, name),
-      cast:SceneCastMember(
-        id,
-        castMemberId,
-        castMember:CastMember(id, characterName, actorName)
-      )
-    `)
-    .eq("id", sceneId)
-    .single();
+  const { data, error } = await queryScenesWithFallback(
+    supabase,
+    (select) => supabase.from("Scene").select(select).eq("id", sceneId).single(),
+    "getScene"
+  );
 
   if (error) {
     console.error("Error fetching scene:", error);
     return { data: null, error: error.message };
   }
 
-  return { data: data as Scene, error: null };
+  const mapped = mapSceneRow(data as SceneRow);
+  return { data: mapped, error: null };
 }
 
 // Create a new scene
@@ -147,6 +325,36 @@ export async function createScene(input: SceneInput) {
 
   const maxSortOrder = existingScenes?.[0]?.sortOrder ?? -1;
 
+  let resolvedLocationId = input.locationId || null;
+  const normalizedSetName = input.setName?.trim();
+
+  // If no explicit location was selected, auto-create a location from set name.
+  if (!resolvedLocationId && normalizedSetName) {
+    const { data: existingLocation } = await supabase
+      .from("Location")
+      .select("id")
+      .eq("projectId", input.projectId)
+      .eq("name", normalizedSetName)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingLocation?.id) {
+      resolvedLocationId = existingLocation.id;
+    } else {
+      const { data: createdLocation } = await supabase
+        .from("Location")
+        .insert({
+          projectId: input.projectId,
+          name: normalizedSetName,
+          interiorExterior: input.intExt || "INT",
+        })
+        .select("id")
+        .single();
+
+      resolvedLocationId = createdLocation?.id || null;
+    }
+  }
+
   // Create the scene
   const { data: scene, error: sceneError } = await supabase
     .from("Scene")
@@ -156,7 +364,8 @@ export async function createScene(input: SceneInput) {
       synopsis: input.synopsis || null,
       intExt: input.intExt || "INT",
       dayNight: input.dayNight || "DAY",
-      locationId: input.locationId || null,
+      setName: normalizedSetName || null,
+      locationId: resolvedLocationId,
       pageCount: input.pageCount || 1,
       scriptDay: input.scriptDay || null,
       estimatedMinutes: input.estimatedMinutes || null,
@@ -205,6 +414,49 @@ export async function updateScene(id: string, updates: Partial<SceneInput>) {
 
   // Extract castIds to handle separately
   const { castIds, projectId, ...sceneUpdates } = updates;
+  const normalizedSetName = sceneUpdates.setName?.trim();
+
+  if (!sceneUpdates.locationId && normalizedSetName) {
+    let resolvedProjectId = projectId;
+    if (!resolvedProjectId) {
+      const { data: existingScene } = await supabase
+        .from("Scene")
+        .select("projectId")
+        .eq("id", id)
+        .single();
+      resolvedProjectId = existingScene?.projectId;
+    }
+
+    if (!resolvedProjectId) {
+      console.error("Unable to resolve projectId while auto-creating location for scene update");
+    } else {
+    const { data: existingLocation } = await supabase
+      .from("Location")
+      .select("id")
+      .eq("projectId", resolvedProjectId)
+      .eq("name", normalizedSetName)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingLocation?.id) {
+      sceneUpdates.locationId = existingLocation.id;
+    } else {
+      const { data: createdLocation } = await supabase
+        .from("Location")
+        .insert({
+          projectId: resolvedProjectId,
+          name: normalizedSetName,
+          interiorExterior: sceneUpdates.intExt || "INT",
+        })
+        .select("id")
+        .single();
+
+      if (createdLocation?.id) {
+        sceneUpdates.locationId = createdLocation.id;
+      }
+    }
+    }
+  }
 
   // Update the scene
   const { data, error } = await supabase

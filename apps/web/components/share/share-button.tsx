@@ -117,7 +117,7 @@ export function ShareButton({ variant = "sidebar" }: ShareButtonProps) {
 
   // Variant-specific button styles
   const buttonStyles = {
-    sidebar: "w-full justify-start gap-2 font-normal h-8 text-stone-400 hover:text-white hover:bg-stone-800",
+    sidebar: "w-full justify-start gap-2 font-normal h-8 text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover",
     default: "w-full justify-start gap-3 rounded-lg px-3 py-2.5 text-muted-foreground hover:text-foreground hover:bg-muted/50",
     header: "gap-2 text-muted-foreground hover:text-foreground",
   };
@@ -298,11 +298,11 @@ function ShareModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50"
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-md mx-4 bg-background border border-border rounded-lg shadow-2xl">
+      <div className="relative w-full max-w-md mx-4 bg-background border border-border rounded-lg shadow-soft-lg">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-sm font-medium">Share wrapshoot</h2>
           <Button
@@ -317,8 +317,8 @@ function ShareModal({
 
         {submitted ? (
           <div className="p-8 text-center">
-            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-green-500/10 flex items-center justify-center">
-              <CheckCircle className="h-6 w-6 text-green-500" />
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[hsl(var(--feedback-success-bg))] flex items-center justify-center">
+              <CheckCircle className="h-6 w-6 text-[hsl(var(--feedback-success-fg))]" />
             </div>
             <h3 className="text-lg font-medium mb-1">Invite sent!</h3>
             <p className="text-sm text-muted-foreground">Your friend will receive an email shortly.</p>

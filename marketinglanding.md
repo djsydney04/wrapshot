@@ -18,150 +18,139 @@ Wrapshot combines traditional film production tools with intelligent automation 
 
 ---
 
-## Key Feature Highlights
+## New in 2026 (Feature Launch Callouts)
 
-### 1. Wrapshot Intelligence (AI-Powered)
-
-**Smart Script Analysis**
-- Upload your script PDF and let AI automatically extract all scenes
-- Intelligent parsing of scene headers, action lines, and dialogue
-- Automatic INT/EXT and DAY/NIGHT detection
-
-**Smart Element Recognition**
-- AI identifies and categorizes production elements automatically
-- Detects props, wardrobe, vehicles, makeup, VFX, SFX, animals, and more
-- Confidence ratings show how certain the AI is about each suggestion
-
-**Smart Synopsis Generation**
-- AI-generated scene summaries focused on production needs
-- Saves hours of manual breakdown work
-
-**Smart Time Estimation**
-- Intelligent shooting time estimates based on scene complexity
-- Considers dialogue density, action sequences, and technical requirements
+- Guided setup checklist on project overview
+- Wrapshot Intelligence analysis results dashboard with inline edits
+- Script version change detection and review banner
+- Smart Assistant with project-context chat prompts
+- Location Intelligence with permit guidance and risk callouts
+- Call sheet distribution by email (with PDF attachment workflow)
+- Department-level budget submission and approval workflow
 
 ---
 
-### 2. Visual Stripeboard & Scheduling
+## Key Feature Highlights
 
-**Traditional Stripeboard View**
-- Classic film industry stripeboard interface
-- Color-coded scene strips by INT/EXT and DAY/NIGHT
-- Drag-and-drop scene assignment to shooting days
+### 1. Wrapshot Intelligence Script Pipeline
 
-**Multiple View Options**
-- Grid view for quick overview
-- Kanban view organized by scene status
-- Timeline/Gantt view for schedule visualization
-- List view for detailed scene information
+**Agent-Based Script Analysis**
+- Upload a script PDF and trigger background analysis
+- Auto-extract scenes, cast references, production elements, synopses, and time estimates
+- Progress tracking and retry handling for long scripts
 
-**Smart Scheduling**
-- Create shooting days with custom dates and times
-- Drag scenes from unscheduled pool to shooting days
-- Reorder scenes within days with drag-and-drop
+**Analysis Results Dashboard**
+- Review what the AI created before finalizing
+- Edit scene synopsis and actor names inline
+- Remove low-confidence items and accept suggested crew roles
+
+**Script Version Intelligence**
+- Upload new script versions with revision colors
+- Generate change summaries between versions
+- Review adds/removals/updates before updating schedule and budget
+
+---
+
+### 2. Guided Project Setup
+
+**Setup Wizard**
+- New projects start with a guided setup flow
+- Upload script, add shooting days, cast, and crew in one sequence
+- Auto-start script analysis from the wizard upload step
+
+**Overview Checklist**
+- Persistent "Getting Started" checklist with completion progress
+- Quick navigation into missing setup steps
+- Dismissible once teams are ready to work in full project views
+
+---
+
+### 3. Visual Stripeboard & Scheduling
+
+**Scheduling Views**
+- Stripeboard for drag-and-drop scene assignment to shooting days
+- List/Grid for fast scene editing
+- Kanban by scene status
+- Timeline view for day-by-day ordering
+
+**Production Scheduling**
+- Create and edit shooting days with call times
+- Move scenes between unscheduled and scheduled states
 - Track page counts in industry-standard eighths
 
 ---
 
-### 3. Cast & Crew Management
+### 4. Call Sheets: Draft, Publish, Distribute
 
-**Cast Management**
-- Comprehensive cast profiles with character and actor info
-- Track availability, call times, and work status
-- Daily and weekly rate tracking
-- Email invitations with role-based access
+**Call Sheet Editor**
+- Generate call sheets from shooting day data
+- Edit notes, cast call times, and department call times
+- Save draft or publish versioned call sheets
 
-**Crew Organization**
-- Organize crew by department (Camera, Lighting, Sound, Art, etc.)
-- Designate department heads
-- Invite crew members with specific role permissions
-- Searchable crew directory
-
-**Team Collaboration**
-- Role-based access control (Admin, Coordinator, Department Head, Crew, Cast, Viewer)
-- Project sharing via email invitations
-- Real-time collaborative updates
-
----
-
-### 4. Comprehensive Scene Breakdown
-
-**25+ Element Categories**
-- Props, Wardrobe, Vehicles, Makeup/Hair
-- Camera, Grip & Electric, Sound & Music
-- Special Effects (SFX, VFX, Mechanical)
-- Art Department, Set Dressing, Greenery
-- Background/Extras, Special Equipment
-- Safety notes, Location notes, General comments
-
-**AI-Assisted Breakdown**
-- Accept or dismiss AI-generated element suggestions
-- Quick inline element creation
-- Link cast members to scenes they appear in
+**Export & Distribution**
+- Download polished PDF call sheets
+- Select cast/crew recipients and email directly from the call sheet screen
+- Track draft/published status per shooting day
 
 ---
 
 ### 5. Budget & Finance Tracking
 
-**Budget Management**
-- Create budgets with customizable categories
-- Pre-built templates for different production types
-- Hierarchical structure with main categories and subcategories
-- Line items with quantities and unit rates
+**Budget Builder**
+- Create budget categories, subcategories, and line items
+- Track estimated vs. actual spend
+- Log transactions with receipt upload and OCR parsing
 
-**Expense Tracking**
-- Log actual expenses against budget items
-- Upload receipts with automatic OCR parsing
-- Real-time budget vs. actual comparison
-- Visual budget health indicators (Under/At Risk/Over)
-
-**Financial Visibility**
-- Complete transaction history
-- Multi-budget support per project
-- Invoice and payment tracking
+**Department Approval Workflow**
+- Assign department heads to budget areas
+- Department states: Not Started, In Progress, Submitted, Revision Requested, Approved
+- Finance can approve, request revision, or reopen approved departments
 
 ---
 
-### 6. Location Management
+### 6. Team & Permissions
 
-**Location Database**
-- Maintain shooting locations with addresses
-- Categorize as Practical, Studio, Backlot, or Virtual
-- INT/EXT classification
+**Cast & Crew Management**
+- Profiles, rates, availability, and invite status tracking
+- Department organization and head assignment
+- Searchable cast/crew directories with project-level context
 
-**Permit Tracking**
-- Track permit status: Not Started, Applied, Approved, Denied
-- Add technical notes for parking, load-in, sound considerations
-
----
-
-### 7. Equipment & Gear Tracking
-
-**Gear Inventory**
-- Track equipment by department
-- Categories: Camera, Lighting, Sound, Art, Costume, Props, Vehicles, Special Equipment
-- Scene-based gear requirements
-- Technical notes and specifications
+**Role-Based Access**
+- Project roles: Admin, Coordinator, Department Head, Crew, Cast, Viewer
+- Permission-based controls across scenes, schedule, budget, and call sheets
+- Invitation flows for collaborators and cast/crew portals
 
 ---
 
-### 8. Script Management
+### 7. Location Intelligence
 
-**Version Control**
-- Upload multiple script versions
-- Color-coded revision tracking (industry standard colors)
-- Version history with upload dates
-- Easy revision comparison
+**Location Management**
+- Maintain location database with address, type, and permit status
+- Capture parking, technical, and sound notes
+- Link locations to scenes and shooting days
+
+**AI Location Intelligence**
+- Generate nearby support suggestions
+- Surface permit guidance and checklist steps
+- Highlight logistics risks and recommended next actions
 
 ---
 
-### 9. Call Sheet Generation
+### 8. Smart Assistant
 
-**Auto-Generated Call Sheets**
-- Create call sheets from shooting day data
-- Include scenes, cast/crew call times, locations
-- Department-specific information
-- PDF export for distribution
+**Project-Context Chat**
+- Ask schedule, permit, cast, crew, and scene questions in one place
+- Use quick prompts for common planning requests
+- Keep private per-project chat history for your account
+
+---
+
+### 9. Core Production Tracking
+
+**All-in-One Workspace**
+- Manage scenes, cast, crew, locations, gear, and schedule in one project hub
+- View project progress from development through post-production
+- Keep updates synchronized across collaborating team members
 
 ---
 

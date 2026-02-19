@@ -197,7 +197,7 @@ export function AddProjectForm({ open, onOpenChange }: AddProjectFormProps) {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !formData.name.trim()}>
+            <Button variant="skeuo" type="submit" disabled={loading || !formData.name.trim()}>
               {loading ? "Creating..." : "Create project"}
             </Button>
           </DialogFooter>
