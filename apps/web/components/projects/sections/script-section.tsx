@@ -273,7 +273,7 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
         <div className="text-sm text-muted-foreground">
           {scripts.length} version{scripts.length !== 1 ? "s" : ""} uploaded
         </div>
-        <Button size="sm" onClick={() => setShowUpload(true)} disabled={isRunning}>
+        <Button variant="skeuo" size="sm" onClick={() => setShowUpload(true)} disabled={isRunning}>
           <Upload className="h-4 w-4 mr-1" />
           Upload New Version
         </Button>
@@ -373,7 +373,7 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
           <p className="text-sm text-muted-foreground mb-4">
             Upload your script to auto-generate scenes, cast, and elements
           </p>
-          <Button onClick={() => setShowUpload(true)}>
+          <Button variant="skeuo" onClick={() => setShowUpload(true)}>
             <Upload className="h-4 w-4 mr-1" />
             Upload Script
           </Button>
@@ -432,10 +432,11 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
           </DialogBody>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUpload(false)}>
+            <Button variant="skeuo-outline" onClick={() => setShowUpload(false)}>
               Cancel
             </Button>
             <Button
+              variant="skeuo"
               onClick={handleUpload}
               disabled={!uploadData.fileUrl || loading || startingJob}
             >

@@ -612,7 +612,7 @@ export function PostSection({ projectId, shootingDays, scenes }: PostSectionProp
                   ))}
                 </select>
               </div>
-              <Button onClick={handleCreateBatch} disabled={!selectedDayId || creatingBatch}>
+              <Button variant="skeuo" onClick={handleCreateBatch} disabled={!selectedDayId || creatingBatch}>
                 {creatingBatch ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Prepare ingest batch
               </Button>
@@ -791,7 +791,7 @@ export function PostSection({ projectId, shootingDays, scenes }: PostSectionProp
                 value={newVersionSourceRange}
                 onChange={(event) => setNewVersionSourceRange(event.target.value)}
               />
-              <Button onClick={handleCreateEditVersion} disabled={creatingVersion}>
+              <Button variant="skeuo" onClick={handleCreateEditVersion} disabled={creatingVersion}>
                 {creatingVersion ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Create
               </Button>
@@ -878,7 +878,7 @@ export function PostSection({ projectId, shootingDays, scenes }: PostSectionProp
                       value={newReviewNote}
                       onChange={(event) => setNewReviewNote(event.target.value)}
                     />
-                    <Button onClick={handleCreateReviewNote} disabled={creatingReviewNote}>
+                    <Button variant="skeuo" onClick={handleCreateReviewNote} disabled={creatingReviewNote}>
                       {creatingReviewNote ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                       Add
                     </Button>
@@ -957,7 +957,7 @@ export function PostSection({ projectId, shootingDays, scenes }: PostSectionProp
                 value={newVfxDueDate}
                 onChange={(event) => setNewVfxDueDate(event.target.value)}
               />
-              <Button onClick={handleCreateVfxShot} disabled={creatingVfxShot}>
+              <Button variant="skeuo" onClick={handleCreateVfxShot} disabled={creatingVfxShot}>
                 {creatingVfxShot ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Add
               </Button>
@@ -1041,6 +1041,7 @@ export function PostSection({ projectId, shootingDays, scenes }: PostSectionProp
                       rows={3}
                     />
                     <Button
+                      variant="skeuo"
                       className="mt-2"
                       onClick={handleCreateTurnover}
                       disabled={creatingTurnover}
@@ -1084,7 +1085,7 @@ export function PostSection({ projectId, shootingDays, scenes }: PostSectionProp
                     value={newDeliveryDueDate}
                     onChange={(event) => setNewDeliveryDueDate(event.target.value)}
                   />
-                  <Button onClick={handleCreateDeliveryItem} disabled={creatingDelivery}>
+                  <Button variant="skeuo" onClick={handleCreateDeliveryItem} disabled={creatingDelivery}>
                     {creatingDelivery ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Add
                   </Button>

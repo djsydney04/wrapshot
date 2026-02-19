@@ -168,7 +168,7 @@ export default function NotificationSettingsPage() {
 
         <SettingsCardFooter>
           <Button variant="ghost">Reset to Defaults</Button>
-          <Button onClick={handleSave} className="gap-2">
+          <Button variant="skeuo" onClick={handleSave} className="gap-2">
             {saved && <Check className="h-4 w-4" />}
             {saved ? "Saved" : "Save Changes"}
           </Button>

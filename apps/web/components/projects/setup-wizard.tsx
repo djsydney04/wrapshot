@@ -453,7 +453,7 @@ export function SetupWizard({
               or come back to this guide anytime.
             </p>
             <div className="flex justify-center gap-3">
-              <Button onClick={onComplete}>
+              <Button variant="skeuo" onClick={onComplete}>
                 Start Working
               </Button>
             </div>
@@ -547,14 +547,14 @@ export function SetupWizard({
                   )}
                   {/* After complete, show continue */}
                   {scriptState === "complete" && (
-                    <Button onClick={handleNext}>
+                    <Button variant="skeuo" onClick={handleNext}>
                       Continue
                       <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>
                   )}
                   {/* During analysis, let user continue while Smart works in background */}
                   {(scriptState === "uploading" || scriptState === "analyzing") && (
-                    <Button onClick={handleNext} variant={scriptState === "uploading" ? "ghost" : "default"} disabled={scriptState === "uploading"}>
+                    <Button onClick={handleNext} variant={scriptState === "uploading" ? "ghost" : "skeuo"} disabled={scriptState === "uploading"}>
                       {scriptState === "uploading" ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -570,7 +570,7 @@ export function SetupWizard({
                   )}
                 </div>
               ) : (
-                <Button onClick={handleNext}>
+                <Button variant="skeuo" onClick={handleNext}>
                   {currentStep === "welcome" ? "Get Started" : "Continue"}
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>

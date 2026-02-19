@@ -814,6 +814,7 @@ export function CameraSection({
                   </div>
 
                   <Button
+                    variant="skeuo"
                     size="sm"
                     onClick={handleCreateShot}
                     disabled={!shotForm.shotCode.trim() || !shotForm.sceneId}
@@ -1257,7 +1258,7 @@ export function CameraSection({
                     />
                   </div>
                 </div>
-                <Button size="sm" onClick={handleCreateAsset} disabled={!assetForm.name.trim()}>
+                <Button variant="skeuo" size="sm" onClick={handleCreateAsset} disabled={!assetForm.name.trim()}>
                   <Plus className="mr-1 h-4 w-4" />
                   Add Asset
                 </Button>
@@ -1465,7 +1466,7 @@ export function CameraSection({
                   </Button>
                 </div>
 
-                <Button size="sm" onClick={handleSaveReport}>
+                <Button variant="skeuo" size="sm" onClick={handleSaveReport}>
                   <Save className="mr-1 h-4 w-4" />
                   Save Camera Report
                 </Button>

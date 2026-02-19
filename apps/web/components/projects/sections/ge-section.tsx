@@ -304,7 +304,7 @@ export function GeSection({ projectId, scenes, shootingDays }: GeSectionProps) {
                     />
                   </div>
                 </div>
-                <Button size="sm" onClick={handleCreateLightingPlan}>
+                <Button variant="skeuo" size="sm" onClick={handleCreateLightingPlan}>
                   <Plus className="mr-1 h-4 w-4" />
                   Add Lighting Plan
                 </Button>
@@ -484,7 +484,7 @@ export function GeSection({ projectId, scenes, shootingDays }: GeSectionProps) {
                     />
                   </div>
                 </div>
-                <Button size="sm" onClick={handleCreateRiggingTask}>
+                <Button variant="skeuo" size="sm" onClick={handleCreateRiggingTask}>
                   <Plus className="mr-1 h-4 w-4" />
                   Add Rigging Task
                 </Button>
@@ -641,7 +641,7 @@ export function GeSection({ projectId, scenes, shootingDays }: GeSectionProps) {
                   </Button>
                 </div>
 
-                <Button size="sm" onClick={handleSavePowerPlan}>
+                <Button variant="skeuo" size="sm" onClick={handleSavePowerPlan}>
                   <Save className="mr-1 h-4 w-4" />
                   Save Power + Safety Plan
                 </Button>

@@ -460,6 +460,7 @@ export default function NewProjectPage() {
 
               <div className="space-y-2">
                 <Button
+                  variant="skeuo"
                   onClick={() => handleCreate(false)}
                   disabled={isSubmitting}
                   className="w-full"
@@ -487,6 +488,7 @@ export default function NewProjectPage() {
                         {error || "You've reached the project limit for your plan."}
                       </p>
                       <Button
+                        variant="skeuo"
                         className="mt-3"
                         size="sm"
                         onClick={() => router.push("/settings/billing")}
@@ -527,7 +529,7 @@ export default function NewProjectPage() {
                   Skip
                 </Button>
               )}
-              <Button onClick={handleNext} disabled={!canProceed}>
+              <Button variant="skeuo" onClick={handleNext} disabled={!canProceed}>
                 Continue
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>

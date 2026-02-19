@@ -20,6 +20,8 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         notion:
           "text-muted-foreground hover:bg-[hsl(var(--notion-hover))] hover:text-foreground",
+        skeuo: "btn-skeuo btn-skeuo-primary",
+        "skeuo-outline": "btn-skeuo btn-skeuo-outline",
       },
       size: {
         default: "h-9 px-4 py-2",

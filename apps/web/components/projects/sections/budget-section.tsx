@@ -405,7 +405,7 @@ export function BudgetSection({ projectId }: BudgetSectionProps) {
           </p>
         </div>
         {budgetPermissions?.canManageRequests && (
-          <Button onClick={handleOpenCreateDialog}>
+          <Button variant="skeuo" onClick={handleOpenCreateDialog}>
             <Plus className="h-4 w-4 mr-2" />
             Create Budget
           </Button>
@@ -667,7 +667,7 @@ export function BudgetSection({ projectId }: BudgetSectionProps) {
             Create a budget to start tracking expenses for this project.
           </p>
           {budgetPermissions?.canManageRequests && (
-            <Button onClick={handleOpenCreateDialog}>
+            <Button variant="skeuo" onClick={handleOpenCreateDialog}>
               <Plus className="h-4 w-4 mr-2" />
               Create Budget
             </Button>
@@ -716,13 +716,13 @@ export function BudgetSection({ projectId }: BudgetSectionProps) {
 
           <DialogFooter>
             <Button
-              variant="outline"
+              variant="skeuo-outline"
               onClick={() => setShowCreateDialog(false)}
               disabled={createLoading}
             >
               Cancel
             </Button>
-            <Button onClick={() => void handleCreateBudget()} disabled={createLoading}>
+            <Button variant="skeuo" onClick={() => void handleCreateBudget()} disabled={createLoading}>
               {createLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />

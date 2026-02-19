@@ -149,7 +149,7 @@ export function LocationsSection({
         <div className="text-sm text-muted-foreground">
           {localLocations.length} location{localLocations.length === 1 ? "" : "s"}
         </div>
-        <Button size="sm" onClick={() => setShowAddLocation(true)}>
+        <Button size="sm" variant="skeuo" onClick={() => setShowAddLocation(true)}>
           <Plus className="h-4 w-4" />
           Add Location
         </Button>
@@ -243,7 +243,7 @@ export function LocationsSection({
           <p className="mb-4 text-sm text-muted-foreground">
             Locations are auto-created from analyzed scenes or you can add them manually.
           </p>
-          <Button onClick={() => setShowAddLocation(true)}>
+          <Button variant="skeuo" onClick={() => setShowAddLocation(true)}>
             <Plus className="h-4 w-4" />
             Add First Location
           </Button>
@@ -419,10 +419,10 @@ export function LocationsSection({
                 </div>
               </DialogBody>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setEditing(null)}>
+                <Button variant="skeuo-outline" onClick={() => setEditing(null)}>
                   Cancel
                 </Button>
-                <Button onClick={handleSave} disabled={saving}>
+                <Button variant="skeuo" onClick={handleSave} disabled={saving}>
                   {saving ? "Saving..." : "Save"}
                 </Button>
               </DialogFooter>

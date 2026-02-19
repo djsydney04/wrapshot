@@ -72,13 +72,13 @@ export default function ProjectsDashboard() {
 
         <div className="flex items-center gap-3">
           <FeedbackButton variant="header" source="top_bar" />
-          <Button size="sm" variant="outline" asChild>
+          <Button size="sm" variant="skeuo-outline" asChild>
             <Link href="/assistant">
               <Bot className="h-4 w-4" />
               Assistant
             </Link>
           </Button>
-          <Button size="sm" asChild>
+          <Button size="sm" variant="skeuo" asChild>
             <Link href="/projects/new">
               <Plus className="h-4 w-4" />
               New Project

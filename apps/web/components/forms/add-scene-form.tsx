@@ -276,12 +276,12 @@ export function AddSceneForm({
               <DialogFooter>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="skeuo-outline"
                   onClick={() => onOpenChange(false)}
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={loading}>
+                <Button variant="skeuo" type="submit" disabled={loading}>
                   {loading ? "Saving..." : (isEditing ? "Save Changes" : "Create Scene")}
                 </Button>
               </DialogFooter>
@@ -319,13 +319,13 @@ export function AddSceneForm({
             <DialogFooter>
               <Button
                 type="button"
-                variant="outline"
+                variant="skeuo-outline"
                 onClick={() => onOpenChange(false)}
               >
                 Cancel
               </Button>
               {!isEditing && (
-                <Button onClick={(e) => handleSubmit(e as unknown as React.FormEvent)} disabled={loading || !formData.sceneNumber || !formData.synopsis}>
+                <Button variant="skeuo" onClick={(e) => handleSubmit(e as unknown as React.FormEvent)} disabled={loading || !formData.sceneNumber || !formData.synopsis}>
                   {loading ? "Creating..." : "Create Scene"}
                 </Button>
               )}

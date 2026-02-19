@@ -124,7 +124,7 @@ export default function AssistantPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 Create a project first, then assistant chat will be project-aware.
               </p>
-              <Button className="mt-4" asChild>
+              <Button variant="skeuo" className="mt-4" asChild>
                 <Link href="/projects/new">Create Project</Link>
               </Button>
             </div>

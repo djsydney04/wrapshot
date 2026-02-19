@@ -119,7 +119,7 @@ export function CastSection({ projectId, cast }: CastSectionProps) {
             />
           </div>
         </div>
-        <Button size="sm" onClick={() => setShowAddCast(true)}>
+        <Button size="sm" variant="skeuo" onClick={() => setShowAddCast(true)}>
           <Plus className="h-4 w-4" />
           Add Cast Member
         </Button>
@@ -211,7 +211,7 @@ export function CastSection({ projectId, cast }: CastSectionProps) {
             {searchQuery ? "Try a different search term" : "Add cast members to your project"}
           </p>
           {!searchQuery && (
-            <Button onClick={() => setShowAddCast(true)}>
+            <Button variant="skeuo" onClick={() => setShowAddCast(true)}>
               <Plus className="h-4 w-4" />
               Add First Cast Member
             </Button>

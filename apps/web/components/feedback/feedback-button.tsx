@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { MessageSquarePlus, X, Send, Loader2, CheckCircle } from "lucide-react";
 import posthogLib from "posthog-js";
 import { usePostHog } from "posthog-js/react";
@@ -27,6 +28,7 @@ export function FeedbackButton({
   const [message, setMessage] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [submitted, setSubmitted] = React.useState(false);
+  const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const surveyId =
     process.env.NEXT_PUBLIC_POSTHOG_FEEDBACK_SURVEY_ID ||
@@ -71,11 +73,14 @@ export function FeedbackButton({
     setIsSubmitting(false);
     setSubmitted(true);
 
-    setTimeout(() => {
+    // Auto-close after showing the thank-you message
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = setTimeout(() => {
       setIsOpen(false);
       setSubmitted(false);
       setMessage("");
       setFeedbackType("feature");
+      closeTimerRef.current = null;
     }, 2000);
   };
 
@@ -85,7 +90,21 @@ export function FeedbackButton({
     { value: "general", label: "General" },
   ];
 
+  const handleClose = React.useCallback(() => {
+    if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
+    setIsOpen(false);
+    setMessage("");
+    setFeedbackType("feature");
+    setSubmitted(false);
+  }, []);
+
   const handleOpen = () => {
+    // Cancel any pending auto-close from a previous submission
+    if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
+    // Reset form state on every open so stale data never shows
+    setMessage("");
+    setFeedbackType("feature");
+    setSubmitted(false);
     setIsOpen(true);
     const ph = posthog ?? posthogLib;
     if (ph && typeof ph.capture === "function") {
@@ -143,7 +162,7 @@ export function FeedbackButton({
         {/* Modal */}
         {isOpen && <FeedbackModal
           isOpen={isOpen}
-          onClose={() => setIsOpen(false)}
+          onClose={handleClose}
           submitted={submitted}
           feedbackTypes={feedbackTypes}
           feedbackType={feedbackType}
@@ -176,7 +195,7 @@ export function FeedbackButton({
         {/* Modal */}
         {isOpen && <FeedbackModal
           isOpen={isOpen}
-          onClose={() => setIsOpen(false)}
+          onClose={handleClose}
           submitted={submitted}
           feedbackTypes={feedbackTypes}
           feedbackType={feedbackType}
@@ -205,7 +224,7 @@ export function FeedbackButton({
       {/* Modal */}
       {isOpen && <FeedbackModal
         isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
+        onClose={handleClose}
         submitted={submitted}
         feedbackTypes={feedbackTypes}
         feedbackType={feedbackType}
@@ -247,7 +266,7 @@ function FeedbackModal({
 }: FeedbackModalProps) {
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
         className="absolute inset-0 bg-black/50"
@@ -321,6 +340,7 @@ function FeedbackModal({
             </div>
 
             <Button
+              variant="skeuo"
               type="submit"
               disabled={!message.trim() || isSubmitting}
               className="w-full"
@@ -340,6 +360,7 @@ function FeedbackModal({
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

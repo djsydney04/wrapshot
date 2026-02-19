@@ -260,7 +260,7 @@ export function CrewSection({ projectId, crew }: CrewSectionProps) {
             <BookUser className="h-4 w-4" />
             Crew Directory
           </Button>
-          <Button size="sm" onClick={() => setShowAddCrew(true)}>
+          <Button size="sm" variant="skeuo" onClick={() => setShowAddCrew(true)}>
             <Plus className="h-4 w-4" />
             Add Crew Member
           </Button>
@@ -340,7 +340,7 @@ export function CrewSection({ projectId, crew }: CrewSectionProps) {
                 : "Add crew members to your project"}
             </p>
             {!searchQuery && (
-              <Button onClick={() => setShowAddCrew(true)}>
+              <Button variant="skeuo" onClick={() => setShowAddCrew(true)}>
                 <Plus className="h-4 w-4" />
                 Add First Crew Member
               </Button>

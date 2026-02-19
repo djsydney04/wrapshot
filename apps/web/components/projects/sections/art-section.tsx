@@ -846,7 +846,7 @@ export function ArtSection({ projectId, scenes, shootingDays, crew }: ArtSection
                   })),
                 ]}
               />
-              <Button onClick={handleGeneratePullList} disabled={generating}>
+              <Button variant="skeuo" onClick={handleGeneratePullList} disabled={generating}>
                 {generating ? (
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                 ) : (
@@ -999,7 +999,7 @@ export function ArtSection({ projectId, scenes, shootingDays, crew }: ArtSection
                           })),
                         ]}
                       />
-                      <Button onClick={handleCreatePullItem} disabled={creatingPullItem}>
+                      <Button variant="skeuo" onClick={handleCreatePullItem} disabled={creatingPullItem}>
                         {creatingPullItem ? (
                           <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                         ) : null}
@@ -1065,7 +1065,7 @@ export function ArtSection({ projectId, scenes, shootingDays, crew }: ArtSection
                   })),
                 ]}
               />
-              <Button onClick={handleCreateContinuity} disabled={creatingContinuity}>
+              <Button variant="skeuo" onClick={handleCreateContinuity} disabled={creatingContinuity}>
                 {creatingContinuity ? (
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                 ) : null}
@@ -1223,7 +1223,7 @@ export function ArtSection({ projectId, scenes, shootingDays, crew }: ArtSection
                         onChange={(event) => setContinuityPhotoLookType(event.target.value)}
                         placeholder="Look type (optional)"
                       />
-                      <Button onClick={handleAddContinuityPhoto} disabled={addingContinuityPhoto}>
+                      <Button variant="skeuo" onClick={handleAddContinuityPhoto} disabled={addingContinuityPhoto}>
                         {addingContinuityPhoto ? (
                           <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                         ) : null}
@@ -1290,7 +1290,7 @@ export function ArtSection({ projectId, scenes, shootingDays, crew }: ArtSection
                         onChange={(event) => setAttachmentName(event.target.value)}
                         placeholder="File name (optional)"
                       />
-                      <Button onClick={handleCreateContinuityAttachment}>Attach</Button>
+                      <Button variant="skeuo" onClick={handleCreateContinuityAttachment}>Attach</Button>
                     </div>
                     <div className="mt-2 space-y-1">
                       {loadingCollab ? (
@@ -1412,7 +1412,7 @@ export function ArtSection({ projectId, scenes, shootingDays, crew }: ArtSection
                 onChange={(event) => setNewWorkOrderSummary(event.target.value)}
                 placeholder="Summary"
               />
-              <Button onClick={handleCreateWorkOrder} disabled={creatingWorkOrder}>
+              <Button variant="skeuo" onClick={handleCreateWorkOrder} disabled={creatingWorkOrder}>
                 {creatingWorkOrder ? (
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                 ) : null}
@@ -1544,7 +1544,7 @@ export function ArtSection({ projectId, scenes, shootingDays, crew }: ArtSection
                         onChange={(event) => setAssignHours(event.target.value)}
                         placeholder="Hours"
                       />
-                      <Button onClick={handleAssignCrew} disabled={assigningCrew}>
+                      <Button variant="skeuo" onClick={handleAssignCrew} disabled={assigningCrew}>
                         {assigningCrew ? (
                           <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                         ) : null}
