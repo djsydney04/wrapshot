@@ -38,7 +38,7 @@ export default function LoginPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">
+        <h1 className="text-2xl font-semibold tracking-tight">
           Welcome back
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -96,6 +96,7 @@ export default function LoginPage() {
         )}
 
         <Button
+          variant="skeuo"
           type="submit"
           disabled={loading}
           className="w-full"
