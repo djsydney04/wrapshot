@@ -58,16 +58,16 @@ export default function AssistantPage() {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <header className="flex h-14 items-center justify-between border-b border-border/85 px-4">
-        <div className="flex items-center gap-3">
+      <header className="flex min-h-14 flex-wrap items-center justify-between gap-2 border-b border-border/85 px-3 py-2 sm:px-4 sm:py-0">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Link
             href="/"
-            className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
+            className="flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground sm:gap-2"
           >
             <ChevronLeft className="h-4 w-4" />
-            <span className="text-sm font-medium">Dashboard</span>
+            <span className="hidden text-sm font-medium sm:inline">Dashboard</span>
           </Link>
-          <span className="text-muted-foreground/60">/</span>
+          <span className="hidden text-muted-foreground/60 sm:inline">/</span>
           <span className="flex items-center gap-2 text-sm font-semibold">
             <Bot className="h-4 w-4" />
             Assistant
@@ -76,7 +76,7 @@ export default function AssistantPage() {
       </header>
 
       <div className="flex-1 overflow-auto">
-        <div className="mx-auto w-full max-w-[1320px] space-y-4 p-4 md:p-6">
+        <div className="mx-auto w-full max-w-[1320px] space-y-4 p-4 sm:p-5 md:p-6">
           <div className="skeuo-panel rounded-xl px-4 py-3">
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>

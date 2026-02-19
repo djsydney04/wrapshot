@@ -64,17 +64,19 @@ export default function ProjectsDashboard() {
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Header */}
-      <header className="flex h-12 items-center justify-between border-b border-border px-6">
+      <header className="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2 sm:h-12 sm:px-6 sm:py-0">
         <div className="flex items-center gap-3">
           <span className="text-lg font-semibold tracking-tight">wrapshoot</span>
         </div>
 
-        <div className="flex items-center gap-3">
-          <FeedbackButton variant="header" source="top_bar" />
+        <div className="ml-auto flex items-center gap-2 sm:gap-3">
+          <div className="hidden sm:block">
+            <FeedbackButton variant="header" source="top_bar" />
+          </div>
           <Button size="sm" variant="skeuo" asChild>
             <Link href="/projects/new">
               <Plus className="h-4 w-4" />
-              New Project
+              <span className="hidden sm:inline">New Project</span>
             </Link>
           </Button>
 
@@ -121,7 +123,7 @@ export default function ProjectsDashboard() {
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-5xl px-6 py-8">
+        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
           {/* Page Header */}
           <div className="mb-8">
             <h1 className="text-xl font-semibold text-foreground">Projects</h1>

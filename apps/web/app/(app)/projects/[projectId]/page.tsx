@@ -904,21 +904,23 @@ export default function ProjectDetailPage() {
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Header */}
-      <header className="flex h-14 items-center justify-between border-b border-border/85 bg-background/75 px-4 backdrop-blur-xl">
-        <div className="flex items-center gap-3">
+      <header className="flex min-h-14 flex-wrap items-center justify-between gap-2 border-b border-border/85 bg-background/75 px-3 py-2 backdrop-blur-xl sm:px-4 sm:py-0">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Link
             href="/"
-            className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
+            className="flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground sm:gap-2"
           >
             <ChevronLeft className="h-4 w-4" />
-            <span className="text-sm font-medium">Projects</span>
+            <span className="hidden text-sm font-medium sm:inline">Projects</span>
           </Link>
-          <span className="text-muted-foreground/60">/</span>
-          <span className="text-sm font-semibold">{project.name}</span>
+          <span className="hidden text-muted-foreground/60 sm:inline">/</span>
+          <span className="truncate text-sm font-semibold">{project.name}</span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <FeedbackButton variant="header" source="top_bar" />
+        <div className="ml-auto flex items-center gap-2">
+          <div className="hidden sm:block">
+            <FeedbackButton variant="header" source="top_bar" />
+          </div>
 
           {/* User Menu */}
           <DropdownMenu>

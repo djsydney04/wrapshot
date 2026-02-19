@@ -115,7 +115,7 @@ function TeamPageContent() {
             return (
               <div
                 key={member.id}
-                className="flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors"
+                className="flex flex-wrap items-center gap-3 p-4 transition-colors hover:bg-muted/30"
               >
                 <div className="relative">
                   <Avatar alt={member.name} size="sm" />
@@ -124,7 +124,7 @@ function TeamPageContent() {
                   )}
                 </div>
 
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 flex-1 basis-[220px]">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-sm">{member.name}</p>
                     {member.status === "pending" && (
@@ -139,7 +139,7 @@ function TeamPageContent() {
                 </div>
 
                 <div className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
+                  "flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
                   role.bg, role.color
                 )}>
                   <RoleIcon className="h-3 w-3" />
@@ -147,7 +147,7 @@ function TeamPageContent() {
                 </div>
 
                 {member.role !== "OWNER" && (
-                  <Button variant="ghost" size="icon-sm" className="text-muted-foreground">
+                  <Button variant="ghost" size="icon-sm" className="ml-auto text-muted-foreground">
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 )}
@@ -281,7 +281,7 @@ export default function TeamSettingsPage() {
       description="Manage your account team members"
       breadcrumbs={[{ label: "Projects", href: "/" }, { label: "Settings", href: "/settings" }, { label: "Team" }]}
       actions={
-        <Button className="gap-2" size="sm">
+        <Button className="w-full gap-2 sm:w-auto" size="sm">
           <Plus className="h-4 w-4" />
           Invite Member
         </Button>

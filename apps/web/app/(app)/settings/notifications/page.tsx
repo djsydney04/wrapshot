@@ -100,70 +100,74 @@ export default function NotificationSettingsPage() {
       breadcrumbs={[{ label: "Projects", href: "/" }, { label: "Settings", href: "/settings" }, { label: "Notifications" }]}
     >
       <SettingsCard>
-        {/* Channel Headers */}
-        <div className="p-4 border-b border-border bg-muted/30">
-          <div className="grid grid-cols-[1fr,72px,72px,72px] gap-3 items-center">
-            <span className="text-sm font-medium text-muted-foreground">Notification Type</span>
-            <div className="flex flex-col items-center gap-0.5">
-              <Mail className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">Email</span>
+        <div className="overflow-x-auto">
+          <div className="min-w-[460px]">
+            {/* Channel Headers */}
+            <div className="border-b border-border bg-muted/30 p-4">
+              <div className="grid grid-cols-[1fr,72px,72px,72px] items-center gap-3">
+                <span className="text-sm font-medium text-muted-foreground">Notification Type</span>
+                <div className="flex flex-col items-center gap-0.5">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">Email</span>
+                </div>
+                <div className="flex flex-col items-center gap-0.5">
+                  <Bell className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">Push</span>
+                </div>
+                <div className="flex flex-col items-center gap-0.5">
+                  <Smartphone className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">SMS</span>
+                </div>
+              </div>
             </div>
-            <div className="flex flex-col items-center gap-0.5">
-              <Bell className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">Push</span>
-            </div>
-            <div className="flex flex-col items-center gap-0.5">
-              <Smartphone className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">SMS</span>
+
+            {/* Settings */}
+            <div className="divide-y divide-border">
+              {settings.map((setting) => {
+                const Icon = setting.icon;
+                return (
+                  <div
+                    key={setting.id}
+                    className="grid grid-cols-[1fr,72px,72px,72px] items-center gap-3 p-4 transition-colors hover:bg-muted/20"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+                        <Icon className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{setting.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {setting.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Toggle switches */}
+                    {(["email", "push", "sms"] as const).map((channel) => (
+                      <div key={channel} className="flex justify-center">
+                        <button
+                          onClick={() => toggleSetting(setting.id, channel)}
+                          className={cn(
+                            "relative h-5 w-9 rounded-full transition-colors duration-200",
+                            setting[channel]
+                              ? "bg-foreground"
+                              : "bg-muted"
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200",
+                              setting[channel] ? "left-[18px]" : "left-0.5"
+                            )}
+                          />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
             </div>
           </div>
-        </div>
-
-        {/* Settings */}
-        <div className="divide-y divide-border">
-          {settings.map((setting) => {
-            const Icon = setting.icon;
-            return (
-              <div
-                key={setting.id}
-                className="grid grid-cols-[1fr,72px,72px,72px] gap-3 items-center p-4 hover:bg-muted/20 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                    <Icon className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">{setting.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {setting.description}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Toggle switches */}
-                {(["email", "push", "sms"] as const).map((channel) => (
-                  <div key={channel} className="flex justify-center">
-                    <button
-                      onClick={() => toggleSetting(setting.id, channel)}
-                      className={cn(
-                        "relative h-5 w-9 rounded-full transition-colors duration-200",
-                        setting[channel]
-                          ? "bg-foreground"
-                          : "bg-muted"
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200",
-                          setting[channel] ? "left-[18px]" : "left-0.5"
-                        )}
-                      />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            );
-          })}
         </div>
 
         <SettingsCardFooter>
