@@ -11,7 +11,6 @@ import { getProjects } from "@/lib/actions/projects";
 import type { Project } from "@/lib/actions/projects.types";
 import {
   Plus,
-  Bot,
   Loader2,
   Settings,
   LogOut,
@@ -72,12 +71,6 @@ export default function ProjectsDashboard() {
 
         <div className="flex items-center gap-3">
           <FeedbackButton variant="header" source="top_bar" />
-          <Button size="sm" variant="skeuo-outline" asChild>
-            <Link href="/assistant">
-              <Bot className="h-4 w-4" />
-              Assistant
-            </Link>
-          </Button>
           <Button size="sm" variant="skeuo" asChild>
             <Link href="/projects/new">
               <Plus className="h-4 w-4" />
@@ -138,10 +131,6 @@ export default function ProjectsDashboard() {
                 : hasProjects
                 ? `${projects.length} project${projects.length !== 1 ? "s" : ""}`
                 : "Create your first project to get started"}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Use <Link href="/assistant" className="text-foreground underline">Assistant</Link> for
-              standalone project-aware planning chat.
             </p>
           </div>
 

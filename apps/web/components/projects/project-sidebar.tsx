@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   LayoutDashboard,
+  Bot,
   FileText,
   Calendar,
   Film,
@@ -24,6 +25,7 @@ import { Button } from "@/components/ui/button";
 
 export type ProjectSection =
   | "dashboard"
+  | "assistant"
   | "script"
   | "schedule"
   | "callsheets"
@@ -112,6 +114,7 @@ export function ProjectSidebar({
         label: "Planning",
         items: [
           { key: "dashboard", id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+          { key: "assistant", id: "assistant", label: "Agent", icon: Bot },
           {
             key: "script",
             id: "script",

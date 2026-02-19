@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { sendOnboardingInviteEmail } from "@/lib/email/invites";
 
 export async function saveOnboardingProfile(data: {
   firstName: string;
@@ -80,10 +81,37 @@ export async function sendOnboardingInvites(emails: string[]) {
     throw new Error("Failed to send invites");
   }
 
-  // TODO: Send actual invite emails via your email service
-  // For now, just store them in the database
+  const { data: profile } = await supabase
+    .from("UserProfile")
+    .select("firstName, lastName, displayName")
+    .eq("userId", user.id)
+    .maybeSingle();
 
-  return { success: true, sent: validEmails.length };
+  const inviterName =
+    profile?.displayName ||
+    `${profile?.firstName || ""} ${profile?.lastName || ""}`.trim() ||
+    user.email?.split("@")[0] ||
+    "A team member";
+
+  const emailResults = await Promise.all(
+    validEmails.map(async (email) => {
+      const result = await sendOnboardingInviteEmail({
+        toEmail: email,
+        inviterName,
+        inviterEmail: user.email ?? null,
+      });
+
+      if (!result.sent && result.error) {
+        console.warn(`Onboarding invite email failed for ${email}:`, result.error);
+      }
+
+      return result;
+    })
+  );
+
+  const sentCount = emailResults.filter((result) => result.sent).length;
+
+  return { success: true, sent: sentCount };
 }
 
 export async function updateOnboardingStep(step: number) {

@@ -43,6 +43,7 @@ import { CameraSection } from "@/components/projects/sections/camera-section";
 import { GeSection } from "@/components/projects/sections/ge-section";
 import { PostSection } from "@/components/projects/sections/post-section";
 import { SettingsSection } from "@/components/projects/sections/settings-section";
+import { AssistantSection } from "@/components/projects/sections/assistant-section";
 import { SetupWizard } from "@/components/projects/setup-wizard";
 import { useProjectStore } from "@/lib/stores/project-store";
 import { useLayoutStore } from "@/lib/stores/layout-store";
@@ -82,6 +83,10 @@ const SECTION_META: Record<ProjectSection, { title: string; description: string 
   dashboard: {
     title: "Project Dashboard",
     description: "Track setup progress, upcoming work, and production health at a glance.",
+  },
+  assistant: {
+    title: "Project Agent",
+    description: "Review project-aware agent output and ask follow-up planning questions.",
   },
   script: {
     title: "Script Intelligence",
@@ -148,6 +153,7 @@ type DataKey = "scenes" | "scripts" | "cast" | "crew" | "locations" | "elements"
 
 const SECTION_DATA_KEYS: Record<ProjectSection, DataKey[]> = {
   dashboard: ["scenes", "scripts", "cast", "crew"],
+  assistant: [],
   script: ["scripts"],
   schedule: ["scenes", "locations", "cast"],
   callsheets: ["scenes", "cast", "crew"],
@@ -175,6 +181,7 @@ const DATA_KEY_LABEL: Record<DataKey, string> = {
 
 const SECTION_ORDER: ProjectSection[] = [
   "dashboard",
+  "assistant",
   "script",
   "scenes",
   "schedule",
@@ -204,7 +211,7 @@ const WORKFLOW_PLAN: { id: string; label: string; section: ProjectSection }[] = 
 
 function normalizeSection(section: string | null): ProjectSection | null {
   if (!section) return null;
-  if (section === "overview" || section === "assistant") return "dashboard";
+  if (section === "overview") return "dashboard";
   if (SECTION_ORDER.includes(section as ProjectSection)) {
     return section as ProjectSection;
   }
@@ -779,6 +786,8 @@ export default function ProjectDetailPage() {
             onNavigate={(section) => handleSectionChange(section as ProjectSection)}
           />
         );
+      case "assistant":
+        return <AssistantSection projectId={projectId} projectName={project.name} />;
       case "script":
         return (
           <ScriptSection
@@ -1024,6 +1033,8 @@ export default function ProjectDetailPage() {
                   >
                     {section === "callsheets"
                       ? "Call Sheets"
+                      : section === "assistant"
+                        ? "Agent"
                       : section === "art"
                         ? "Art"
                       : section === "camera"

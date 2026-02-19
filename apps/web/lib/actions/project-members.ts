@@ -5,6 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { requireProjectPermission, getCurrentUserId, checkPlanLimit } from "@/lib/permissions/server";
 import type { ProjectRole } from "@/lib/permissions";
+import { sendProjectInviteEmail } from "@/lib/email/invites";
+import { getAppBaseUrl } from "@/lib/email/resend";
 import { checkUserExistsByEmail } from "./users";
 
 // Get project members
@@ -212,8 +214,41 @@ export async function createProjectInvite(
     throw new Error("Failed to create invite");
   }
 
-  // TODO: Send email notification
-  // await sendProjectInviteEmail(email, projectId, data.token);
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const [{ data: project }, { data: inviterProfile }, { data: authData }] = await Promise.all([
+    supabase
+      .from("Project")
+      .select("name")
+      .eq("id", projectId)
+      .maybeSingle(),
+    supabase
+      .from("UserProfile")
+      .select("firstName, lastName, displayName")
+      .eq("userId", userId)
+      .maybeSingle(),
+    supabase.auth.getUser(),
+  ]);
+
+  const inviterEmail = authData.user?.email || null;
+  const inviterName =
+    inviterProfile?.displayName ||
+    `${inviterProfile?.firstName || ""} ${inviterProfile?.lastName || ""}`.trim() ||
+    inviterEmail?.split("@")[0] ||
+    "A team member";
+
+  const emailResult = await sendProjectInviteEmail({
+    toEmail: normalizedEmail,
+    projectName: project?.name || "a project",
+    role,
+    inviterName,
+    inviterEmail,
+    inviteToken: data.token,
+  });
+
+  if (!emailResult.sent && emailResult.error) {
+    console.warn("Project invite created, but email delivery failed:", emailResult.error);
+  }
 
   revalidatePath(`/projects/${projectId}/team`);
   return data;
@@ -243,8 +278,39 @@ export async function resendProjectInvite(projectId: string, inviteId: string) {
     throw new Error("Failed to resend invite");
   }
 
-  // TODO: Send email notification
-  // await sendProjectInviteEmail(data.email, projectId, data.token);
+  const [{ data: project }, { data: inviterProfile }, { data: authData }] = await Promise.all([
+    supabase
+      .from("Project")
+      .select("name")
+      .eq("id", projectId)
+      .maybeSingle(),
+    supabase
+      .from("UserProfile")
+      .select("firstName, lastName, displayName")
+      .eq("userId", data.createdBy)
+      .maybeSingle(),
+    supabase.auth.getUser(),
+  ]);
+
+  const inviterEmail = authData.user?.email || null;
+  const inviterName =
+    inviterProfile?.displayName ||
+    `${inviterProfile?.firstName || ""} ${inviterProfile?.lastName || ""}`.trim() ||
+    inviterEmail?.split("@")[0] ||
+    "A team member";
+
+  const emailResult = await sendProjectInviteEmail({
+    toEmail: data.email,
+    projectName: project?.name || "a project",
+    role: data.role,
+    inviterName,
+    inviterEmail,
+    inviteToken: data.token,
+  });
+
+  if (!emailResult.sent && emailResult.error) {
+    console.warn("Project invite resent, but email delivery failed:", emailResult.error);
+  }
 
   return data;
 }
@@ -477,12 +543,36 @@ export async function inviteUserToProject(
 
   // Get inviter's email
   const { data: { user: inviter } } = await supabase.auth.getUser();
-  const inviterEmail = inviter?.email || "A team member";
+  const inviterEmail = inviter?.email ?? null;
+  const inviterEmailForMetadata = inviter?.email || "A team member";
+  const { data: inviterProfile } = await supabase
+    .from("UserProfile")
+    .select("firstName, lastName, displayName")
+    .eq("userId", inviterId)
+    .maybeSingle();
+  const inviterName =
+    inviterProfile?.displayName ||
+    `${inviterProfile?.firstName || ""} ${inviterProfile?.lastName || ""}`.trim() ||
+    inviter?.email?.split("@")[0] ||
+    "A team member";
 
   if (userCheck.exists) {
     // User exists on platform - they just need to accept the invite
-    // TODO: Send notification email to existing user
-    // await sendExistingUserInviteEmail(normalizedEmail, projectName, invite.token);
+    const emailResult = await sendProjectInviteEmail({
+      toEmail: normalizedEmail,
+      projectName,
+      role,
+      inviterName,
+      inviterEmail,
+      inviteToken: invite.token,
+    });
+
+    if (!emailResult.sent && emailResult.error) {
+      console.warn(
+        "Invite created for existing user, but email delivery failed:",
+        emailResult.error
+      );
+    }
 
     revalidatePath(`/projects/${projectId}/team`);
     return {
@@ -494,8 +584,7 @@ export async function inviteUserToProject(
     // User doesn't exist - send Supabase registration invite
     const adminClient = createAdminClient();
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-    const redirectTo = `${siteUrl}/invites/${invite.token}`;
+    const redirectTo = `${getAppBaseUrl()}/invites/${invite.token}`;
 
     const { error: authError } = await adminClient.auth.admin.inviteUserByEmail(
       normalizedEmail,
@@ -505,7 +594,7 @@ export async function inviteUserToProject(
           invite_token: invite.token,
           project_id: projectId,
           project_name: projectName,
-          inviter_email: inviterEmail,
+          inviter_email: inviterEmailForMetadata,
           role: role,
         },
       }
