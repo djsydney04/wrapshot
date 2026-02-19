@@ -29,9 +29,9 @@ export default async function OnboardingLayout({
 
   // Full-page layout without app shell
   return (
-    <div className="min-h-screen bg-background relative">
+    <div className="relative min-h-dvh bg-background">
       {/* Branding */}
-      <div className="absolute top-6 right-6 z-10">
+      <div className="absolute right-4 top-4 z-10 sm:right-6 sm:top-6">
         <span className="font-semibold text-lg tracking-tight">wrapshoot</span>
       </div>
       {children}

@@ -45,51 +45,53 @@ export function SettingsLayout({
       <Header breadcrumbs={breadcrumbs} />
 
       <div className="flex-1 overflow-auto relative">
-        <div className="mx-auto max-w-5xl px-6 py-8">
-          <div className="flex gap-12">
+        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:gap-12">
             {/* Sidebar Nav */}
-            <nav className="w-56 shrink-0">
-              <div className="sticky top-6 space-y-1">
-                {settingsNav.map((item) => {
-                  const isActive = pathname === item.href;
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200",
-                        isActive
-                          ? "bg-muted"
-                          : "hover:bg-muted/50"
-                      )}
-                    >
-                      <div className={cn(
-                        "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
-                        isActive
-                          ? "bg-foreground text-background"
-                          : "text-muted-foreground group-hover:text-foreground"
-                      )}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={cn(
-                          "text-sm font-medium",
-                          isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+            <nav className="w-full lg:w-56 lg:shrink-0">
+              <div className="space-y-3 lg:sticky lg:top-6 lg:space-y-1">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1 lg:gap-1">
+                  {settingsNav.map((item) => {
+                    const isActive = pathname === item.href;
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          "group flex items-center gap-2 rounded-lg border px-3 py-2.5 transition-all duration-200 lg:border-transparent",
+                          isActive
+                            ? "border-border bg-muted"
+                            : "border-border/70 hover:bg-muted/50"
+                        )}
+                      >
+                        <div className={cn(
+                          "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
+                          isActive
+                            ? "bg-foreground text-background"
+                            : "text-muted-foreground group-hover:text-foreground"
                         )}>
-                          {item.label}
-                        </p>
-                      </div>
-                      <ChevronRight className={cn(
-                        "h-4 w-4 text-muted-foreground/40 transition-transform",
-                        isActive && "text-foreground"
-                      )} />
-                    </Link>
-                  );
-                })}
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className={cn(
+                            "truncate text-sm font-medium",
+                            isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                          )}>
+                            {item.label}
+                          </p>
+                        </div>
+                        <ChevronRight className={cn(
+                          "hidden h-4 w-4 text-muted-foreground/40 transition-transform lg:block",
+                          isActive && "text-foreground"
+                        )} />
+                      </Link>
+                    );
+                  })}
+                </div>
 
-                <div className="mt-3 border-t border-border pt-3">
-                  <FeedbackButton variant="default" source="settings_sidebar" />
+                <div className="border-t border-border pt-3">
+                  <FeedbackButton source="settings_sidebar" />
                 </div>
               </div>
             </nav>
@@ -97,7 +99,7 @@ export function SettingsLayout({
             {/* Content */}
             <div className="flex-1 min-w-0 space-y-6">
               {/* Header */}
-              <div className="flex items-start justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
                   <p className="text-muted-foreground mt-1">{description}</p>
@@ -138,7 +140,7 @@ interface SettingsCardHeaderProps {
 
 export function SettingsCardHeader({ title, description, icon: Icon, action }: SettingsCardHeaderProps) {
   return (
-    <div className="flex items-center justify-between p-5 border-b border-border">
+    <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
         {Icon && (
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
@@ -179,7 +181,12 @@ interface SettingsCardFooterProps {
 
 export function SettingsCardFooter({ children, className }: SettingsCardFooterProps) {
   return (
-    <div className={cn("flex items-center justify-end gap-3 p-5 bg-muted/30 border-t border-border", className)}>
+    <div
+      className={cn(
+        "flex flex-col-reverse items-stretch gap-2 border-t border-border bg-muted/30 p-5 sm:flex-row sm:items-center sm:justify-end sm:gap-3",
+        className
+      )}
+    >
       {children}
     </div>
   );
@@ -195,7 +202,7 @@ interface DangerZoneProps {
 export function DangerZone({ title, description, action }: DangerZoneProps) {
   return (
     <div className="rounded-lg border border-destructive/20 bg-destructive/5 overflow-hidden">
-      <div className="flex items-center justify-between p-5">
+      <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="font-medium text-destructive">{title}</p>
           <p className="text-sm text-muted-foreground">{description}</p>

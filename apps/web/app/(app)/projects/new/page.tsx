@@ -164,7 +164,7 @@ export default function NewProjectPage() {
   return (
     <div className="flex h-full flex-col bg-background" onKeyDown={handleKeyDown}>
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-6 py-4">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
         <Link
           href="/projects"
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -186,12 +186,12 @@ export default function NewProjectPage() {
           ))}
         </div>
 
-        <div className="w-[120px]" /> {/* Spacer for balance */}
+        <div className="hidden w-[120px] sm:block" aria-hidden /> {/* Spacer for balance */}
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-xl px-6 py-8">
+        <div className="mx-auto max-w-xl px-4 py-6 sm:px-6 sm:py-8">
           {/* Step 1: Project Basics */}
           {step === 1 && (
             <div className="space-y-6">
@@ -260,7 +260,7 @@ export default function NewProjectPage() {
                 {/* Status */}
                 <div className="space-y-2">
                   <Label>Status</Label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
                     {statusOptions.slice(0, 4).map((option) => (
                       <button
                         key={option.value}
@@ -281,7 +281,7 @@ export default function NewProjectPage() {
                 </div>
 
                 {/* Dates */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="startDate">Start date</Label>
                     <Input
@@ -303,7 +303,7 @@ export default function NewProjectPage() {
                 </div>
 
                 {/* Key Personnel */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="director">Director</Label>
                     <Input
@@ -350,7 +350,7 @@ export default function NewProjectPage() {
 
               <div className="space-y-4">
                 {/* Add invite form */}
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Input
                     type="email"
                     placeholder="Email address"
@@ -367,7 +367,7 @@ export default function NewProjectPage() {
                   <select
                     value={inviteRole}
                     onChange={(e) => setInviteRole(e.target.value as ProjectRole)}
-                    className="h-9 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring sm:w-[170px]"
                   >
                     {(["COORDINATOR", "DEPARTMENT_HEAD", "CREW", "CAST", "VIEWER"] as ProjectRole[]).map((role) => (
                       <option key={role} value={role}>
@@ -381,6 +381,7 @@ export default function NewProjectPage() {
                     size="icon"
                     onClick={handleAddInvite}
                     disabled={!inviteEmail.trim() || !inviteEmail.includes("@")}
+                    className="w-full sm:w-9"
                   >
                     <UserPlus className="h-4 w-4" />
                   </Button>
@@ -390,13 +391,13 @@ export default function NewProjectPage() {
                 {crewInvites.length > 0 && (
                   <div className="rounded-md border border-border divide-y divide-border">
                     {crewInvites.map((invite) => (
-                      <div key={invite.email} className="flex items-center justify-between px-3 py-2">
-                        <div className="flex items-center gap-3">
+                      <div key={invite.email} className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 items-center gap-3">
                           <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium uppercase">
                             {invite.email.charAt(0)}
                           </div>
-                          <div>
-                            <p className="text-sm">{invite.email}</p>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm">{invite.email}</p>
                             <p className="text-xs text-muted-foreground">
                               {PROJECT_ROLE_LABELS[invite.role]}
                             </p>
@@ -436,22 +437,22 @@ export default function NewProjectPage() {
 
               {/* Summary */}
               <div className="rounded-lg border border-border p-4 space-y-3">
-                <div className="flex justify-between">
+                <div className="flex items-start justify-between gap-4">
                   <span className="text-sm text-muted-foreground">Project name</span>
                   <span className="text-sm font-medium">{name}</span>
                 </div>
                 {description && (
-                  <div className="flex justify-between">
+                  <div className="flex items-start justify-between gap-4">
                     <span className="text-sm text-muted-foreground">Description</span>
-                    <span className="text-sm font-medium truncate max-w-[200px]">{description}</span>
+                    <span className="max-w-[220px] truncate text-right text-sm font-medium">{description}</span>
                   </div>
                 )}
-                <div className="flex justify-between">
+                <div className="flex items-start justify-between gap-4">
                   <span className="text-sm text-muted-foreground">Status</span>
                   <span className="text-sm font-medium">{statusOptions.find(s => s.value === status)?.label}</span>
                 </div>
                 {crewInvites.length > 0 && (
-                  <div className="flex justify-between">
+                  <div className="flex items-start justify-between gap-4">
                     <span className="text-sm text-muted-foreground">Team invites</span>
                     <span className="text-sm font-medium">{crewInvites.length} pending</span>
                   </div>
@@ -512,9 +513,9 @@ export default function NewProjectPage() {
 
       {/* Footer Navigation */}
       {step < 4 && (
-        <div className="border-t border-border px-6 py-4">
-          <div className="mx-auto max-w-xl flex items-center justify-between">
-            <div>
+        <div className="border-t border-border px-4 py-4 sm:px-6">
+          <div className="mx-auto flex max-w-xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="order-2 sm:order-1">
               {step > 1 && (
                 <Button variant="ghost" onClick={handleBack}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
@@ -523,13 +524,13 @@ export default function NewProjectPage() {
               )}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="order-1 flex w-full items-center gap-2 sm:order-2 sm:w-auto sm:gap-3">
               {(step === 2 || step === 3) && (
-                <Button variant="ghost" onClick={handleNext}>
+                <Button variant="ghost" onClick={handleNext} className="flex-1 sm:flex-none">
                   Skip
                 </Button>
               )}
-              <Button variant="skeuo" onClick={handleNext} disabled={!canProceed}>
+              <Button variant="skeuo" onClick={handleNext} disabled={!canProceed} className="flex-1 sm:flex-none">
                 Continue
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>

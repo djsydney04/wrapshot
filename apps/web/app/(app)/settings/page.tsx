@@ -29,7 +29,7 @@ export default function SettingsPage() {
       {/* Avatar Section */}
       <SettingsCard>
         <SettingsCardBody>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
             <div className="relative group">
               <div className="h-20 w-20 rounded-xl bg-muted flex items-center justify-center overflow-hidden">
                 <Avatar size="lg" alt="User" className="h-16 w-16" />
@@ -43,7 +43,7 @@ export default function SettingsPage() {
               <p className="text-sm text-muted-foreground">
                 JPG, PNG or GIF. Max 5MB.
               </p>
-              <div className="flex gap-2 mt-3">
+              <div className="mt-3 flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                 <Button variant="outline" size="sm">Upload</Button>
                 <Button variant="ghost" size="sm" className="text-muted-foreground">Remove</Button>
               </div>

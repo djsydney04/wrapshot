@@ -194,8 +194,8 @@ function BillingContent() {
       {/* Current Plan */}
       <SettingsCard>
         <SettingsCardBody>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-4">
               <div className={cn(
                 "flex h-10 w-10 items-center justify-center rounded-lg",
                 currentPlan === "STUDIO" ? "bg-[hsl(var(--badge-amber))]" : currentPlan === "PRO" ? "bg-[hsl(var(--badge-blue))]" : "bg-muted"
@@ -209,7 +209,7 @@ function BillingContent() {
                 )}
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <h3 className="font-medium">
                     {currentTier?.name ?? "Free"} Plan
                   </h3>
@@ -236,6 +236,7 @@ function BillingContent() {
                 variant="outline"
                 onClick={handleManageSubscription}
                 disabled={loadingPortal}
+                className="w-full sm:w-auto"
               >
                 {loadingPortal && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Manage Subscription
@@ -335,7 +336,7 @@ function BillingContent() {
             description="Manage your payment details in the billing portal"
           />
           <SettingsCardBody>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div className="flex flex-col gap-3 rounded-lg bg-muted/50 p-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-md bg-card border border-border">
                   <CreditCard className="h-4 w-4 text-muted-foreground" />
@@ -352,6 +353,7 @@ function BillingContent() {
                 size="sm"
                 onClick={handleManageSubscription}
                 disabled={loadingPortal}
+                className="w-full sm:w-auto"
               >
                 {loadingPortal ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update"}
               </Button>
@@ -370,7 +372,7 @@ function BillingContent() {
           <SettingsCardBody>
             {/* Invoice Count Display */}
             {subscription.invoiceCount > 0 && (
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 mb-4">
+              <div className="mb-4 flex flex-col gap-3 rounded-lg bg-muted/50 p-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-md bg-card border border-border">
                     <Receipt className="h-4 w-4 text-muted-foreground" />

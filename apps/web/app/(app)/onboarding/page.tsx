@@ -140,7 +140,7 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-dvh bg-background">
       {/* Progress bar */}
       <div className="fixed top-0 left-0 right-0 h-1 bg-muted">
         <div
@@ -149,9 +149,9 @@ export default function OnboardingPage() {
         />
       </div>
 
-      <div className="mx-auto max-w-lg px-6 pt-16 pb-12">
+      <div className="mx-auto max-w-lg px-4 pb-12 pt-16 sm:px-6">
         {/* Branding */}
-        <div className="flex justify-center mb-12">
+        <div className="mb-10 flex justify-center sm:mb-12">
           <span className="text-xl font-semibold tracking-tight">wrapshoot</span>
         </div>
         {/* Step 1: Profile */}
@@ -180,7 +180,7 @@ export default function OnboardingPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">First name</Label>
                   <Input
@@ -244,7 +244,7 @@ export default function OnboardingPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               {PRODUCTION_TYPES.map((type) => (
                 <button
                   key={type.id}
@@ -323,18 +323,18 @@ export default function OnboardingPage() {
               )}
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <Button
                 variant="outline"
                 onClick={handleNext}
-                className="flex-1"
+                className="w-full sm:flex-1"
               >
                 Skip for now
               </Button>
               <Button
                 onClick={handleNext}
                 disabled={!emails.some((e) => e.trim() && e.includes("@"))}
-                className="flex-1"
+                className="w-full sm:flex-1"
               >
                 Send invites
               </Button>
