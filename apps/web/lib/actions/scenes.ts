@@ -50,7 +50,7 @@ export interface Scene {
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
-  // Stripeboard fields
+  // Stripboard fields
   episode?: string | null;
   scenePartNumber?: number | null;
   setName?: string | null;

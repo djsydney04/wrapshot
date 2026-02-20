@@ -471,7 +471,7 @@ export function StripeboardSection({
               </div>
             )}
 
-            {/* Main Stripeboard (Center) */}
+            {/* Main Stripboard (Center) */}
             <div className="flex-1 min-w-0">
               {viewMode === "stripeboard" ? (
                 <div className="space-y-4">
