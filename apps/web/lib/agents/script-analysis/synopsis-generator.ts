@@ -73,7 +73,7 @@ export async function executeSynopsisGenerator(
     };
   }
 
-  const kimi = new KimiClient(apiKey);
+  const kimi = new KimiClient();
   const retry = new RetryHandler();
 
   // Process in batches
