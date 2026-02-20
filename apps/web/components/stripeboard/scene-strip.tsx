@@ -247,7 +247,7 @@ export const SceneStrip = React.forwardRef<HTMLDivElement, SceneStripProps>(
       expanded: "text-sm",
     };
 
-    // Strip layout (for stripeboard scheduling)
+    // Strip layout (for stripboard scheduling)
     return (
       <div
         ref={ref}

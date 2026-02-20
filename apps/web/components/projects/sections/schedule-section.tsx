@@ -67,6 +67,13 @@ export function ScheduleSection({
   stripeboardCast = [],
   useMockData = false,
 }: ScheduleSectionProps) {
+  const viewModeLabel: Record<ViewMode, string> = {
+    week: "Week",
+    month: "Month",
+    list: "List",
+    stripeboard: "Stripboard",
+  };
+
   const [showAddDay, setShowAddDay] = React.useState(false);
   const [selectedDate, setSelectedDate] = React.useState<Date | null>(null);
   const [selectedDay, setSelectedDay] = React.useState<ShootingDay | null>(null);
@@ -738,7 +745,7 @@ export function ScheduleSection({
               <div className="flex items-start justify-between gap-2 pb-3 border-b border-border/70">
                 <div>
                   <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                    {viewMode} view context
+                    {viewModeLabel[viewMode]} view context
                   </p>
                   {featuredDay ? (
                     <p className="text-sm font-medium mt-0.5">
