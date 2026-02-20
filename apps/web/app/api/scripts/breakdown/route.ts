@@ -264,7 +264,7 @@ export async function POST(request: Request) {
     }
 
     // Use Kimi to extract scenes in chunks so large scripts are fully processed.
-    const kimi = new KimiClient(llmApiKey);
+    const kimi = new KimiClient();
     let breakdownResult: BreakdownResult;
 
     try {

@@ -3,7 +3,12 @@
  * Prefers Cerebras GLM 4.7 and falls back to Fireworks Kimi when needed.
  */
 import { getCerebrasClient } from "@/lib/ai/cerebras";
-import { getCerebrasApiKey } from "@/lib/ai/config";
+import {
+  getCerebrasApiKey,
+  getCerebrasModel,
+  getFireworksApiKey,
+  getFireworksModel,
+} from "@/lib/ai/config";
 import { getFireworksClient } from "@/lib/ai/fireworks";
 import { JsonParser } from "@/lib/agents/utils/json-parser";
 import type { OpenAI } from "@posthog/ai";
@@ -35,21 +40,70 @@ interface KimiCompletionOptions {
   posthogProperties?: Record<string, unknown>;
 }
 
+type ScriptAnalysisProvider = "cerebras" | "fireworks";
+
 export class KimiClient {
   private client: OpenAI;
   private model: string;
+  private provider: ScriptAnalysisProvider;
+  private readonly fireworksClient: OpenAI | null;
+  private readonly fireworksModel: string;
 
   constructor(apiKey?: string) {
+    void apiKey;
+
     const cerebrasKey = getCerebrasApiKey();
+    const fireworksKey = getFireworksApiKey();
+    this.fireworksModel = getFireworksModel();
+    this.fireworksClient = fireworksKey ? getFireworksClient(fireworksKey) : null;
+
     if (cerebrasKey) {
       this.client = getCerebrasClient(cerebrasKey);
-      this.model = process.env.CEREBRAS_MODEL || "zai-glm-4.7";
+      this.model = getCerebrasModel();
+      this.provider = "cerebras";
       return;
     }
 
-    this.client = getFireworksClient(apiKey);
-    this.model =
-      process.env.FIREWORKS_MODEL || "accounts/fireworks/models/kimi-k2p5";
+    this.client = this.fireworksClient ?? getFireworksClient();
+    this.model = this.fireworksModel;
+    this.provider = "fireworks";
+  }
+
+  private is404Error(error: unknown): boolean {
+    if (!error || typeof error !== "object") {
+      return false;
+    }
+
+    const errorWithStatus = error as { status?: number; message?: string };
+
+    if (errorWithStatus.status === 404) {
+      return true;
+    }
+
+    const message = String(errorWithStatus.message || "").toLowerCase();
+    return message.includes("404") || message.includes("not found");
+  }
+
+  private canFallbackToFireworks(error: unknown): boolean {
+    return this.provider === "cerebras" && Boolean(this.fireworksClient) && this.is404Error(error);
+  }
+
+  private switchToFireworks(): void {
+    if (!this.fireworksClient) {
+      return;
+    }
+
+    this.client = this.fireworksClient;
+    this.model = this.fireworksModel;
+    this.provider = "fireworks";
+  }
+
+  getActiveProvider(): ScriptAnalysisProvider {
+    return this.provider;
+  }
+
+  getActiveModel(): string {
+    return this.model;
   }
 
   async complete(options: KimiCompletionOptions): Promise<string> {
@@ -63,19 +117,40 @@ export class KimiClient {
       posthogProperties,
     } = options;
 
-    const response = (await this.client.chat.completions.create(
-      {
-        model: this.model,
-        messages,
-        max_tokens: maxTokens,
-        temperature,
-        posthogDistinctId,
-        posthogTraceId,
-        posthogProperties,
-        posthogCaptureImmediate: true,
-      } as Parameters<typeof this.client.chat.completions.create>[0],
-      { timeout },
-    )) as ChatCompletion;
+    const request = {
+      model: this.model,
+      messages,
+      max_tokens: maxTokens,
+      temperature,
+      posthogDistinctId,
+      posthogTraceId,
+      posthogProperties,
+      posthogCaptureImmediate: true,
+    } as Parameters<typeof this.client.chat.completions.create>[0];
+
+    let response: ChatCompletion;
+    try {
+      response = (await this.client.chat.completions.create(request, {
+        timeout,
+      })) as ChatCompletion;
+    } catch (error) {
+      if (!this.canFallbackToFireworks(error)) {
+        throw error;
+      }
+
+      console.warn(
+        `[KimiClient] Cerebras returned 404 for model "${this.model}". Falling back to Fireworks "${this.fireworksModel}".`,
+      );
+      this.switchToFireworks();
+
+      response = (await this.client.chat.completions.create(
+        {
+          ...request,
+          model: this.model,
+        },
+        { timeout },
+      )) as ChatCompletion;
+    }
 
     const content = response.choices?.[0]?.message?.content;
 
@@ -113,20 +188,41 @@ export class KimiClient {
       posthogProperties,
     } = options;
 
-    const response = (await this.client.chat.completions.create(
-      {
-        model: this.model,
-        messages: messages as any,
-        max_tokens: maxTokens,
-        temperature,
-        ...(tools && tools.length > 0 ? { tools, tool_choice } : {}),
-        posthogDistinctId,
-        posthogTraceId,
-        posthogProperties,
-        posthogCaptureImmediate: true,
-      } as Parameters<typeof this.client.chat.completions.create>[0],
-      { timeout },
-    )) as ChatCompletion;
+    const request = {
+      model: this.model,
+      messages: messages as any,
+      max_tokens: maxTokens,
+      temperature,
+      ...(tools && tools.length > 0 ? { tools, tool_choice } : {}),
+      posthogDistinctId,
+      posthogTraceId,
+      posthogProperties,
+      posthogCaptureImmediate: true,
+    } as Parameters<typeof this.client.chat.completions.create>[0];
+
+    let response: ChatCompletion;
+    try {
+      response = (await this.client.chat.completions.create(request, {
+        timeout,
+      })) as ChatCompletion;
+    } catch (error) {
+      if (!this.canFallbackToFireworks(error)) {
+        throw error;
+      }
+
+      console.warn(
+        `[KimiClient] Cerebras returned 404 for model "${this.model}". Falling back to Fireworks "${this.fireworksModel}".`,
+      );
+      this.switchToFireworks();
+
+      response = (await this.client.chat.completions.create(
+        {
+          ...request,
+          model: this.model,
+        },
+        { timeout },
+      )) as ChatCompletion;
+    }
 
     return response;
   }
@@ -147,20 +243,41 @@ export class KimiClient {
       posthogProperties,
     } = options;
 
-    const stream = (await this.client.chat.completions.create(
-      {
-        model: this.model,
-        messages,
-        max_tokens: maxTokens,
-        temperature,
-        stream: true,
-        posthogDistinctId,
-        posthogTraceId,
-        posthogProperties,
-        posthogCaptureImmediate: true,
-      } as Parameters<typeof this.client.chat.completions.create>[0],
-      { timeout },
-    )) as Stream<ChatCompletionChunk>;
+    const request = {
+      model: this.model,
+      messages,
+      max_tokens: maxTokens,
+      temperature,
+      stream: true,
+      posthogDistinctId,
+      posthogTraceId,
+      posthogProperties,
+      posthogCaptureImmediate: true,
+    } as Parameters<typeof this.client.chat.completions.create>[0];
+
+    let stream: Stream<ChatCompletionChunk>;
+    try {
+      stream = (await this.client.chat.completions.create(request, {
+        timeout,
+      })) as Stream<ChatCompletionChunk>;
+    } catch (error) {
+      if (!this.canFallbackToFireworks(error)) {
+        throw error;
+      }
+
+      console.warn(
+        `[KimiClient] Cerebras returned 404 for model "${this.model}". Falling back to Fireworks "${this.fireworksModel}".`,
+      );
+      this.switchToFireworks();
+
+      stream = (await this.client.chat.completions.create(
+        {
+          ...request,
+          model: this.model,
+        },
+        { timeout },
+      )) as Stream<ChatCompletionChunk>;
+    }
 
     for await (const chunk of stream) {
       const content = chunk.choices?.[0]?.delta?.content;

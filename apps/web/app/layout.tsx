@@ -82,7 +82,25 @@ export default function RootLayout({
         <PostHogProvider posthogKey={posthogKey} posthogHost={posthogHost}>
           {children}
           <CommandPalette />
-          <Toaster position="bottom-right" richColors />
+          <Toaster
+            position="bottom-right"
+            closeButton
+            theme="system"
+            toastOptions={{
+              classNames: {
+                toast: "app-toast",
+                title: "app-toast-title",
+                description: "app-toast-description",
+                actionButton: "app-toast-action",
+                cancelButton: "app-toast-cancel",
+                success: "app-toast-success",
+                error: "app-toast-error",
+                warning: "app-toast-warning",
+                info: "app-toast-info",
+                loading: "app-toast-loading",
+              },
+            }}
+          />
         </PostHogProvider>
       </body>
     </html>
