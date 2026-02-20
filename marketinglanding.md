@@ -70,7 +70,7 @@ Wrapshot combines traditional film production tools with intelligent automation 
 **Scheduling Views**
 - Stripeboard for drag-and-drop scene assignment to shooting days
 - List/Grid for fast scene editing
-- Kanban by scene status
+- Board by scene status
 - Timeline view for day-by-day ordering
 
 **Production Scheduling**

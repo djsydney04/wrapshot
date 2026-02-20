@@ -58,7 +58,7 @@ without introducing a separate planning system.
   - `ArtPullItem` (listId, sourceElementId, qty, source, dueDayId, status)
 - UI:
   - Auto-generated pull list from tagged art elements.
-  - Prep-day Kanban: `TO_SOURCE -> PULLED -> ON_TRUCK -> ON_SET -> WRAPPED`.
+  - Prep-day board: `TO_SOURCE -> PULLED -> ON_TRUCK -> ON_SET -> WRAPPED`.
 - Integrations:
   - Link items to `GearItem` when reusable.
   - Create/update budget request when sourcing external rentals/purchases.
