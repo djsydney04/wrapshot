@@ -7,20 +7,21 @@
 ## Table of Contents
 
 1. [Getting Started](#getting-started)
-2. [Creating Your First Project](#creating-your-first-project)
-3. [Uploading & Analyzing Your Script](#uploading--analyzing-your-script)
-4. [Managing Scenes](#managing-scenes)
-5. [Building Your Cast](#building-your-cast)
-6. [Organizing Your Crew](#organizing-your-crew)
-7. [Scheduling & Stripeboard](#scheduling--stripeboard)
-8. [Call Sheets & Distribution](#call-sheets--distribution)
-9. [Scene Breakdown](#scene-breakdown)
-10. [Budget & Finance](#budget--finance)
-11. [Locations](#locations)
-12. [Gear & Equipment](#gear--equipment)
-13. [Team Collaboration](#team-collaboration)
-14. [Smart Assistant](#smart-assistant)
-15. [Tips & Best Practices](#tips--best-practices)
+2. [Feature List](#feature-list)
+3. [Creating Your First Project](#creating-your-first-project)
+4. [Uploading & Analyzing Your Script](#uploading--analyzing-your-script)
+5. [Managing Scenes](#managing-scenes)
+6. [Building Your Cast](#building-your-cast)
+7. [Organizing Your Crew](#organizing-your-crew)
+8. [Scheduling & Stripboard](#scheduling--stripboard)
+9. [Call Sheets & Distribution](#call-sheets--distribution)
+10. [Scene Breakdown](#scene-breakdown)
+11. [Budget & Finance](#budget--finance)
+12. [Locations](#locations)
+13. [Gear & Equipment](#gear--equipment)
+14. [Team Collaboration](#team-collaboration)
+15. [Smart Assistant](#smart-assistant)
+16. [Tips & Best Practices](#tips--best-practices)
 
 ---
 
@@ -39,6 +40,27 @@ After logging in, you'll see your **Projects Dashboard** showing:
 - All your projects with their current status
 - Quick-start recommendations
 - Upcoming shooting days
+
+---
+
+## Feature List
+
+Use this as a quick feature checklist before diving into full workflows.
+
+- Project creation and setup wizard
+- AI script upload, parsing, and scene extraction
+- Scene management (grid, kanban, timeline, list)
+- Cast directory and invitations
+- Crew directory, departments, and access controls
+- Schedule planning (month/week/list)
+- Drag-and-drop stripboard scheduling
+- Call sheet drafting, publishing, PDF export, and distribution
+- Scene breakdown management (props, wardrobe, vehicles, effects, and more)
+- Budget tracking and finance workflows
+- Location database, permit status, and location intelligence
+- Gear and equipment tracking by scene/department
+- Project sharing with role-based permissions
+- Project assistant for planning and operational questions
 
 ---
 
@@ -255,11 +277,11 @@ Similar to cast, invite crew members to access the project:
 
 ---
 
-## Scheduling & Stripeboard
+## Scheduling & Stripboard
 
-### Understanding the Stripeboard
+### Understanding the Stripboard
 
-The stripeboard is the traditional film scheduling tool, now digital:
+The stripboard is the traditional film scheduling tool, now digital:
 - Each scene is represented as a colored strip
 - Strips are color-coded by INT/EXT and DAY/NIGHT
 - Drag strips to assign scenes to shooting days
@@ -299,7 +321,7 @@ Within a shooting day, drag scenes to change the shooting order. Scene order is 
 ### Calendar Views
 
 Switch between views:
-- **Stripeboard** - Traditional strip view
+- **Stripboard** - Traditional strip view
 - **Monthly Calendar** - Overview of the entire shoot
 - **Weekly Calendar** - Detailed weekly view
 
