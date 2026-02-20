@@ -6,7 +6,6 @@ import { usePostHog } from "posthog-js/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SimpleTooltip } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 
 interface ShareButtonProps {
   variant?: "sidebar" | "default" | "header";
@@ -115,29 +114,16 @@ export function ShareButton({ variant = "sidebar" }: ShareButtonProps) {
     setTimeout(resetForm, 300);
   };
 
-  // Variant-specific button styles
-  const buttonStyles = {
-    sidebar: "w-full justify-start gap-2 font-normal h-8 text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover",
-    default: "w-full justify-start gap-3 rounded-lg px-3 py-2.5 text-muted-foreground hover:text-foreground hover:bg-muted/50",
-    header: "gap-2 text-muted-foreground hover:text-foreground",
-  };
-
-  const iconContainerStyles = {
-    sidebar: "",
-    default: "flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground group-hover:text-foreground",
-    header: "",
-  };
-
   // Header variant
   if (variant === "header") {
     return (
       <>
         <SimpleTooltip content="Share with friends">
           <Button
-            variant="ghost"
+            variant="skeuo-outline"
             size="sm"
             onClick={handleOpen}
-            className={buttonStyles.header}
+            className="gap-2"
           >
             <Share2 className="h-4 w-4" />
             Share
@@ -173,17 +159,17 @@ export function ShareButton({ variant = "sidebar" }: ShareButtonProps) {
   if (variant === "default") {
     return (
       <>
-        <button
+        <Button
+          variant="skeuo-outline"
+          size="sm"
           onClick={handleOpen}
-          className={cn("group flex items-center transition-all duration-200", buttonStyles.default)}
+          className="w-full justify-start gap-2.5"
         >
-          <div className={iconContainerStyles.default}>
-            <Share2 className="h-4 w-4" />
-          </div>
+          <Share2 className="h-4 w-4" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-left">Share</p>
           </div>
-        </button>
+        </Button>
         {isOpen && <ShareModal
           isOpen={isOpen}
           onClose={handleClose}
@@ -214,9 +200,10 @@ export function ShareButton({ variant = "sidebar" }: ShareButtonProps) {
   return (
     <>
       <Button
-        variant="ghost"
+        variant="skeuo-outline"
+        size="sm"
         onClick={handleOpen}
-        className={buttonStyles.sidebar}
+        className="h-8 w-full justify-start gap-2"
       >
         <Share2 className="h-4 w-4" />
         Share
@@ -302,7 +289,7 @@ function ShareModal({
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-md mx-4 bg-background border border-border rounded-lg shadow-soft-lg">
+      <div className="surface-pop relative mx-4 w-full max-w-md rounded-lg border border-border">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-sm font-medium">Share wrapshoot</h2>
           <Button
@@ -338,7 +325,7 @@ function ShareModal({
                 />
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="skeuo-outline"
                   size="sm"
                   onClick={handleCopyLink}
                   className="shrink-0"
@@ -365,7 +352,7 @@ function ShareModal({
             <div className="flex gap-2">
               <Button
                 type="button"
-                variant="outline"
+                variant="skeuo-outline"
                 onClick={handleTextShare}
                 className="flex-1"
               >
@@ -374,12 +361,9 @@ function ShareModal({
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant={shareMethod === "email" ? "skeuo" : "skeuo-outline"}
                 onClick={() => setShareMethod("email")}
-                className={cn(
-                  "flex-1",
-                  shareMethod === "email" && "ring-2 ring-ring"
-                )}
+                className="flex-1"
               >
                 <Mail className="h-4 w-4 mr-2" />
                 Email

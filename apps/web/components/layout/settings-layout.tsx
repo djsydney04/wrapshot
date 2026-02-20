@@ -91,7 +91,7 @@ export function SettingsLayout({
                 </div>
 
                 <div className="border-t border-border pt-3">
-                  <FeedbackButton source="settings_sidebar" />
+                  <FeedbackButton variant="default" source="settings_sidebar" />
                 </div>
               </div>
             </nav>
