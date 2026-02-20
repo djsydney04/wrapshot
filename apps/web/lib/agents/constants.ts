@@ -3,22 +3,37 @@
  */
 
 import type { AgentJobStatus } from './types';
+import { getCerebrasModel } from '@/lib/ai/config';
+
+function readPositiveIntFromEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 // Chunking configuration
 export const CHUNK_CONFIG = {
-  MAX_CHARS_PER_CHUNK: 14000,
-  MIN_CHARS_PER_CHUNK: 2500,
-  OVERLAP_CHARS: 500, // Overlap for context continuity
-  SCENE_HEADER_PATTERN: /^(INT|EXT|INT\/EXT|I\/E)\.?/im,
+  MAX_CHARS_PER_CHUNK: readPositiveIntFromEnv('SCRIPT_ANALYSIS_MAX_CHARS_PER_CHUNK', 12000),
+  MIN_CHARS_PER_CHUNK: readPositiveIntFromEnv('SCRIPT_ANALYSIS_MIN_CHARS_PER_CHUNK', 2500),
+  OVERLAP_CHARS: readPositiveIntFromEnv('SCRIPT_ANALYSIS_OVERLAP_CHARS', 500),
+  SCENE_HEADER_PATTERN: /^(?:\d+[A-Z]?\s+)?(?:INT|EXT)(?:\s*\.?\s*\/\s*(?:INT|EXT))?\.?/im,
 };
 
 // LLM configuration
 export const LLM_CONFIG = {
-  MODEL: process.env.CEREBRAS_MODEL || 'zai-glm-4.7',
-  MAX_TOKENS_SCENE_EXTRACTION: 8000,
-  MAX_TOKENS_ELEMENT_EXTRACTION: 4000,
-  MAX_TOKENS_SYNOPSIS: 2000,
-  MAX_TOKENS_TIME_ESTIMATE: 2000,
+  MODEL: getCerebrasModel(),
+  MAX_TOKENS_SCENE_EXTRACTION: readPositiveIntFromEnv(
+    'SCRIPT_ANALYSIS_SCENE_MAX_TOKENS',
+    3500
+  ),
+  MAX_TOKENS_ELEMENT_EXTRACTION: readPositiveIntFromEnv(
+    'SCRIPT_ANALYSIS_ELEMENT_MAX_TOKENS',
+    3000
+  ),
+  MAX_TOKENS_SYNOPSIS: readPositiveIntFromEnv('SCRIPT_ANALYSIS_SYNOPSIS_MAX_TOKENS', 1800),
+  MAX_TOKENS_TIME_ESTIMATE: readPositiveIntFromEnv('SCRIPT_ANALYSIS_TIME_MAX_TOKENS', 2000),
   TEMPERATURE_EXTRACTION: 0.1,
   TEMPERATURE_SYNOPSIS: 0.3,
 };

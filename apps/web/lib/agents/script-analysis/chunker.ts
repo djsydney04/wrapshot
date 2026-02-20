@@ -26,8 +26,8 @@ const CHARS_PER_PAGE = 1500;
 
 // Scene header patterns for screenplay format
 const SCENE_HEADER_PATTERNS = [
-  /^(INT|EXT|INT\/EXT|I\/E)\.?\s+/i,
-  /^(\d+[A-Z]?)\s+(INT|EXT|INT\/EXT|I\/E)\.?\s+/i,
+  /^(?:\d+[A-Z]?\s+)?(?:INT|EXT)(?:\s*\.?\s*\/\s*(?:INT|EXT))?\.?\s+/i,
+  /^(?:\d+[A-Z]?\s+)?(?:INT\/EXT|EXT\/INT|I\/E)\.?\s+/i,
   /^SCENE\s+\d+/im,
 ];
 

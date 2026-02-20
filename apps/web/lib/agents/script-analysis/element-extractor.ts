@@ -106,7 +106,7 @@ export async function executeElementExtractor(
     };
   }
 
-  const kimi = new KimiClient(apiKey);
+  const kimi = new KimiClient();
   const retry = new RetryHandler();
 
   // Process scenes in batches to avoid token limits
