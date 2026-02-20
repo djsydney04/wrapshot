@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 
 export default async function AuthLayout({
@@ -19,29 +20,54 @@ export default async function AuthLayout({
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Left Panel - Branding */}
-      <div className="hidden lg:flex flex-col justify-between bg-stone-900 text-white p-10">
-        {/* Logo */}
+      <div className="hidden bg-[#1f2937] p-10 text-white lg:flex lg:flex-col xl:p-14">
         <div className="flex items-center">
-          <span className="font-semibold text-lg">wrapshoot</span>
+          <Image
+            src="/logo.svg"
+            alt="Wrapshoot logo"
+            width={38}
+            height={38}
+            className="h-9 w-9 rounded-md"
+            priority
+          />
         </div>
 
-        {/* Tagline */}
-        <div>
-          <p className="text-2xl font-light leading-relaxed">
-            Production management for modern filmmakers.
-          </p>
-        </div>
+        <div className="mt-16 max-w-lg space-y-5">
+          <div className="space-y-3">
+            <h2 className="text-3xl font-semibold leading-tight tracking-tight xl:text-4xl">
+              Production planning with shared context.
+            </h2>
+            <p className="text-sm leading-relaxed text-blue-100/80">
+              Keep prep and shoot-day decisions connected in one place.
+            </p>
+          </div>
 
-        {/* Footer spacer */}
-        <div />
+          <div className="space-y-1 text-sm text-blue-100/90">
+            <p>Script breakdown, planning, and call sheets stay connected.</p>
+            <p>Your team works from the same source of truth.</p>
+          </div>
+        </div>
       </div>
 
       {/* Right Panel - Form */}
       <div className="flex flex-col justify-center px-4 py-12 sm:px-6 lg:px-20 xl:px-24 bg-background">
         <div className="mx-auto w-full max-w-sm">
           {/* Mobile Logo */}
-          <div className="flex items-center mb-8 lg:hidden">
-            <span className="font-semibold text-lg">wrapshoot</span>
+          <div className="mb-8 lg:hidden">
+            <div className="flex items-center gap-2">
+              <Image
+                src="/logo.svg"
+                alt="Wrapshoot logo"
+                width={32}
+                height={32}
+                className="h-8 w-8 rounded-md"
+                priority
+              />
+              <span className="text-lg font-semibold tracking-tight">wrapshoot</span>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Production planning from script analysis to call sheets.
+            </p>
           </div>
 
           {children}
