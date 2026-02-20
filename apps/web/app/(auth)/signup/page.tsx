@@ -1,19 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useSearchParams } from "next/navigation";
 
 export default function SignUpPage() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
+  const [queryPrefilled, setQueryPrefilled] = useState(false);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const supabase = createClient();
+  const hasMinLength = password.length >= 8;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const canSubmit = email.trim().length > 0 && hasMinLength && hasUppercase && hasNumber;
+
+  useEffect(() => {
+    if (queryPrefilled) return;
+    const prefillEmail = searchParams.get("email");
+    if (prefillEmail) {
+      setEmail(prefillEmail);
+      setQueryPrefilled(true);
+    }
+  }, [searchParams, queryPrefilled]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,11 +132,16 @@ export default function SignUpPage() {
               type="password"
               autoComplete="new-password"
               required
-              minLength={6}
+              minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Min 6 characters"
+              placeholder="At least 8 characters"
             />
+            <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+              <li className={hasMinLength ? "text-emerald-600" : ""}>At least 8 characters</li>
+              <li className={hasUppercase ? "text-emerald-600" : ""}>At least 1 uppercase letter</li>
+              <li className={hasNumber ? "text-emerald-600" : ""}>At least 1 number</li>
+            </ul>
           </div>
         </div>
 
@@ -133,7 +154,7 @@ export default function SignUpPage() {
         <Button
           variant="skeuo"
           type="submit"
-          disabled={loading}
+          disabled={loading || !canSubmit}
           className="w-full"
         >
           {loading ? "Creating account..." : "Create account"}

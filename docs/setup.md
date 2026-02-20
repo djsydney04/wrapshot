@@ -53,6 +53,10 @@ NEXT_PUBLIC_SUPABASE_URL="https://xxxxx.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJxxx..."
 SUPABASE_SERVICE_ROLE_KEY="eyJxxx..."  # Get from API settings
 
+# Email (optional, required for invite emails)
+RESEND_API_KEY="re_xxx..."
+RESEND_FROM_EMAIL="wrapshoot <noreply@yourdomain.com>"
+
 # Database
 DATABASE_URL="postgres://postgres.xxxxx:password@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
 DIRECT_URL="postgresql://postgres:password@db.xxxxx.supabase.co:5432/postgres"
@@ -109,7 +113,7 @@ The app will be available at [http://localhost:3000](http://localhost:3000)
 
 1. Go to http://localhost:3000
 2. Click "Sign up"
-3. Enter email and password (min 6 characters)
+3. Enter email and password (min 8 characters)
 4. Check your email for confirmation link
 5. Click the link to verify
 6. Sign in with your credentials
