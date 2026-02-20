@@ -192,14 +192,14 @@ export default function WelcomePage() {
 
           {/* Auth buttons */}
           <div className="space-y-3">
-            <Button asChild className="w-full h-11" size="lg">
+            <Button asChild variant="skeuo" className="w-full h-11" size="lg">
               <Link href="/signup">
                 Create an account
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Link>
             </Button>
 
-            <Button asChild variant="outline" className="w-full h-11" size="lg">
+            <Button asChild variant="skeuo-outline" className="w-full h-11" size="lg">
               <Link href="/login">
                 Sign in
               </Link>
@@ -221,7 +221,7 @@ export default function WelcomePage() {
           {/* Social auth buttons */}
           <div className="grid grid-cols-2 gap-3">
             <Button
-              variant="outline"
+              variant="skeuo-outline"
               className="h-11"
               onClick={() => void handleOAuthSignIn("google")}
               disabled={oauthLoading !== null}
@@ -251,7 +251,7 @@ export default function WelcomePage() {
               Google
             </Button>
             <Button
-              variant="outline"
+              variant="skeuo-outline"
               className="h-11"
               onClick={() => void handleOAuthSignIn("github")}
               disabled={oauthLoading !== null}

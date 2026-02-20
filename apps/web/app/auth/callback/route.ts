@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -18,6 +19,29 @@ export async function GET(request: Request) {
       let redirectTo = next ?? "/";
 
       if (user) {
+        const normalizedEmail = user.email?.toLowerCase();
+
+        if (normalizedEmail) {
+          try {
+            const admin = createAdminClient();
+            const acceptedAt = new Date().toISOString();
+            await Promise.all([
+              admin
+                .from("OnboardingInvite")
+                .update({ status: "ACCEPTED", acceptedAt })
+                .eq("email", normalizedEmail)
+                .in("status", ["PENDING", "SENT"]),
+              admin
+                .from("FriendInvite")
+                .update({ status: "ACCEPTED", acceptedAt })
+                .eq("email", normalizedEmail)
+                .in("status", ["PENDING", "SENT"]),
+            ]);
+          } catch (inviteAcceptanceError) {
+            console.warn("Unable to mark invites as accepted:", inviteAcceptanceError);
+          }
+        }
+
         // Check if this user came from a project invite (metadata from invite email)
         const inviteToken = user.user_metadata?.invite_token;
 

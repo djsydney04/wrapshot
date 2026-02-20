@@ -3,6 +3,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { sendOnboardingInviteEmail } from "@/lib/email/invites";
+import { z } from "zod";
+
+const inviteEmailSchema = z.string().trim().email().max(320);
 
 export async function saveOnboardingProfile(data: {
   firstName: string;
@@ -57,9 +60,18 @@ export async function sendOnboardingInvites(emails: string[]) {
     throw new Error("Not authenticated");
   }
 
+  const normalizedUserEmail = user.email?.toLowerCase();
+  const seen = new Set<string>();
   const validEmails = emails
-    .map((e) => e.trim().toLowerCase())
-    .filter((e) => e && e.includes("@"));
+    .map((email) => email.trim().toLowerCase())
+    .filter((email) => {
+      if (!email || seen.has(email)) return false;
+      const parsed = inviteEmailSchema.safeParse(email);
+      if (!parsed.success) return false;
+      if (normalizedUserEmail && email === normalizedUserEmail) return false;
+      seen.add(email);
+      return true;
+    });
 
   if (validEmails.length === 0) {
     return { success: true, sent: 0 };
@@ -74,7 +86,7 @@ export async function sendOnboardingInvites(emails: string[]) {
 
   const { error } = await supabase
     .from("OnboardingInvite")
-    .upsert(invites, { onConflict: "invitedBy,email", ignoreDuplicates: true });
+    .upsert(invites, { onConflict: "invitedBy,email" });
 
   if (error) {
     console.error("Error sending invites:", error);
@@ -101,6 +113,14 @@ export async function sendOnboardingInvites(emails: string[]) {
         inviterEmail: user.email ?? null,
       });
 
+      await supabase
+        .from("OnboardingInvite")
+        .update({
+          status: result.sent ? "SENT" : "FAILED",
+        })
+        .eq("invitedBy", user.id)
+        .eq("email", email);
+
       if (!result.sent && result.error) {
         console.warn(`Onboarding invite email failed for ${email}:`, result.error);
       }
@@ -110,8 +130,9 @@ export async function sendOnboardingInvites(emails: string[]) {
   );
 
   const sentCount = emailResults.filter((result) => result.sent).length;
+  const failedCount = emailResults.length - sentCount;
 
-  return { success: true, sent: sentCount };
+  return { success: true, sent: sentCount, failed: failedCount };
 }
 
 export async function updateOnboardingStep(step: number) {

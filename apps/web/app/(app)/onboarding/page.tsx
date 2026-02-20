@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ImageUpload } from "@/components/ui/image-upload";
-import { ArrowRight, Loader2, X, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, X, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   saveOnboardingProfile,
@@ -51,6 +51,10 @@ export default function OnboardingPage() {
   const [step, setStep] = React.useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [inviteSending, setInviteSending] = React.useState(false);
+  const [inviteSendError, setInviteSendError] = React.useState<string | null>(null);
+  const [inviteSentCount, setInviteSentCount] = React.useState(0);
+  const [inviteFailedCount, setInviteFailedCount] = React.useState(0);
 
   // Step 1: Profile
   const [firstName, setFirstName] = React.useState("");
@@ -66,6 +70,24 @@ export default function OnboardingPage() {
 
   // Step 4: Referral
   const [referralSource, setReferralSource] = React.useState("");
+
+  const validInviteEmails = React.useMemo(() => {
+    const seen = new Set<string>();
+    return emails
+      .map((email) => email.trim().toLowerCase())
+      .filter((email) => {
+        if (!email || seen.has(email)) return false;
+        const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        if (!valid) return false;
+        seen.add(email);
+        return true;
+      });
+  }, [emails]);
+
+  const hasInvalidInviteEmail = React.useMemo(
+    () => emails.some((email) => email.trim().length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())),
+    [emails]
+  );
 
   const canProceed = React.useMemo(() => {
     switch (step) {
@@ -86,6 +108,13 @@ export default function OnboardingPage() {
     setError(null);
     if (step < 4) {
       setStep((step + 1) as Step);
+    }
+  };
+
+  const handleBack = () => {
+    setError(null);
+    if (step > 1) {
+      setStep((step - 1) as Step);
     }
   };
 
@@ -119,11 +148,6 @@ export default function OnboardingPage() {
         referralSource,
       });
 
-      const validEmails = emails.filter((e) => e.trim() && e.includes("@"));
-      if (validEmails.length > 0) {
-        await sendOnboardingInvites(validEmails);
-      }
-
       await completeOnboarding();
 
       await new Promise((resolve) => setTimeout(resolve, 200));
@@ -136,6 +160,35 @@ export default function OnboardingPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSendInvitesAndContinue = async () => {
+    setInviteSendError(null);
+
+    if (hasInvalidInviteEmail) {
+      setInviteSendError("Please fix invalid email addresses before sending invites.");
+      return;
+    }
+
+    if (validInviteEmails.length === 0) {
+      handleNext();
+      return;
+    }
+
+    try {
+      setInviteSending(true);
+      const result = await sendOnboardingInvites(validInviteEmails);
+      setInviteSentCount(result.sent ?? 0);
+      setInviteFailedCount(result.failed ?? 0);
+      setEmails([""]);
+      handleNext();
+    } catch (inviteError) {
+      setInviteSendError(
+        inviteError instanceof Error ? inviteError.message : "Failed to send invites"
+      );
+    } finally {
+      setInviteSending(false);
     }
   };
 
@@ -154,11 +207,26 @@ export default function OnboardingPage() {
         <div className="mb-10 flex justify-center sm:mb-12">
           <span className="text-xl font-semibold tracking-tight">wrapshoot</span>
         </div>
+        <div className="mb-4 flex items-center justify-between">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleBack}
+            disabled={step === 1 || isSubmitting || inviteSending}
+            className={cn("h-8 px-2", step === 1 && "invisible")}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+          <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+            Step {step} of 4
+          </p>
+        </div>
+        <div className="surface-pop rounded-2xl p-6 sm:p-7">
         {/* Step 1: Profile */}
         {step === 1 && (
           <div className="space-y-8">
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Step 1 of 4</p>
               <h1 className="text-xl font-semibold tracking-tight">
                 Let&apos;s set up your profile
               </h1>
@@ -235,7 +303,6 @@ export default function OnboardingPage() {
         {step === 2 && (
           <div className="space-y-8">
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Step 2 of 4</p>
               <h1 className="text-xl font-semibold tracking-tight">
                 What are you working on?
               </h1>
@@ -277,12 +344,14 @@ export default function OnboardingPage() {
         {step === 3 && (
           <div className="space-y-8">
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Step 3 of 4</p>
               <h1 className="text-xl font-semibold tracking-tight">
                 Invite your team
               </h1>
               <p className="text-muted-foreground mt-2">
                 Production is a team sport. Add collaborators now or later.
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                You can invite up to 5 teammates now. Invalid addresses must be corrected before sending.
               </p>
             </div>
 
@@ -323,20 +392,44 @@ export default function OnboardingPage() {
               )}
             </div>
 
+            {inviteSendError && (
+              <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3">
+                <p className="text-sm text-destructive">{inviteSendError}</p>
+              </div>
+            )}
+
+            {hasInvalidInviteEmail && (
+              <p className="text-xs text-destructive">
+                One or more email addresses are invalid.
+              </p>
+            )}
+
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button
-                variant="outline"
-                onClick={handleNext}
+                variant="skeuo-outline"
+                onClick={() => {
+                  setInviteSendError(null);
+                  handleNext();
+                }}
                 className="w-full sm:flex-1"
+                disabled={inviteSending}
               >
                 Skip for now
               </Button>
               <Button
-                onClick={handleNext}
-                disabled={!emails.some((e) => e.trim() && e.includes("@"))}
+                variant="skeuo"
+                onClick={() => void handleSendInvitesAndContinue()}
+                disabled={validInviteEmails.length === 0 || hasInvalidInviteEmail || inviteSending}
                 className="w-full sm:flex-1"
               >
-                Send invites
+                {inviteSending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  `Send ${validInviteEmails.length} invite${validInviteEmails.length === 1 ? "" : "s"}`
+                )}
               </Button>
             </div>
           </div>
@@ -346,7 +439,6 @@ export default function OnboardingPage() {
         {step === 4 && (
           <div className="space-y-8">
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Step 4 of 4</p>
               <h1 className="text-xl font-semibold tracking-tight">
                 How did you find us?
               </h1>
@@ -354,6 +446,15 @@ export default function OnboardingPage() {
                 We&apos;d love to know what brought you here.
               </p>
             </div>
+
+            {inviteSentCount > 0 && (
+              <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                Sent {inviteSentCount} invite{inviteSentCount === 1 ? "" : "s"}
+                {inviteFailedCount > 0
+                  ? ` (${inviteFailedCount} failed)`
+                  : ""}.
+              </div>
+            )}
 
             {error && (
               <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3">
@@ -381,6 +482,7 @@ export default function OnboardingPage() {
 
             <div className="space-y-3 pt-4">
               <Button
+                variant="skeuo"
                 onClick={() => handleComplete(false)}
                 disabled={!canProceed || isSubmitting}
                 className="w-full"
@@ -389,16 +491,17 @@ export default function OnboardingPage() {
                 Get started
               </Button>
               <Button
-                variant="ghost"
+                variant="skeuo-outline"
                 onClick={() => handleComplete(true)}
                 disabled={!canProceed || isSubmitting}
-                className="w-full text-muted-foreground"
+                className="w-full"
               >
                 Take a quick tour first
               </Button>
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
