@@ -115,27 +115,14 @@ export function FeedbackButton({
     }
   };
 
-  // Variant-specific button styles
-  const buttonStyles = {
-    sidebar: "w-full justify-start gap-2 font-normal h-8 text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover",
-    default: "w-full justify-start gap-3 rounded-lg px-3 py-2.5 text-muted-foreground hover:text-foreground hover:bg-muted/50",
-    header: "gap-2 text-muted-foreground hover:text-foreground",
-  };
-
-  const iconContainerStyles = {
-    sidebar: "",
-    default: "flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground group-hover:text-foreground",
-    header: "",
-  };
-
   if (collapsed) {
     return (
       <SimpleTooltip content="Feedback" side="right">
         <Button
-          variant="ghost"
+          variant="skeuo-outline"
           size="icon"
           onClick={handleOpen}
-          className="w-full text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover"
+          className="w-full"
         >
           <MessageSquarePlus className="h-4 w-4" />
         </Button>
@@ -149,10 +136,10 @@ export function FeedbackButton({
       <>
         <SimpleTooltip content="Send feedback">
           <Button
-            variant="ghost"
+            variant="skeuo-outline"
             size="sm"
             onClick={handleOpen}
-            className={buttonStyles.header}
+            className="gap-2"
           >
             <MessageSquarePlus className="h-4 w-4" />
             Feedback
@@ -180,17 +167,17 @@ export function FeedbackButton({
   if (variant === "default") {
     return (
       <>
-        <button
+        <Button
+          variant="skeuo-outline"
+          size="sm"
           onClick={handleOpen}
-          className={cn("group flex items-center transition-all duration-200", buttonStyles.default)}
+          className="w-full justify-start gap-2.5"
         >
-          <div className={iconContainerStyles.default}>
-            <MessageSquarePlus className="h-4 w-4" />
-          </div>
+          <MessageSquarePlus className="h-4 w-4" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-left">Feedback</p>
           </div>
-        </button>
+        </Button>
 
         {/* Modal */}
         {isOpen && <FeedbackModal
@@ -213,9 +200,10 @@ export function FeedbackButton({
   return (
     <>
       <Button
-        variant="ghost"
+        variant="skeuo-outline"
+        size="sm"
         onClick={handleOpen}
-        className={buttonStyles.sidebar}
+        className="h-8 w-full justify-start gap-2"
       >
         <MessageSquarePlus className="h-4 w-4" />
         Feedback
@@ -273,7 +261,7 @@ function FeedbackModal({
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-md mx-4 bg-background border border-border rounded-lg shadow-soft-lg">
+      <div className="surface-pop relative mx-4 w-full max-w-md rounded-lg border border-border">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-sm font-medium">Send Feedback</h2>
           <Button
@@ -307,10 +295,10 @@ function FeedbackModal({
                     type="button"
                     onClick={() => setFeedbackType(type.value)}
                     className={cn(
-                      "px-3 py-2 text-xs rounded-md border transition-colors",
+                      "rounded-md border px-3 py-2 text-xs transition-colors",
                       feedbackType === type.value
-                        ? "bg-muted border-border text-foreground"
-                        : "bg-background border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                        ? "skeuo-pressed border-border text-foreground"
+                        : "skeuo-chip border-border text-muted-foreground hover:text-foreground"
                     )}
                   >
                     {type.label}
