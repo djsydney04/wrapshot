@@ -180,7 +180,7 @@ interface CallSheetPdfProps {
 }
 
 export function CallSheetPdf({ data }: CallSheetPdfProps) {
-  const { callSheet, shootingDay, project, scenes, castCallTimes, departmentCalls, locations } = data;
+  const { callSheet, shootingDay, project, scenes, castCallTimes, departmentCalls, crewCalls, locations } = data;
   const totalPageEighths = scenes.reduce(
     (sum, s) => sum + decimalPagesToEighths(Number(s.scene.pageCount || 0)),
     0
@@ -201,6 +201,10 @@ export function CallSheetPdf({ data }: CallSheetPdfProps) {
   // Dept table column widths
   const deptColWidths = [150, 80, 240];
   const deptTotal = deptColWidths.reduce((s, w) => s + w, 0);
+
+  // Crew call table column widths
+  const crewColWidths = [150, 80, 240];
+  const crewTotal = crewColWidths.reduce((s, w) => s + w, 0);
 
   return (
     <Document>
@@ -259,6 +263,41 @@ export function CallSheetPdf({ data }: CallSheetPdfProps) {
           <View style={{ marginBottom: 8 }}>
             <Text style={styles.infoLabel}>Weather</Text>
             <Text style={{ fontSize: 8 }}>{shootingDay.weatherNotes}</Text>
+          </View>
+        )}
+
+        {/* Crew Call Times */}
+        {crewCalls.length > 0 && (
+          <View>
+            <Text style={styles.sectionTitle}>Crew Call Times</Text>
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                {["Crew/Unit", "Call Time", "Notes"].map((h, i) => (
+                  <Text
+                    key={h}
+                    style={[
+                      i < 2 ? styles.tableHeaderCell : styles.tableHeaderCellLast,
+                      { width: crewColWidths[i] },
+                    ]}
+                  >
+                    {h}
+                  </Text>
+                ))}
+              </View>
+              {crewCalls.map((cc) => (
+                <View key={cc.id} style={styles.tableRow}>
+                  <Text style={[styles.tableCell, styles.bold, { width: crewColWidths[0] }]}>
+                    {cc.crewName}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: crewColWidths[1] }]}>
+                    {cc.callTime}
+                  </Text>
+                  <Text style={[styles.tableCellLast, { width: crewColWidths[2] }]}>
+                    {cc.notes || ""}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </View>
         )}
 

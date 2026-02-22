@@ -36,7 +36,7 @@ import {
   syncArtBlockersToCallSheet,
 } from "@/lib/actions/art-department";
 import type { DepartmentDayDependency } from "@/lib/actions/departments-readiness";
-import { updateCastCallTimes, updateDepartmentCallTimes } from "@/lib/actions/shooting-days";
+import { updateCastCallTimes, updateDepartmentCallTimes, updateCrewCallTimes } from "@/lib/actions/shooting-days";
 import { CallSheetPreview } from "./call-sheet-preview";
 import { DistributeDialog } from "./distribute-dialog";
 import type { ShootingDay } from "@/lib/types";
@@ -62,6 +62,12 @@ type CastCallTimeEdit = {
 
 type DeptCallTimeEdit = {
   department: string;
+  callTime: string;
+  notes: string;
+};
+
+type CrewCallTimeEdit = {
+  crewName: string;
   callTime: string;
   notes: string;
 };
@@ -108,13 +114,14 @@ export function CallSheetEditor({
   const [headerTextColor, setHeaderTextColor] = React.useState("#111111");
   const [footerText, setFooterText] = React.useState("");
 
-  // Cast & department call times
+  // Cast, department & crew call times
   const [castCallTimes, setCastCallTimes] = React.useState<CastCallTimeEdit[]>([]);
   const [deptCallTimes, setDeptCallTimes] = React.useState<DeptCallTimeEdit[]>([]);
+  const [crewCallTimes, setCrewCallTimes] = React.useState<CrewCallTimeEdit[]>([]);
 
   // Collapsible sections
   const [expandedSections, setExpandedSections] = React.useState<Set<string>>(
-    new Set(["general", "style", "scenes", "cast", "departments", "location", "notes"])
+    new Set(["general", "style", "scenes", "cast", "crews", "departments", "location", "notes"])
   );
 
   const toggleSection = (section: string) => {
@@ -163,6 +170,15 @@ export function CallSheetEditor({
             department: dc.department,
             callTime: dc.callTime || "",
             notes: dc.notes || "",
+          }))
+        );
+
+        // Initialize crew call times
+        setCrewCallTimes(
+          data.crewCalls.map((cc) => ({
+            crewName: cc.crewName,
+            callTime: cc.callTime || "",
+            notes: cc.notes || "",
           }))
         );
       } else {
@@ -289,6 +305,36 @@ export function CallSheetEditor({
         return { success: false, error: deptResult.error || "Failed to save department call times." };
       }
 
+      // Save crew call times
+      const invalidCrewCall = crewCallTimes.find(
+        (ct) =>
+          (ct.crewName.trim().length > 0 && ct.callTime.trim().length === 0) ||
+          (ct.crewName.trim().length === 0 && ct.callTime.trim().length > 0)
+      );
+
+      if (invalidCrewCall) {
+        return {
+          success: false,
+          error: "Each crew call row must include both crew name and call time.",
+        };
+      }
+
+      const crewResult = await updateCrewCallTimes(
+        shootingDay.id,
+        crewCallTimes
+          .filter((ct) => ct.crewName.trim().length > 0 && ct.callTime.trim().length > 0)
+          .map((ct, index) => ({
+            crewName: ct.crewName.trim(),
+            callTime: ct.callTime,
+            notes: ct.notes || undefined,
+            sortOrder: index,
+          }))
+      );
+
+      if (!crewResult.success) {
+        return { success: false, error: crewResult.error || "Failed to save crew call times." };
+      }
+
       await reloadCallSheetData();
       return { success: true };
     } catch (error) {
@@ -300,6 +346,7 @@ export function CallSheetEditor({
   }, [
     advanceNotes,
     castCallTimes,
+    crewCallTimes,
     deptCallTimes,
     fullData,
     mealNotes,
@@ -477,6 +524,25 @@ export function CallSheetEditor({
 
   const removeDeptCallTime = (index: number) => {
     setDeptCallTimes((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateCrewCallTime = (index: number, field: keyof CrewCallTimeEdit, value: string) => {
+    setCrewCallTimes((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const addCrewCallTime = () => {
+    setCrewCallTimes((prev) => [
+      ...prev,
+      { crewName: "", callTime: "", notes: "" },
+    ]);
+  };
+
+  const removeCrewCallTime = (index: number) => {
+    setCrewCallTimes((prev) => prev.filter((_, i) => i !== index));
   };
 
   if (loading) {
@@ -705,6 +771,54 @@ export function CallSheetEditor({
                   No scenes assigned to this shooting day.
                 </p>
               )}
+            </CollapsibleSection>
+
+            {/* Crew Call Times (Multiple Units) */}
+            <CollapsibleSection
+              title={`Crew Call Times (${crewCallTimes.length})`}
+              expanded={expandedSections.has("crews")}
+              onToggle={() => toggleSection("crews")}
+            >
+              <p className="text-xs text-muted-foreground mb-3">
+                Set different call times for multiple crews or units (e.g., Main Unit, Second Unit, Splinter Unit).
+              </p>
+              {crewCallTimes.length > 0 ? (
+                <div className="space-y-2">
+                  {crewCallTimes.map((ct, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <Input
+                        value={ct.crewName}
+                        onChange={(e) => updateCrewCallTime(idx, "crewName", e.target.value)}
+                        placeholder="Crew/Unit Name"
+                        className="flex-1 h-8 text-sm"
+                      />
+                      <Input
+                        type="time"
+                        value={ct.callTime}
+                        onChange={(e) => updateCrewCallTime(idx, "callTime", e.target.value)}
+                        className="w-32 h-8 text-sm"
+                      />
+                      <Input
+                        value={ct.notes}
+                        onChange={(e) => updateCrewCallTime(idx, "notes", e.target.value)}
+                        placeholder="Notes"
+                        className="flex-1 h-8 text-sm"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive h-8 w-8 p-0"
+                        onClick={() => removeCrewCallTime(idx)}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <Button variant="outline" size="sm" className="mt-2 text-xs" onClick={addCrewCallTime}>
+                + Add Crew Call Time
+              </Button>
             </CollapsibleSection>
 
             {/* Cast Call Times */}
