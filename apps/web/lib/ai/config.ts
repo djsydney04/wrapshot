@@ -1,4 +1,6 @@
 export const WRAPSHOT_INTELLIGENCE_LABEL = "Wrapshot Intelligence";
+const DEFAULT_CEREBRAS_MODEL = "zai-glm-4.7";
+const DEFAULT_FIREWORKS_MODEL = "accounts/fireworks/models/kimi-k2p5";
 
 /**
  * Resolve the Cerebras API key from supported environment variable names.
@@ -28,4 +30,12 @@ export function getScriptAnalysisProvider(): "cerebras" | "fireworks" | null {
   if (getCerebrasApiKey()) return "cerebras";
   if (getFireworksApiKey()) return "fireworks";
   return null;
+}
+
+export function getCerebrasModel(): string {
+  return process.env.CEREBRAS_MODEL || DEFAULT_CEREBRAS_MODEL;
+}
+
+export function getFireworksModel(): string {
+  return process.env.FIREWORKS_MODEL || DEFAULT_FIREWORKS_MODEL;
 }

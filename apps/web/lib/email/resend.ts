@@ -23,5 +23,5 @@ export function getAppBaseUrl(): string {
 }
 
 export function getDefaultFromEmail(): string {
-  return "wrapshoot <noreply@wrapshoot.com>";
+  return process.env.RESEND_FROM_EMAIL || "wrapshoot <noreply@wrapshoot.com>";
 }
