@@ -24,7 +24,7 @@ import {
   getFilmDayTemplateOptions,
 } from "@/lib/schedule/film-day";
 import { formatPageEighths, formatScenePages, sumPageEighths } from "@/lib/utils/page-eighths";
-import type { ShootingDay } from "@/lib/types";
+import type { ShootingDay, Scene } from "@/lib/types";
 import { trackShootingDayCreated } from "@/lib/analytics/posthog";
 
 interface AddShootingDayFormProps {
@@ -38,6 +38,9 @@ interface AddShootingDayFormProps {
   useMockData?: boolean;
   // Edit mode props
   editingDay?: ShootingDay | null;
+  // Data props - pass these instead of relying on the store in production
+  existingShootingDays?: ShootingDay[];
+  availableScenes?: Scene[];
 }
 
 export function AddShootingDayForm({
@@ -50,6 +53,8 @@ export function AddShootingDayForm({
   onSuccess,
   useMockData = false,
   editingDay,
+  existingShootingDays,
+  availableScenes,
 }: AddShootingDayFormProps) {
   const {
     addShootingDay: addShootingDayToStore,
@@ -68,8 +73,13 @@ export function AddShootingDayForm({
     []
   );
 
-  const existingDays = getShootingDaysForProject(projectId);
-  const scenes = getScenesForProject(projectId);
+  // In production mode, use props; in mock mode, use the store
+  const existingDays = useMockData
+    ? getShootingDaysForProject(projectId)
+    : (existingShootingDays || []);
+  const scenes = useMockData
+    ? getScenesForProject(projectId)
+    : (availableScenes || []);
 
   const isEditMode = !!editingDay;
 
