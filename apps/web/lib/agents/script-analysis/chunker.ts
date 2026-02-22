@@ -7,6 +7,7 @@
 
 import { CHUNK_CONFIG } from '../constants';
 import type { ScriptChunk } from '../types';
+import { isLikelySceneHeaderLine } from '@/lib/scripts/scene-heuristics';
 
 export interface ChunkOptions {
   maxCharsPerChunk?: number;
@@ -23,13 +24,6 @@ export interface ChunkMetadata {
 
 // Standard screenplay page is ~250 words or ~1500 characters
 const CHARS_PER_PAGE = 1500;
-
-// Scene header patterns for screenplay format
-const SCENE_HEADER_PATTERNS = [
-  /^(?:\d+[A-Z]?\s+)?(?:INT|EXT)(?:\s*\.?\s*\/\s*(?:INT|EXT))?\.?\s+/i,
-  /^(?:\d+[A-Z]?\s+)?(?:INT\/EXT|EXT\/INT|I\/E)\.?\s+/i,
-  /^SCENE\s+\d+/im,
-];
 
 export class ScriptChunker {
   private options: Required<ChunkOptions>;
@@ -133,9 +127,16 @@ export class ScriptChunker {
       charPosition += line.length + 1; // +1 for newline
     }
 
+    if (boundaries.length > 0 && boundaries[0] !== 0) {
+      boundaries.unshift(0);
+    }
+
     // If no scene boundaries found, create artificial ones based on size
     if (boundaries.length === 0) {
-      const interval = Math.floor(this.options.maxCharsPerChunk / 2);
+      const interval = Math.max(
+        this.options.minCharsPerChunk,
+        Math.floor(this.options.maxCharsPerChunk * 0.9)
+      );
       for (let i = 0; i < text.length; i += interval) {
         boundaries.push(i);
       }
@@ -148,12 +149,9 @@ export class ScriptChunker {
    * Check if a line is a scene header
    */
   private isSceneHeader(line: string): boolean {
-    for (const pattern of SCENE_HEADER_PATTERNS) {
-      if (pattern.test(line)) {
-        return true;
-      }
-    }
-    return false;
+    if (!line) return false;
+    if (/^SCENE\s+\d+/i.test(line)) return true;
+    return isLikelySceneHeaderLine(line);
   }
 
   /**
@@ -175,6 +173,7 @@ export class ScriptChunker {
 
       // Find the best boundary to split at
       let splitPoint = this.findBestSplitPoint(
+        text,
         boundaries,
         currentStart,
         targetEnd,
@@ -228,6 +227,7 @@ export class ScriptChunker {
    * Find the best position to split based on scene boundaries
    */
   private findBestSplitPoint(
+    text: string,
     boundaries: number[],
     start: number,
     targetEnd: number,
@@ -254,7 +254,38 @@ export class ScriptChunker {
       return nextBoundary;
     }
 
-    // Fall back to targetEnd
+    return this.findNaturalSplitPoint(text, start, targetEnd, textLength);
+  }
+
+  /**
+   * Fall back split that tries to avoid cutting in the middle of a sentence/paragraph.
+   */
+  private findNaturalSplitPoint(
+    text: string,
+    start: number,
+    targetEnd: number,
+    textLength: number
+  ): number {
+    const maxForward = Math.min(textLength, targetEnd + 800);
+    const minBackward = Math.max(start + this.options.minCharsPerChunk, targetEnd - 800);
+
+    const forwardBreak = text.indexOf('\n\n', targetEnd);
+    if (forwardBreak > targetEnd && forwardBreak <= maxForward) {
+      return forwardBreak + 2;
+    }
+
+    const backwardWindow = text.slice(minBackward, targetEnd);
+    const backwardBreakOffset = backwardWindow.lastIndexOf('\n\n');
+    if (backwardBreakOffset >= 0) {
+      return minBackward + backwardBreakOffset + 2;
+    }
+
+    const lineBreakWindow = text.slice(minBackward, targetEnd);
+    const lineBreakOffset = lineBreakWindow.lastIndexOf('\n');
+    if (lineBreakOffset >= 0) {
+      return minBackward + lineBreakOffset + 1;
+    }
+
     return Math.min(targetEnd, textLength);
   }
 

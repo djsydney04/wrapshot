@@ -12,6 +12,7 @@ import {
   normalizeSceneNumber,
   sortByScriptPageOrder,
 } from '@/lib/scripts/scene-order';
+import { extractHeuristicScenesFromChunkText } from '@/lib/scripts/scene-heuristics';
 import { JsonParser } from '../utils/json-parser';
 import { RetryHandler } from '../utils/retry-handler';
 import { LLM_CONFIG } from '../constants';
@@ -62,20 +63,6 @@ interface SceneExtractionResponse {
   scenes: ExtractedScene[];
 }
 
-const HEURISTIC_CHARS_PER_PAGE = 1500;
-const HEURISTIC_SCENE_HEADER_PATTERN =
-  /^(?:(\d+[A-Z]?)\s+)?((?:INT|EXT)(?:\s*\.?\s*\/\s*(?:INT|EXT))?|INT\/EXT|EXT\/INT|I\/E)\.?\s+(.+)$/i;
-const VALID_TIMES_OF_DAY = [
-  'DAY',
-  'NIGHT',
-  'DAWN',
-  'DUSK',
-  'MORNING',
-  'AFTERNOON',
-  'EVENING',
-  'CONTINUOUS',
-] as const;
-
 function isSceneExtractionResponse(data: unknown): boolean {
   if (!data || typeof data !== 'object') return false;
   const obj = data as Record<string, unknown>;
@@ -125,6 +112,8 @@ export async function executeSceneExtractor(
       continue;
     }
 
+    const chunkFallbackScenes = buildHeuristicScenesForChunk(chunk, context.lastSceneNumber);
+
     await tracker.updateProgress(
       processedChunks,
       totalChunks,
@@ -160,100 +149,68 @@ export async function executeSceneExtractor(
         response,
         isSceneExtractionResponse
       );
+      const chunkPageStart = typeof chunk.pageStart === 'number' ? chunk.pageStart : 1;
+      let scenesToApply: ExtractedScene[] = [];
 
       if (!parseResult.success) {
-        console.error(`[SceneExtractor] Failed to parse response for chunk ${chunk.chunkIndex}:`, parseResult.error);
-        // Continue with partial results
         parseFailures++;
-        processedChunks++;
-        continue;
-      }
+        console.error(
+          `[SceneExtractor] Failed to parse response for chunk ${chunk.chunkIndex}:`,
+          parseResult.error
+        );
 
-      const chunkScenes = parseResult.data.scenes;
-      const chunkPageStart = typeof chunk.pageStart === 'number' ? chunk.pageStart : 1;
-
-      // Normalize and validate scenes
-      for (const scene of chunkScenes) {
-        // Ensure required fields
-        if (!scene.setName || !String(scene.setName).trim()) {
+        if (chunkFallbackScenes.length > 0) {
+          scenesToApply = chunkFallbackScenes;
+          usedSluglineFallback = true;
+        } else {
+          processedChunks++;
           continue;
         }
+      } else {
+        const llmScenes = parseResult.data.scenes;
+        const normalizedLlmScenes = llmScenes
+          .map((scene, index) =>
+            normalizeExtractedSceneForChunk(scene, chunkPageStart, allScenes.length + index + 1)
+          )
+          .filter((scene): scene is ExtractedScene => scene !== null);
 
-        scene.sceneNumber = normalizeSceneNumber(
-          scene.sceneNumber,
-          allScenes.length + 1
-        );
-        scene.setName = String(scene.setName).trim();
-
-        // Normalize intExt
-        scene.intExt = normalizeIntExt(scene.intExt);
-
-        // Normalize timeOfDay
-        scene.timeOfDay = normalizeTimeOfDay(scene.timeOfDay);
-
-        // Normalize characters to uppercase, filtering out nulls/empties
-        scene.characters = (scene.characters || [])
-          .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
-          .map(c => c.toUpperCase().trim());
-
-        const adjustedPageStart = adjustChunkLocalPage(scene.scriptPageStart, chunkPageStart);
-        const adjustedPageEnd = adjustChunkLocalPage(scene.scriptPageEnd, chunkPageStart);
-        scene.scriptPageStart = adjustedPageStart || chunkPageStart;
-        scene.scriptPageEnd =
-          (adjustedPageEnd && adjustedPageStart
-            ? Math.max(adjustedPageStart, adjustedPageEnd)
-            : adjustedPageEnd) || scene.scriptPageStart;
-
-        // Update known characters
-        for (const charName of scene.characters) {
-          const existing = context.knownCharacters.find(
-            c => c.name === charName || c.aliases.includes(charName)
-          );
-          if (existing) {
-            existing.sceneCount++;
-          } else {
-            context.knownCharacters.push({
-              name: charName,
-              aliases: [],
-              firstAppearance: parseInt(scene.sceneNumber) || context.lastSceneNumber + 1,
-              sceneCount: 1,
-            });
-          }
+        if (normalizedLlmScenes.length === 0 && chunkFallbackScenes.length > 0) {
+          scenesToApply = chunkFallbackScenes;
+          usedSluglineFallback = true;
+        } else if (shouldSupplementWithHeuristicScenes(normalizedLlmScenes, chunkFallbackScenes)) {
+          scenesToApply = mergeScenesWithHeuristicFallback(normalizedLlmScenes, chunkFallbackScenes);
+          usedSluglineFallback = scenesToApply.length > normalizedLlmScenes.length || usedSluglineFallback;
+        } else {
+          scenesToApply = normalizedLlmScenes;
         }
+      }
 
-        // Update known locations
-        updateKnownLocations(context.knownLocations, scene);
-
-        // Update last scene number
-        const sceneNum = parseInt(scene.sceneNumber);
-        if (!isNaN(sceneNum) && sceneNum > context.lastSceneNumber) {
-          context.lastSceneNumber = sceneNum;
-        }
-
+      for (const scene of scenesToApply) {
+        applySceneToContext(scene, context.knownCharacters, context.knownLocations, context);
         allScenes.push(scene);
       }
 
-      console.log(`[SceneExtractor] Extracted ${chunkScenes.length} scenes from chunk ${chunk.chunkIndex}`);
+      console.log(
+        `[SceneExtractor] Extracted ${scenesToApply.length} scenes from chunk ${chunk.chunkIndex}` +
+          (scenesToApply === chunkFallbackScenes ? ' (heuristic fallback)' : '')
+      );
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[SceneExtractor] Error processing chunk ${chunk.chunkIndex}:`, errorMessage);
       failedChunks++;
+
+      if (chunkFallbackScenes.length > 0) {
+        for (const scene of chunkFallbackScenes) {
+          applySceneToContext(scene, context.knownCharacters, context.knownLocations, context);
+          allScenes.push(scene);
+        }
+        usedSluglineFallback = true;
+      }
       // Continue with other chunks - partial failure is acceptable
     }
 
     processedChunks++;
-  }
-
-  if (allScenes.length === 0) {
-    const fallbackScenes = extractScenesFromSluglines(chunksToProcess, context.lastSceneNumber);
-    if (fallbackScenes.length > 0) {
-      allScenes = fallbackScenes;
-      usedSluglineFallback = true;
-      console.warn(
-        `[SceneExtractor] LLM extraction returned no scenes. Recovered ${fallbackScenes.length} scenes from script sluglines.`,
-      );
-    }
   }
 
   if (allScenes.length === 0) {
@@ -279,12 +236,6 @@ export async function executeSceneExtractor(
   context.extractedScenes = dedupedScenes;
 
   await tracker.updateProgress(totalChunks, totalChunks, `Extracted ${dedupedScenes.length} scenes`);
-
-  if (usedSluglineFallback) {
-    for (const scene of dedupedScenes) {
-      updateKnownLocations(context.knownLocations, scene);
-    }
-  }
 
   console.log(
     `[SceneExtractor] Total: ${dedupedScenes.length} scenes, ${context.knownCharacters.length} characters` +
@@ -359,149 +310,144 @@ function updateKnownLocations(locations: LocationReference[], scene: ExtractedSc
   }
 }
 
-function extractScenesFromSluglines(
-  chunks: Array<Partial<ScriptChunk>>,
+function normalizeExtractedSceneForChunk(
+  scene: Partial<ExtractedScene>,
+  chunkPageStart: number,
+  fallbackSceneNumber: number
+): ExtractedScene | null {
+  if (!scene.setName || !String(scene.setName).trim()) {
+    return null;
+  }
+
+  const normalized: ExtractedScene = {
+    sceneNumber: normalizeSceneNumber(scene.sceneNumber, fallbackSceneNumber),
+    intExt: normalizeIntExt(scene.intExt || 'INT'),
+    setName: String(scene.setName).trim(),
+    timeOfDay: normalizeTimeOfDay(scene.timeOfDay || 'DAY'),
+    pageLengthEighths: normalizePageLengthEighths(scene.pageLengthEighths),
+    synopsis: String(scene.synopsis || '').trim(),
+    characters: (scene.characters || [])
+      .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
+      .map((c) => c.toUpperCase().trim()),
+    scriptPageStart: chunkPageStart,
+    scriptPageEnd: chunkPageStart,
+  };
+
+  const adjustedPageStart = adjustChunkLocalPage(scene.scriptPageStart, chunkPageStart);
+  const adjustedPageEnd = adjustChunkLocalPage(scene.scriptPageEnd, chunkPageStart);
+  normalized.scriptPageStart = adjustedPageStart || chunkPageStart;
+  normalized.scriptPageEnd =
+    (adjustedPageEnd && adjustedPageStart
+      ? Math.max(adjustedPageStart, adjustedPageEnd)
+      : adjustedPageEnd) || normalized.scriptPageStart;
+
+  return normalized;
+}
+
+function normalizePageLengthEighths(value: number | undefined): number {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return 1;
+  }
+
+  const normalized = Math.round(Number(value));
+  if (!Number.isFinite(normalized) || normalized <= 0) {
+    return 1;
+  }
+
+  return Math.min(normalized, 64);
+}
+
+function buildHeuristicScenesForChunk(
+  chunk: Partial<ScriptChunk>,
   startingSceneNumber: number
 ): ExtractedScene[] {
-  const extracted: ExtractedScene[] = [];
-  let nextAutoSceneNumber = Math.max(1, startingSceneNumber + 1);
+  const chunkText = typeof chunk.chunkText === 'string' ? chunk.chunkText : '';
+  if (!chunkText.trim()) {
+    return [];
+  }
 
-  const sortedChunks = [...chunks].sort((a, b) => {
-    const aIndex = typeof a.chunkIndex === 'number' ? a.chunkIndex : 0;
-    const bIndex = typeof b.chunkIndex === 'number' ? b.chunkIndex : 0;
-    return aIndex - bIndex;
+  const scenes = extractHeuristicScenesFromChunkText(chunkText, {
+    chunkPageStart: typeof chunk.pageStart === 'number' ? chunk.pageStart : 1,
+    chunkPageEnd: typeof chunk.pageEnd === 'number' ? chunk.pageEnd : undefined,
+    startingSceneNumber,
   });
 
-  for (const chunk of sortedChunks) {
-    const chunkText = typeof chunk.chunkText === 'string' ? chunk.chunkText : '';
-    if (!chunkText.trim()) {
-      continue;
+  return scenes.map((scene) => ({
+    ...scene,
+    sceneNumber: normalizeSceneNumber(scene.sceneNumber, startingSceneNumber + 1),
+  }));
+}
+
+function mergeScenesWithHeuristicFallback(
+  primaryScenes: ExtractedScene[],
+  heuristicScenes: ExtractedScene[]
+): ExtractedScene[] {
+  if (heuristicScenes.length === 0) {
+    return primaryScenes;
+  }
+
+  const merged = [...primaryScenes];
+  const seen = new Set(
+    merged.map((scene) => makeSceneKey(scene.sceneNumber, scene.setName))
+  );
+
+  for (const scene of heuristicScenes) {
+    const key = makeSceneKey(scene.sceneNumber, scene.setName);
+    if (!seen.has(key)) {
+      merged.push(scene);
+      seen.add(key);
     }
+  }
 
-    const lines = chunkText.split('\n');
-    let charOffset = 0;
-    const headers: Array<{
-      offset: number;
-      sceneNumber: string | null;
-      intExt: 'INT' | 'EXT' | 'BOTH';
-      setName: string;
-      timeOfDay: string;
-    }> = [];
+  return merged;
+}
 
-    for (const line of lines) {
-      const parsed = parseSceneHeader(line.trim());
-      if (parsed) {
-        headers.push({
-          offset: charOffset,
-          ...parsed,
-        });
-      }
-      charOffset += line.length + 1;
-    }
+function shouldSupplementWithHeuristicScenes(
+  primaryScenes: ExtractedScene[],
+  heuristicScenes: ExtractedScene[]
+): boolean {
+  if (primaryScenes.length === 0 || heuristicScenes.length === 0) {
+    return false;
+  }
 
-    if (headers.length === 0) {
-      continue;
-    }
+  if (heuristicScenes.length < 3) {
+    return false;
+  }
 
-    const chunkStartPage = typeof chunk.pageStart === 'number' ? chunk.pageStart : 1;
-    const chunkEndPage =
-      typeof chunk.pageEnd === 'number'
-        ? Math.max(chunkStartPage, chunk.pageEnd)
-        : chunkStartPage + Math.max(0, chunkText.length / HEURISTIC_CHARS_PER_PAGE);
-    const chunkPageSpan = Math.max(1, chunkEndPage - chunkStartPage + 1);
-    const chunkLength = Math.max(1, chunkText.length);
+  const coverageRatio = primaryScenes.length / heuristicScenes.length;
+  return coverageRatio < 0.55;
+}
 
-    for (let i = 0; i < headers.length; i++) {
-      const header = headers[i];
-      const nextOffset = headers[i + 1]?.offset ?? chunkText.length;
-      const sceneCharLength = Math.max(1, nextOffset - header.offset);
+function makeSceneKey(sceneNumber: string, setName: string): string {
+  return `${normalizeSceneNumber(sceneNumber, 0).toUpperCase()}::${String(setName).trim().toUpperCase()}`;
+}
 
-      const startPageEstimate = chunkStartPage + (header.offset / chunkLength) * chunkPageSpan;
-      const durationPages = Math.max(1 / 8, sceneCharLength / HEURISTIC_CHARS_PER_PAGE);
-      const endPageEstimate = startPageEstimate + durationPages;
-      const scriptPageStart = roundToEighth(startPageEstimate);
-      const scriptPageEnd = Math.max(scriptPageStart, roundToEighth(endPageEstimate));
-      const pageLengthEighths = Math.max(
-        1,
-        Math.round((scriptPageEnd - scriptPageStart) * 8) || Math.round(durationPages * 8)
-      );
-
-      const sceneNumber = header.sceneNumber || String(nextAutoSceneNumber);
-      const parsedSceneNum = parseSceneNumber(sceneNumber);
-      if (parsedSceneNum > 0) {
-        nextAutoSceneNumber = Math.max(nextAutoSceneNumber, parsedSceneNum + 1);
-      } else {
-        nextAutoSceneNumber++;
-      }
-
-      extracted.push({
-        sceneNumber,
-        intExt: header.intExt,
-        setName: header.setName,
-        timeOfDay: header.timeOfDay,
-        pageLengthEighths,
-        synopsis: 'Auto-detected from scene heading.',
-        characters: [],
-        scriptPageStart,
-        scriptPageEnd,
+function applySceneToContext(
+  scene: ExtractedScene,
+  knownCharacters: CharacterReference[],
+  knownLocations: LocationReference[],
+  context: AgentContext
+): void {
+  for (const charName of scene.characters) {
+    const existing = knownCharacters.find(
+      (character) => character.name === charName || character.aliases.includes(charName)
+    );
+    if (existing) {
+      existing.sceneCount++;
+    } else {
+      knownCharacters.push({
+        name: charName,
+        aliases: [],
+        firstAppearance: parseInt(scene.sceneNumber, 10) || context.lastSceneNumber + 1,
+        sceneCount: 1,
       });
     }
   }
 
-  return extracted;
-}
+  updateKnownLocations(knownLocations, scene);
 
-function parseSceneHeader(line: string): {
-  sceneNumber: string | null;
-  intExt: 'INT' | 'EXT' | 'BOTH';
-  setName: string;
-  timeOfDay: string;
-} | null {
-  if (!line) return null;
-
-  const match = line.match(HEURISTIC_SCENE_HEADER_PATTERN);
-  if (!match) return null;
-
-  const sceneNumber = match[1] ? normalizeSceneNumber(match[1], 1) : null;
-  const intExt = normalizeIntExt(match[2]);
-  const rest = (match[3] || '').trim();
-  if (!rest) return null;
-
-  const segments = rest
-    .split(/\s+-\s+/)
-    .map((segment) => segment.trim())
-    .filter(Boolean);
-
-  if (segments.length === 0) return null;
-
-  const tail = segments[segments.length - 1].toUpperCase();
-  const normalizedTail = tail.replace(/\./g, '').trim();
-  const hasTimeOfDay = VALID_TIMES_OF_DAY.some(
-    (time) => normalizedTail === time || normalizedTail.startsWith(`${time} `)
-  );
-
-  const timeOfDay = hasTimeOfDay ? normalizeTimeOfDay(normalizedTail) : 'DAY';
-  const setSegments = hasTimeOfDay ? segments.slice(0, -1) : segments;
-  const setName = setSegments.join(' - ').trim() || rest;
-
-  return {
-    sceneNumber,
-    intExt,
-    setName,
-    timeOfDay,
-  };
-}
-
-function roundToEighth(value: number): number {
-  const safe = Number.isFinite(value) ? value : 1;
-  return Math.max(1 / 8, Math.round(safe * 8) / 8);
-}
-
-function parseSceneNumber(sceneNumber: string): number {
-  // Handle scene numbers like "1", "2A", "45B", "10.1"
-  const match = sceneNumber.match(/^(\d+)/);
-  if (match) {
-    return parseInt(match[1]);
+  const sceneNum = parseInt(scene.sceneNumber, 10);
+  if (!Number.isNaN(sceneNum) && sceneNum > context.lastSceneNumber) {
+    context.lastSceneNumber = sceneNum;
   }
-  return 0;
 }
