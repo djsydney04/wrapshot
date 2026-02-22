@@ -20,6 +20,7 @@ interface DropdownMenuContentProps {
 
 interface DropdownMenuItemProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
+  closeOnSelect?: boolean;
 }
 
 interface DropdownMenuSeparatorProps {
@@ -105,12 +106,20 @@ function DropdownMenuContent({ children, align = "end", className }: DropdownMen
   );
 }
 
-function DropdownMenuItem({ children, className, onClick, ...props }: DropdownMenuItemProps) {
+function DropdownMenuItem({
+  children,
+  className,
+  onClick,
+  type,
+  closeOnSelect = true,
+  ...props
+}: DropdownMenuItemProps) {
   const { setOpen } = React.useContext(DropdownMenuContext);
+  const buttonType = type ?? "button";
 
   return (
     <button
-      type="button"
+      type={buttonType}
       className={cn(
         "relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none",
         "hover:bg-accent hover:text-accent-foreground",
@@ -120,7 +129,12 @@ function DropdownMenuItem({ children, className, onClick, ...props }: DropdownMe
       )}
       onClick={(e) => {
         onClick?.(e);
-        setOpen(false);
+        if (e.defaultPrevented) return;
+        // Allow native form submit to proceed before unmounting this menu item.
+        if (buttonType === "submit") return;
+        if (closeOnSelect) {
+          setOpen(false);
+        }
       }}
       {...props}
     >
