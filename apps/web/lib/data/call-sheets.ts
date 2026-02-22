@@ -107,6 +107,13 @@ export interface CallSheetFullData {
     callTime: string;
     notes: string | null;
   }>;
+  crewCalls: Array<{
+    id: string;
+    crewName: string;
+    callTime: string;
+    notes: string | null;
+    sortOrder: number;
+  }>;
   locations: Array<{
     name: string;
     address: string | null;
@@ -446,6 +453,17 @@ export async function getFullCallSheetDataForProject(
     return { data: null, error: deptError.message };
   }
 
+  const { data: crewCalls, error: crewError } = await supabase
+    .from("CallSheetCrewCall")
+    .select("id, crewName, callTime, notes, sortOrder")
+    .eq("callSheetId", callSheet.id)
+    .order("sortOrder", { ascending: true });
+
+  if (crewError) {
+    console.error("Error fetching crew calls:", crewError);
+    return { data: null, error: crewError.message };
+  }
+
   const projectRelation = firstRelation(
     (
       shootingDay as {
@@ -604,6 +622,7 @@ export async function getFullCallSheetDataForProject(
       castCallTimes: normalizedCastCallTimes,
       departmentCalls: (departmentCalls ||
         []) as CallSheetFullData["departmentCalls"],
+      crewCalls: (crewCalls || []) as CallSheetFullData["crewCalls"],
       locations,
     },
     error: null,

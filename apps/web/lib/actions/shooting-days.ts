@@ -387,6 +387,14 @@ export interface DepartmentCallTime {
   notes?: string;
 }
 
+// Crew call time type (for multiple crews/units)
+export interface CrewCallTime {
+  crewName: string;
+  callTime: string;
+  notes?: string;
+  sortOrder?: number;
+}
+
 // Update department call times for a shooting day
 export async function updateDepartmentCallTimes(
   shootingDayId: string,
@@ -546,4 +554,84 @@ export async function getProjectScenes(projectId: string) {
   }
 
   return { data, error: null };
+}
+
+// Update crew call times for a shooting day (multiple crews/units)
+export async function updateCrewCallTimes(
+  shootingDayId: string,
+  crewTimes: CrewCallTime[]
+) {
+  const supabase = await createClient();
+
+  // First get or create the call sheet for this shooting day
+  let { data: callSheet, error: fetchError } = await supabase
+    .from("CallSheet")
+    .select("id")
+    .eq("shootingDayId", shootingDayId)
+    .maybeSingle();
+
+  if (fetchError) {
+    console.error("Error fetching call sheet:", fetchError);
+    return { success: false, error: fetchError.message };
+  }
+
+  // Create call sheet if it doesn't exist
+  if (!callSheet) {
+    const { data: newCallSheet, error: createError } = await supabase
+      .from("CallSheet")
+      .insert({ shootingDayId })
+      .select("id")
+      .single();
+
+    if (createError) {
+      console.error("Error creating call sheet:", createError);
+      return { success: false, error: createError.message };
+    }
+    callSheet = newCallSheet;
+  }
+
+  // Delete existing crew calls
+  const { error: deleteError } = await supabase
+    .from("CallSheetCrewCall")
+    .delete()
+    .eq("callSheetId", callSheet.id);
+
+  if (deleteError) {
+    console.error("Error deleting crew calls:", deleteError);
+    return { success: false, error: deleteError.message };
+  }
+
+  // Insert new crew calls
+  if (crewTimes.length > 0) {
+    const crewInserts = crewTimes.map((ct, index) => ({
+      callSheetId: callSheet!.id,
+      crewName: ct.crewName,
+      callTime: ct.callTime,
+      notes: ct.notes || null,
+      sortOrder: ct.sortOrder ?? index,
+    }));
+
+    const { error: insertError } = await supabase
+      .from("CallSheetCrewCall")
+      .insert(crewInserts);
+
+    if (insertError) {
+      console.error("Error inserting crew calls:", insertError);
+      return { success: false, error: insertError.message };
+    }
+  }
+
+  // Get the shooting day to revalidate the project path
+  const { data: shootingDay } = await supabase
+    .from("ShootingDay")
+    .select("projectId")
+    .eq("id", shootingDayId)
+    .single();
+
+  if (shootingDay) {
+    revalidatePath(`/projects/${shootingDay.projectId}`);
+  }
+  revalidatePath("/schedule");
+
+  return { success: true, error: null };
 }
