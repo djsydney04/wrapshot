@@ -3,7 +3,7 @@
 import * as React from "react";
 import {
   LayoutDashboard,
-  Bot,
+  MessageSquare,
   FileText,
   Calendar,
   Film,
@@ -114,7 +114,7 @@ export function ProjectSidebar({
         label: "Planning",
         items: [
           { key: "dashboard", id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-          { key: "assistant", id: "assistant", label: "Agent", icon: Bot },
+          { key: "assistant", id: "assistant", label: "Agent", icon: MessageSquare },
           {
             key: "script",
             id: "script",

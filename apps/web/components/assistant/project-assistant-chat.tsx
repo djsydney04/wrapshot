@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import {
-  Bot,
   Check,
   Copy,
   Lightbulb,
@@ -59,7 +58,6 @@ export function ProjectAssistantChat({
   const [error, setError] = React.useState<string | null>(null);
   const [query, setQuery] = React.useState("");
   const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null);
-  const viewportRef = React.useRef<HTMLDivElement | null>(null);
 
   const fetchHistory = React.useCallback(async () => {
     setLoadingHistory(true);
@@ -88,12 +86,6 @@ export function ProjectAssistantChat({
     setMessages([]);
     void fetchHistory();
   }, [fetchHistory, projectId]);
-
-  React.useEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    viewport.scrollTop = viewport.scrollHeight;
-  }, [messages, sending]);
 
   const handleSend = async (prompt?: string) => {
     const message = (prompt ?? query).trim();
@@ -181,11 +173,11 @@ export function ProjectAssistantChat({
   return (
     <div
       className={cn(
-        "flex h-full min-h-[680px] flex-col rounded-2xl border border-border bg-card/95",
+        "flex flex-col rounded-2xl border border-border bg-card/95",
         className
       )}
     >
-      <div className="flex items-start justify-between gap-4 border-b border-border px-4 py-3">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border px-5 py-4 sm:px-6 sm:py-5">
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-base font-semibold">Wrapshot Assistant</h2>
@@ -225,16 +217,16 @@ export function ProjectAssistantChat({
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1fr)_310px]">
-        <div className="flex min-h-0 flex-col">
-          <div ref={viewportRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+      <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex flex-col">
+          <div className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
             {loadingHistory ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading conversation...
               </div>
             ) : messages.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center">
+              <div className="rounded-xl border border-dashed border-border px-5 py-12 text-center">
                 <Lightbulb className="mx-auto mb-2 h-5 w-5 text-muted-foreground" />
                 <p className="text-sm font-medium">Start with a production question</p>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -249,15 +241,9 @@ export function ProjectAssistantChat({
                     key={message.id}
                     className={cn("flex gap-3", isAssistant ? "justify-start" : "justify-end")}
                   >
-                    {isAssistant && (
-                      <span className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-border bg-muted">
-                        <Bot className="h-4 w-4 text-muted-foreground" />
-                      </span>
-                    )}
-
                     <div
                       className={cn(
-                        "max-w-[85%] rounded-xl border px-3 py-2.5 text-sm",
+                        "max-w-[88%] rounded-xl border px-4 py-3 text-sm",
                         isAssistant
                           ? "border-border bg-muted/45 text-foreground"
                           : "border-primary/15 bg-primary text-primary-foreground"
@@ -313,7 +299,7 @@ export function ProjectAssistantChat({
             )}
           </div>
 
-          <div className="border-t border-border px-4 py-3">
+          <div className="border-t border-border px-5 py-4 sm:px-6 sm:py-5">
             <div className="flex gap-2">
               <Textarea
                 rows={3}
@@ -349,7 +335,7 @@ export function ProjectAssistantChat({
           </div>
         </div>
 
-        <aside className="border-t border-border px-4 py-4 lg:border-l lg:border-t-0">
+        <aside className="border-t border-border px-5 py-5 sm:px-6 lg:border-l lg:border-t-0">
           <p className="text-xs font-semibold uppercase tracking-[0.11em] text-muted-foreground">
             Quick Prompts
           </p>
