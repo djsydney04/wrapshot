@@ -12,8 +12,8 @@ test-results
 # Next.js
 .next/
 out/
-build
-dist
+/build
+/dist
 
 # Misc
 .DS_Store
