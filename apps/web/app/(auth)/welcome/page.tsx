@@ -17,7 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 const features = [
   {
     icon: FileText,
-    title: "AI Script Pipeline",
+    title: "Script Pipeline",
     description: "Upload a PDF and auto-extract scenes, cast, elements, and synopses",
   },
   {
@@ -28,7 +28,7 @@ const features = [
   {
     icon: Users,
     title: "Analysis Results Dashboard",
-    description: "Review AI output, edit inline, and accept crew suggestions quickly",
+    description: "Review analysis results, edit inline, and accept crew suggestions quickly",
   },
   {
     icon: Film,
@@ -105,9 +105,8 @@ export default function WelcomePage() {
               production platform
             </h1>
             <p className="mt-3 text-base text-muted-foreground max-w-md leading-relaxed">
-              Plan from script to shoot day in one workspace. Use Wrapshot Intelligence to
-              break down scripts, review results, and move straight into schedule, budget, and
-              call sheets.
+              Plan from script to shoot day in one workspace. Break down scripts, review
+              results, and move straight into schedule, budget, and call sheets.
             </p>
           </div>
 

@@ -742,6 +742,7 @@ export default function ProjectDetailPage() {
     activeSectionDataKeys.some((key) => !loadedData[key]) &&
     activeSectionErrorKeys.length === 0;
   const sectionMeta = SECTION_META[activeSection];
+  const isAssistantSection = activeSection === "assistant";
 
   const renderSection = () => {
     if (activeSectionErrorKeys.length > 0) {
@@ -1062,7 +1063,12 @@ export default function ProjectDetailPage() {
 
             {/* Section Content */}
             <div
-              className={cn("min-h-[220px]", "skeuo-panel rounded-2xl p-4 md:p-5")}
+              className={cn(
+                "min-h-[220px]",
+                isAssistantSection
+                  ? "rounded-2xl"
+                  : "skeuo-panel rounded-2xl p-4 md:p-5"
+              )}
             >
               {renderSection()}
             </div>

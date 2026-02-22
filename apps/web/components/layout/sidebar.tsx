@@ -15,7 +15,7 @@ import {
   User,
   LayoutDashboard,
   DollarSign,
-  Bot,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -75,12 +75,6 @@ const NAV_ITEMS: NavItem[] = [
       { label: "Budgets", href: "/finance" },
       { label: "New Budget", href: "/finance/new" },
     ],
-  },
-  {
-    label: "Assistant",
-    href: "/assistant",
-    icon: Bot,
-    tourId: "assistant",
   },
 ];
 
@@ -217,22 +211,6 @@ export function Sidebar({ user }: SidebarProps) {
             const Icon = item.icon;
 
             if (!sidebarOpen) {
-              // Assistant item toggles panel even when collapsed
-              if (item.tourId === "assistant") {
-                return (
-                  <SimpleTooltip key={item.href} content={`${item.label} (⌘J)`} side="right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      data-tour={item.tourId}
-                      onClick={toggleAssistantPanel}
-                      className="w-full text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover"
-                    >
-                      <Icon className="h-4 w-4" />
-                    </Button>
-                  </SimpleTooltip>
-                );
-              }
               return (
                 <SimpleTooltip key={item.href} content={item.label} side="right">
                   <Link href={item.href} data-tour={item.tourId}>
@@ -328,27 +306,6 @@ export function Sidebar({ user }: SidebarProps) {
               );
             }
 
-            // Assistant item toggles the side panel
-            if (item.tourId === "assistant") {
-              return (
-                <Button
-                  key={item.href}
-                  variant="ghost"
-                  data-tour={item.tourId}
-                  onClick={toggleAssistantPanel}
-                  className={cn(
-                    "h-8 w-full justify-start gap-2 font-normal text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover"
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                  <kbd className="ml-auto pointer-events-none h-5 select-none rounded border border-sidebar-kbd-border bg-sidebar-kbd px-1.5 font-mono text-[10px] font-medium text-sidebar-kbd-foreground">
-                    ⌘J
-                  </kbd>
-                </Button>
-              );
-            }
-
             return (
               <Link key={item.href} href={item.href} data-tour={item.tourId}>
                 <Button
@@ -410,6 +367,36 @@ export function Sidebar({ user }: SidebarProps) {
           </>
         )}
       </nav>
+
+      {/* Assistant */}
+      <div className="relative z-10 border-t border-sidebar-border px-2 py-2">
+        {sidebarOpen ? (
+          <Button
+            variant="ghost"
+            data-tour="assistant"
+            onClick={toggleAssistantPanel}
+            className="h-8 w-full justify-start gap-2 font-normal text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover"
+          >
+            <Sparkles className="h-4 w-4" />
+            Assistant
+            <kbd className="ml-auto pointer-events-none h-5 select-none rounded border border-sidebar-kbd-border bg-sidebar-kbd px-1.5 font-mono text-[10px] font-medium text-sidebar-kbd-foreground">
+              ⌘J
+            </kbd>
+          </Button>
+        ) : (
+          <SimpleTooltip content="Assistant (⌘J)" side="right">
+            <Button
+              variant="ghost"
+              size="icon"
+              data-tour="assistant"
+              onClick={toggleAssistantPanel}
+              className="w-full text-sidebar-foreground-muted hover:text-sidebar-foreground-active hover:bg-sidebar-hover"
+            >
+              <Sparkles className="h-4 w-4" />
+            </Button>
+          </SimpleTooltip>
+        )}
+      </div>
 
       {/* Footer */}
       <div className="relative z-10 space-y-1 border-t border-sidebar-border p-2">

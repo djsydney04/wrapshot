@@ -8,7 +8,7 @@ import {
   Search,
   LayoutDashboard,
   Plus,
-  Bot,
+  MessageSquare,
   Settings,
   CreditCard,
   DollarSign,
@@ -109,7 +109,7 @@ export function CommandPalette() {
                 onSelect={() => runCommand(() => router.push("/assistant"))}
                 className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm aria-selected:bg-accent"
               >
-                <Bot className="h-4 w-4" />
+                <MessageSquare className="h-4 w-4" />
                 Open Assistant
               </Command.Item>
             </Command.Group>
@@ -150,7 +150,7 @@ export function CommandPalette() {
                 onSelect={() => runCommand(() => router.push("/assistant"))}
                 className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm aria-selected:bg-accent"
               >
-                <Bot className="h-4 w-4" />
+                <MessageSquare className="h-4 w-4" />
                 Assistant
               </Command.Item>
               <Command.Item

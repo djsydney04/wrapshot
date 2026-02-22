@@ -2,13 +2,11 @@
 
 import * as React from "react";
 import {
-  Bot,
   Check,
   Copy,
   Lightbulb,
   Loader2,
   Send,
-  User2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -228,25 +226,19 @@ export function AssistantChatCore({
               <div key={message.id} className="space-y-2">
                 <div
                   className={cn(
-                    "flex gap-2",
+                    "flex",
                     isAssistant ? "justify-start" : "justify-end"
                   )}
                 >
-                  {isAssistant && (
-                    <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border border-border bg-muted">
-                      <Bot className="h-3.5 w-3.5 text-muted-foreground" />
-                    </span>
-                  )}
-
                   <div
                     className={cn(
-                      "max-w-[88%] rounded-xl border px-2.5 py-2 text-sm",
+                      "max-w-[85%] rounded-2xl px-3 py-2.5 text-sm",
                       isAssistant
-                        ? "border-border bg-muted/45 text-foreground"
-                        : "border-primary/15 bg-primary text-primary-foreground"
+                        ? "bg-muted/50 text-foreground"
+                        : "bg-primary text-primary-foreground"
                     )}
                   >
-                    <p className="whitespace-pre-wrap text-[13px] leading-5">
+                    <p className="whitespace-pre-wrap text-[13px] leading-relaxed">
                       {message.content}
                     </p>
                     <div
@@ -254,7 +246,7 @@ export function AssistantChatCore({
                         "mt-1.5 flex items-center justify-between gap-2 text-[10px]",
                         isAssistant
                           ? "text-muted-foreground"
-                          : "text-primary-foreground/75"
+                          : "text-primary-foreground/70"
                       )}
                     >
                       <span>{formatMessageTime(message.createdAt)}</span>
@@ -273,19 +265,13 @@ export function AssistantChatCore({
                       )}
                     </div>
                   </div>
-
-                  {!isAssistant && (
-                    <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border border-primary/20 bg-primary/10">
-                      <User2 className="h-3.5 w-3.5 text-primary" />
-                    </span>
-                  )}
                 </div>
 
                 {/* Confirmation card */}
                 {meta?.type === "tool_confirmation_request" &&
                   meta.confirmationId &&
                   meta.actions && (
-                    <div className="ml-8">
+                    <div className="pl-1">
                       <ToolConfirmationCard
                         confirmationId={meta.confirmationId}
                         actions={meta.actions}
@@ -309,7 +295,7 @@ export function AssistantChatCore({
         )}
 
         {sending && (
-          <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+          <div className="inline-flex items-center gap-2 rounded-2xl bg-muted/50 px-3 py-2.5 text-sm text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             Thinking...
           </div>
@@ -317,8 +303,8 @@ export function AssistantChatCore({
       </div>
 
       {/* Input area */}
-      <div className="border-t border-border px-3 py-2">
-        <div className="flex gap-2">
+      <div className="border-t border-border px-3 py-3">
+        <div className="relative">
           <Textarea
             rows={compact ? 2 : 3}
             maxLength={4000}
@@ -331,19 +317,18 @@ export function AssistantChatCore({
                 void handleSend();
               }
             }}
-            className="text-sm"
+            className="pr-12 text-sm"
           />
           <Button
-            className="h-auto min-w-[60px] gap-1"
-            size="sm"
+            size="icon"
+            className="absolute bottom-2 right-2 h-7 w-7 rounded-lg"
             onClick={() => void handleSend()}
             disabled={sending || !query.trim()}
           >
             <Send className="h-3.5 w-3.5" />
-            Send
           </Button>
         </div>
-        <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
+        <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
           <span>Enter to send</span>
           <span>{query.length}/4000</span>
         </div>

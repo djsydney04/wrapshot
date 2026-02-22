@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Bot, ChevronLeft, ExternalLink, Loader2 } from "lucide-react";
+import { ChevronLeft, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { ProjectAssistantChat } from "@/components/assistant/project-assistant-chat";
@@ -68,10 +68,7 @@ export default function AssistantPage() {
             <span className="hidden text-sm font-medium sm:inline">Dashboard</span>
           </Link>
           <span className="hidden text-muted-foreground/60 sm:inline">/</span>
-          <span className="flex items-center gap-2 text-sm font-semibold">
-            <Bot className="h-4 w-4" />
-            Assistant
-          </span>
+          <span className="text-sm font-semibold">Assistant</span>
         </div>
       </header>
 

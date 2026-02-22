@@ -22,7 +22,7 @@ export function AssistantPanel() {
         open={panelOpen}
         onOpenChange={(open) => !open && closePanel()}
         side="right"
-        className="w-[420px]"
+        className="w-[400px]"
       >
         <SlidePanelHeader onClose={closePanel}>
           <SlidePanelTitle>Wrapshot Assistant</SlidePanelTitle>
@@ -44,7 +44,7 @@ export function AssistantPanel() {
       open={panelOpen}
       onOpenChange={(open) => !open && closePanel()}
       side="right"
-      className="w-[420px]"
+      className="w-[400px]"
     >
       <SlidePanelHeader onClose={closePanel}>
         <div className="flex items-center gap-2">

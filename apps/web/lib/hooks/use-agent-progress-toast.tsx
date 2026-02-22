@@ -22,7 +22,7 @@ function getRunningToastContent(job: AgentJob): React.ReactNode {
     job.stepDescription || STEP_DEFINITIONS[job.status]?.description || "Processing";
 
   return (
-    <div className="w-[280px] space-y-1.5">
+    <div className="w-full min-w-0 space-y-2 pt-0.5">
       <p className="text-xs leading-snug text-muted-foreground">{stepText}</p>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
         <div
@@ -30,7 +30,7 @@ function getRunningToastContent(job: AgentJob): React.ReactNode {
           style={{ width: `${progress}%` }}
         />
       </div>
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground tabular-nums">
         <span>
           Step {Math.max(job.currentStep, 1)} of {Math.max(job.totalSteps, 1)}
         </span>
@@ -64,7 +64,7 @@ export function useAgentProgressToast({
     lastStatusRef.current = statusKey;
 
     if (isRunning) {
-      toast.loading("AI is working on your script", {
+      toast.loading("Analyzing your script", {
         id: toastId,
         description: getRunningToastContent(job),
         duration: Number.POSITIVE_INFINITY,
@@ -73,7 +73,7 @@ export function useAgentProgressToast({
     }
 
     if (isComplete) {
-      toast.success("AI analysis complete", {
+      toast.success("Script analysis complete", {
         id: toastId,
         description: getCompletionDescription(job),
       });
@@ -82,14 +82,14 @@ export function useAgentProgressToast({
 
     if (isFailed) {
       if (job.status === "cancelled") {
-        toast("AI analysis cancelled", {
+        toast("Script analysis cancelled", {
           id: toastId,
           description: "The script analysis job was cancelled.",
         });
         return;
       }
 
-      toast.error("AI analysis failed", {
+      toast.error("Script analysis failed", {
         id: toastId,
         description: job.errorMessage || "Something went wrong while analyzing your script.",
       });
