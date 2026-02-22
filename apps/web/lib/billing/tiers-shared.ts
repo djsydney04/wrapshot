@@ -128,9 +128,9 @@ export function getTierFeatures(tier: PlanTier): string[] {
     features.push(`${tier.historyRetentionDays}-day history`);
   }
 
-  // AI features
+  // Smart features
   if (tier.hasAiFeatures) {
-    features.push("AI-powered features");
+    features.push("Smart features");
   }
 
   // Priority support
