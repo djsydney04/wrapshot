@@ -29,7 +29,7 @@ interface SceneWithLocation {
   dayNight: string;
   pageCount: number;
   sortOrder: number;
-  location: { name: string } | null;
+  location: { name: string } | { name: string }[] | null;
 }
 
 export async function POST(request: Request) {
@@ -118,10 +118,14 @@ export async function POST(request: Request) {
     // 5. Format scenes for the AI prompt
     const sceneList = (scenes as SceneWithLocation[])
       .map((s) => {
-        const locationName =
-          s.location && typeof s.location === "object"
-            ? s.location.name
-            : "Unknown";
+        let locationName = "Unknown";
+        if (s.location) {
+          if (Array.isArray(s.location)) {
+            locationName = s.location[0]?.name || "Unknown";
+          } else {
+            locationName = s.location.name || "Unknown";
+          }
+        }
         return `- ID: ${s.id} | Scene ${s.sceneNumber} | ${s.intExt} ${locationName} - ${s.dayNight} | ${s.pageCount} pages | ${s.synopsis || "No synopsis"}`;
       })
       .join("\n");
