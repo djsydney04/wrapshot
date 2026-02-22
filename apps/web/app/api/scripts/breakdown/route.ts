@@ -9,6 +9,7 @@ import {
   normalizeSceneNumber,
   sortByScriptPageOrder,
 } from "@/lib/scripts/scene-order";
+import { extractHeuristicScenesFromChunkText } from "@/lib/scripts/scene-heuristics";
 import { getScriptAnalysisApiKey } from "@/lib/ai/config";
 
 export interface ExtractedScene {
@@ -35,6 +36,8 @@ interface SceneExtractionResponse {
 
 const LEGACY_BREAKDOWN_MAX_CHARS_PER_CHUNK = 14000;
 const LEGACY_BREAKDOWN_MIN_CHARS_PER_CHUNK = 2500;
+const LEGACY_MIN_SCENE_TOKENS = 1400;
+const LEGACY_MAX_SCENE_TOKENS = 5000;
 
 async function extractScenesWithChunking(
   scriptText: string,
@@ -54,6 +57,11 @@ async function extractScenesWithChunking(
   const extractedScenes: ExtractedScene[] = [];
 
   for (const chunk of chunks) {
+    const chunkFallbackScenes = buildLegacyHeuristicScenes(
+      chunk,
+      extractedScenes.length + 1
+    );
+
     try {
       const response = await kimi.complete({
         messages: [
@@ -67,28 +75,47 @@ async function extractScenesWithChunking(
               `(estimated pages ${chunk.pageStart}-${chunk.pageEnd}).\n\n${chunk.chunkText}`,
           },
         ],
-        maxTokens: 8000,
+        maxTokens: estimateLegacySceneExtractionMaxTokens(chunk),
         temperature: 0.1,
       });
 
       const parsed = KC.extractJson<SceneExtractionResponse | BreakdownResult>(response);
       const chunkScenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
+      const normalizedChunkScenes: ExtractedScene[] = [];
 
       for (const scene of chunkScenes) {
         const normalized = normalizeExtractedScene(
           scene,
-          extractedScenes.length + 1,
+          extractedScenes.length + normalizedChunkScenes.length + 1,
           chunk.pageStart ?? 1
         );
         if (normalized) {
-          extractedScenes.push(normalized);
+          normalizedChunkScenes.push(normalized);
         }
       }
+
+      if (normalizedChunkScenes.length === 0 && chunkFallbackScenes.length > 0) {
+        extractedScenes.push(...chunkFallbackScenes);
+        continue;
+      }
+
+      if (shouldSupplementLegacyScenes(normalizedChunkScenes, chunkFallbackScenes)) {
+        extractedScenes.push(
+          ...mergeLegacySceneFallback(normalizedChunkScenes, chunkFallbackScenes)
+        );
+        continue;
+      }
+
+      extractedScenes.push(...normalizedChunkScenes);
     } catch (error) {
       console.error(
         `[LegacyScriptBreakdown] Failed to process chunk ${chunk.chunkIndex + 1}/${chunks.length}:`,
         error
       );
+
+      if (chunkFallbackScenes.length > 0) {
+        extractedScenes.push(...chunkFallbackScenes);
+      }
     }
   }
 
@@ -103,6 +130,75 @@ async function extractScenesWithChunking(
   );
 
   return sortByScriptPageOrder(deduped, (scene) => scene.script_page_start);
+}
+
+function estimateLegacySceneExtractionMaxTokens(
+  chunk: { sceneCount?: number }
+): number {
+  const estimatedScenes = typeof chunk.sceneCount === "number"
+    ? Math.max(chunk.sceneCount, 1)
+    : 8;
+  const target = estimatedScenes * 180;
+  return Math.max(LEGACY_MIN_SCENE_TOKENS, Math.min(LEGACY_MAX_SCENE_TOKENS, target));
+}
+
+function buildLegacyHeuristicScenes(
+  chunk: { chunkText: string; pageStart: number | null; pageEnd: number | null },
+  fallbackSceneNumber: number
+): ExtractedScene[] {
+  const scenes = extractHeuristicScenesFromChunkText(chunk.chunkText, {
+    chunkPageStart: chunk.pageStart ?? 1,
+    chunkPageEnd: chunk.pageEnd ?? undefined,
+    startingSceneNumber: fallbackSceneNumber - 1,
+  });
+
+  return scenes.map((scene, index) => ({
+    scene_number: normalizeSceneNumber(scene.sceneNumber, fallbackSceneNumber + index),
+    int_ext: scene.intExt,
+    set_name: scene.setName,
+    time_of_day: scene.timeOfDay,
+    page_length_eighths: scene.pageLengthEighths,
+    synopsis: scene.synopsis,
+    characters: scene.characters,
+    script_page_start: scene.scriptPageStart,
+    script_page_end: scene.scriptPageEnd,
+  }));
+}
+
+function shouldSupplementLegacyScenes(
+  primaryScenes: ExtractedScene[],
+  fallbackScenes: ExtractedScene[]
+): boolean {
+  if (primaryScenes.length === 0 || fallbackScenes.length < 3) {
+    return false;
+  }
+
+  const coverageRatio = primaryScenes.length / fallbackScenes.length;
+  return coverageRatio < 0.55;
+}
+
+function mergeLegacySceneFallback(
+  primaryScenes: ExtractedScene[],
+  fallbackScenes: ExtractedScene[]
+): ExtractedScene[] {
+  const merged = [...primaryScenes];
+  const seen = new Set(
+    merged.map((scene) => makeLegacySceneKey(scene.scene_number, scene.set_name))
+  );
+
+  for (const scene of fallbackScenes) {
+    const key = makeLegacySceneKey(scene.scene_number, scene.set_name);
+    if (!seen.has(key)) {
+      merged.push(scene);
+      seen.add(key);
+    }
+  }
+
+  return merged;
+}
+
+function makeLegacySceneKey(sceneNumber: string, setName: string): string {
+  return `${normalizeSceneNumber(sceneNumber, 0).toUpperCase()}::${setName.trim().toUpperCase()}`;
 }
 
 function normalizeExtractedScene(
