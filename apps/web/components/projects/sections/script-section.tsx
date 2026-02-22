@@ -386,7 +386,7 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
           <DialogHeader>
             <DialogTitle>Upload Script</DialogTitle>
             <DialogDescription>
-              Upload a new PDF version of your script for Smart analysis
+              Upload a new PDF or FDX version of your script for Smart analysis
             </DialogDescription>
           </DialogHeader>
 
@@ -402,8 +402,8 @@ export function ScriptSection({ projectId, scripts, onScriptUploaded, onAnalysis
                 }
                 bucket="scripts"
                 folder={projectId}
-                accept="application/pdf,.pdf"
-                placeholder="Drop your script PDF here"
+                accept="application/pdf,.pdf,.fdx,.FDX"
+                placeholder="Drop your script PDF or FDX here"
                 fileName={uploadData.fileName}
               />
             </div>

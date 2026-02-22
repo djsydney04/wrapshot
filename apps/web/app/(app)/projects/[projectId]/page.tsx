@@ -200,7 +200,7 @@ const SECTION_ORDER: ProjectSection[] = [
 
 const WORKFLOW_PLAN: { id: string; label: string; section: ProjectSection }[] = [
   { id: "script", label: "Script Ready", section: "script" },
-  { id: "breakdown", label: "Break Down Scenes", section: "scenes" },
+  { id: "breakdown", label: "Scene Breakdowns", section: "scenes" },
   { id: "schedule", label: "Plan Shoot Days", section: "schedule" },
   { id: "callsheets", label: "Publish Call Sheets", section: "callsheets" },
   { id: "art", label: "Art Plan", section: "art" },

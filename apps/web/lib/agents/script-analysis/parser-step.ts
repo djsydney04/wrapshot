@@ -1,10 +1,10 @@
 /**
  * Parser Step
  *
- * Parses the script PDF and extracts raw text content.
+ * Parses the uploaded script file and extracts raw text content.
  */
 
-import { parsePdfScript, normalizeScriptText } from '@/lib/scripts/parser';
+import { parseScript, normalizeScriptText } from '@/lib/scripts/parser';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { AgentContext, AgentStepResult } from '../types';
 import type { ProgressTracker } from '../orchestrator/progress-tracker';
@@ -34,20 +34,20 @@ export async function executeParserStep(
 
     context.scriptUrl = script.fileUrl;
 
-    await tracker.updateProgress(1, 3, 'Downloading PDF');
+    await tracker.updateProgress(1, 3, 'Downloading script file');
 
-    // Fetch the PDF with timeout
+    // Fetch the script file with timeout
     const fetchController = new AbortController();
     const fetchTimeout = setTimeout(() => fetchController.abort(), 60000);
 
-    let pdfResponse: Response;
+    let scriptResponse: Response;
     try {
-      pdfResponse = await fetch(script.fileUrl, { signal: fetchController.signal });
+      scriptResponse = await fetch(script.fileUrl, { signal: fetchController.signal });
     } catch (fetchErr) {
       clearTimeout(fetchTimeout);
       const msg = fetchErr instanceof Error && fetchErr.name === 'AbortError'
-        ? 'PDF download timed out after 60s'
-        : `Failed to download PDF: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`;
+        ? 'Script download timed out after 60s'
+        : `Failed to download script: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`;
       return {
         success: false,
         error: msg,
@@ -57,34 +57,34 @@ export async function executeParserStep(
       clearTimeout(fetchTimeout);
     }
 
-    if (!pdfResponse.ok) {
+    if (!scriptResponse.ok) {
       return {
         success: false,
-        error: `Failed to fetch PDF: ${pdfResponse.status} ${pdfResponse.statusText}`,
-        errorDetails: { url: script.fileUrl, status: pdfResponse.status },
+        error: `Failed to fetch script file: ${scriptResponse.status} ${scriptResponse.statusText}`,
+        errorDetails: { url: script.fileUrl, status: scriptResponse.status },
       };
     }
 
-    const arrayBuffer = await pdfResponse.arrayBuffer();
-    const pdfBuffer = Buffer.from(arrayBuffer);
+    const arrayBuffer = await scriptResponse.arrayBuffer();
+    const scriptBuffer = Buffer.from(arrayBuffer);
 
-    if (pdfBuffer.length === 0) {
+    if (scriptBuffer.length === 0) {
       return {
         success: false,
-        error: 'Downloaded PDF file is empty (0 bytes)',
+        error: 'Downloaded script file is empty (0 bytes)',
         errorDetails: { url: script.fileUrl },
       };
     }
 
-    await tracker.updateProgress(2, 3, 'Parsing PDF content');
+    await tracker.updateProgress(2, 3, 'Parsing script content');
 
-    // Parse the PDF
-    const parsed = await parsePdfScript(pdfBuffer);
+    // Parse by file extension (PDF, FDX, Fountain, TXT)
+    const parsed = await parseScript(scriptBuffer, script.fileUrl);
 
     if (!parsed.text || parsed.text.trim().length === 0) {
       return {
         success: false,
-        error: 'PDF parsed successfully but contains no extractable text. The PDF may be image-based (scanned) — try uploading a text-based PDF.',
+        error: 'Script was parsed but contains no extractable text.',
         errorDetails: { pageCount: parsed.pageCount },
       };
     }
@@ -94,7 +94,7 @@ export async function executeParserStep(
     if (normalizedText.length < 100) {
       return {
         success: false,
-        error: `Script appears to be too short (${normalizedText.length} characters extracted). The PDF may not contain a valid screenplay.`,
+        error: `Script appears to be too short (${normalizedText.length} characters extracted).`,
         errorDetails: { extractedLength: normalizedText.length, pageCount: parsed.pageCount },
       };
     }

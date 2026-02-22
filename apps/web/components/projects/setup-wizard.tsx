@@ -161,6 +161,7 @@ export function SetupWizard({
         version: "1",
         color: "WHITE",
         fileUrl: url,
+        fileName: name,
         isActive: true,
       });
 
@@ -236,8 +237,8 @@ export function SetupWizard({
                   </div>
                   <h2 className="text-xl font-semibold mb-2">Upload Your Script</h2>
                   <p className="text-muted-foreground max-w-sm mx-auto">
-                    Drop your script PDF below. Wrapshot Intelligence will automatically analyze it
-                    and extract all scenes, characters, and production elements.
+                    Drop your script PDF or FDX below. Wrapshot Intelligence will automatically
+                    analyze it and extract all scenes, characters, and production elements.
                   </p>
                 </div>
                 <FileUpload
@@ -245,8 +246,8 @@ export function SetupWizard({
                   onChange={handleScriptUpload}
                   bucket="scripts"
                   folder={projectId}
-                  accept="application/pdf"
-                  placeholder="Drop your script PDF here to begin"
+                  accept="application/pdf,.pdf,.fdx,.FDX"
+                  placeholder="Drop your script PDF or FDX here to begin"
                   fileName={scriptName}
                 />
               </>

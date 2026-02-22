@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { KimiClient, SCENE_EXTRACTION_PROMPT, KimiClient as KC } from "@/lib/ai/kimi-client";
-import { parsePdfScript, normalizeScriptText } from "@/lib/scripts/parser";
+import { parseScript, normalizeScriptText } from "@/lib/scripts/parser";
 import { ScriptChunker } from "@/lib/agents/script-analysis/chunker";
 import {
   adjustChunkLocalPage,
@@ -292,7 +292,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { scriptId, fileUrl } = body;
+    const { scriptId, fileUrl, fileName } = body;
 
     if (!scriptId || !fileUrl) {
       return NextResponse.json(
@@ -319,17 +319,17 @@ export async function POST(request: Request) {
       })
       .eq("id", scriptId);
 
-    // Fetch the PDF file
-    let pdfBuffer: Buffer;
+    // Fetch the script file
+    let scriptBuffer: Buffer;
     try {
-      const pdfResponse = await fetch(fileUrl);
-      if (!pdfResponse.ok) {
-        throw new Error(`Failed to fetch PDF: ${pdfResponse.status}`);
+      const scriptResponse = await fetch(fileUrl);
+      if (!scriptResponse.ok) {
+        throw new Error(`Failed to fetch script file: ${scriptResponse.status}`);
       }
-      const arrayBuffer = await pdfResponse.arrayBuffer();
-      pdfBuffer = Buffer.from(arrayBuffer);
+      const arrayBuffer = await scriptResponse.arrayBuffer();
+      scriptBuffer = Buffer.from(arrayBuffer);
     } catch (fetchError) {
-      console.error("Error fetching PDF:", fetchError);
+      console.error("Error fetching script file:", fetchError);
       await supabase
         .from("Script")
         .update({ breakdownStatus: "FAILED" })
@@ -340,21 +340,21 @@ export async function POST(request: Request) {
       );
     }
 
-    // Parse the PDF
+    // Parse by file extension (PDF, FDX, Fountain, TXT)
     let scriptText: string;
     let pageCount: number;
     try {
-      const parsed = await parsePdfScript(pdfBuffer);
+      const parsed = await parseScript(scriptBuffer, fileName || fileUrl);
       scriptText = normalizeScriptText(parsed.text);
       pageCount = parsed.pageCount;
     } catch (parseError) {
-      console.error("Error parsing PDF:", parseError);
+      console.error("Error parsing script:", parseError);
       await supabase
         .from("Script")
         .update({ breakdownStatus: "FAILED" })
         .eq("id", scriptId);
       return NextResponse.json(
-        { error: "Failed to parse script PDF" },
+        { error: "Failed to parse script file" },
         { status: 500 }
       );
     }
