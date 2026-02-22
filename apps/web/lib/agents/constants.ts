@@ -18,7 +18,6 @@ export const CHUNK_CONFIG = {
   MAX_CHARS_PER_CHUNK: readPositiveIntFromEnv('SCRIPT_ANALYSIS_MAX_CHARS_PER_CHUNK', 12000),
   MIN_CHARS_PER_CHUNK: readPositiveIntFromEnv('SCRIPT_ANALYSIS_MIN_CHARS_PER_CHUNK', 2500),
   OVERLAP_CHARS: readPositiveIntFromEnv('SCRIPT_ANALYSIS_OVERLAP_CHARS', 500),
-  SCENE_HEADER_PATTERN: /^(?:\d+[A-Z]?\s+)?(?:INT|EXT)(?:\s*\.?\s*\/\s*(?:INT|EXT))?\.?/im,
 };
 
 // LLM configuration
