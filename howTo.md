@@ -49,7 +49,7 @@ Use this as a quick feature checklist before diving into full workflows.
 
 - Project creation and setup wizard
 - AI script upload, parsing, and scene extraction
-- Scene management (grid, kanban, timeline, list)
+- Scene management (grid, board, timeline, list)
 - Cast directory and invitations
 - Crew directory, departments, and access controls
 - Schedule planning (month/week/list)
@@ -157,7 +157,7 @@ When a new script version is uploaded:
 Access scenes through the **Scenes** section. Choose your preferred view:
 
 - **Grid View** - Visual cards showing scene thumbnails
-- **Kanban View** - Organized by status (Not Scheduled, In Progress, Completed)
+- **Board View** - Organized by status (Not Scheduled, In Progress, Completed)
 - **Timeline View** - Gantt chart showing schedule
 - **List View** - Detailed table format
 

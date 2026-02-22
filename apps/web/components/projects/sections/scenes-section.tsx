@@ -85,7 +85,7 @@ export function ScenesSection({
   const viewModes: { id: ViewMode; label: string; icon: React.ElementType }[] = [
     { id: "list", label: "List", icon: LayoutGrid },
     { id: "grid", label: "Grid", icon: LayoutGrid },
-    { id: "kanban", label: "Kanban", icon: Columns3 },
+    { id: "kanban", label: "Board", icon: Columns3 },
     { id: "timeline", label: "Timeline", icon: GanttChart },
   ];
 
