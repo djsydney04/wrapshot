@@ -840,6 +840,13 @@ export function ScheduleSection({
         defaultStartTime={defaultStartTime}
         defaultEndTime={defaultEndTime}
         useMockData={useMockData}
+        existingShootingDays={localShootingDays}
+        availableScenes={scenes}
+        onSuccess={() => {
+          // The realtime subscription should handle the update,
+          // but we can also trigger a refetch via page revalidation
+          // by updating local state optimistically
+        }}
       />
     </div>
   );
