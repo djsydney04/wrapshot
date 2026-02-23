@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { randomUUID } from "crypto";
 import { requireProjectPermission, getCurrentUserId, checkPlanLimit } from "@/lib/permissions/server";
 import type { ProjectRole } from "@/lib/permissions";
 import { sendProjectInviteEmail } from "@/lib/email/invites";
@@ -18,6 +19,87 @@ export interface PendingProjectInvite {
   expiresAt: string;
   createdAt: string;
   inviterName: string;
+}
+
+type ProjectInviteRow = {
+  id: string;
+  token: string;
+  email: string;
+  role: ProjectRole;
+  expiresAt: string;
+  createdAt: string;
+  createdBy: string;
+  projectId: string;
+};
+
+function getInviteExpiryIso(days = 7): string {
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + days);
+  return expiresAt.toISOString();
+}
+
+async function createOrRefreshProjectInvite(
+  projectId: string,
+  normalizedEmail: string,
+  role: ProjectRole,
+  inviterId: string
+): Promise<ProjectInviteRow> {
+  const supabase = await createClient();
+  const { data: existingInvite, error: existingInviteError } = await supabase
+    .from("ProjectInvite")
+    .select("id, token, email, role, expiresAt, createdAt, createdBy, projectId")
+    .eq("projectId", projectId)
+    .eq("email", normalizedEmail)
+    .maybeSingle();
+
+  if (existingInviteError) {
+    console.error("Error checking existing project invite:", existingInviteError);
+    throw new Error("Failed to create invite");
+  }
+
+  if (existingInvite && new Date(existingInvite.expiresAt) > new Date()) {
+    throw new Error("An invite has already been sent to this email");
+  }
+
+  if (existingInvite) {
+    const { data: refreshedInvite, error: refreshError } = await supabase
+      .from("ProjectInvite")
+      .update({
+        role,
+        createdBy: inviterId,
+        expiresAt: getInviteExpiryIso(),
+        token: randomUUID(),
+      })
+      .eq("id", existingInvite.id)
+      .select("id, token, email, role, expiresAt, createdAt, createdBy, projectId")
+      .single();
+
+    if (refreshError || !refreshedInvite) {
+      console.error("Error refreshing project invite:", refreshError);
+      throw new Error("Failed to create invite");
+    }
+
+    return refreshedInvite as ProjectInviteRow;
+  }
+
+  const { data: newInvite, error: newInviteError } = await supabase
+    .from("ProjectInvite")
+    .insert({
+      projectId,
+      email: normalizedEmail,
+      role,
+      createdBy: inviterId,
+      expiresAt: getInviteExpiryIso(),
+    })
+    .select("id, token, email, role, expiresAt, createdAt, createdBy, projectId")
+    .single();
+
+  if (newInviteError || !newInvite) {
+    console.error("Error creating project invite:", newInviteError);
+    throw new Error("Failed to create invite");
+  }
+
+  return newInvite as ProjectInviteRow;
 }
 
 // Get project members
@@ -179,6 +261,7 @@ export async function createProjectInvite(
 
   const supabase = await createClient();
   const normalizedEmail = email.trim().toLowerCase();
+  void department;
   const existingUserCheck = await checkUserExistsByEmail(normalizedEmail);
 
   // Check if user is already a member
@@ -195,39 +278,12 @@ export async function createProjectInvite(
     }
   }
 
-  // Check if invite already exists
-  const { data: existingInvite } = await supabase
-    .from("ProjectInvite")
-    .select("id")
-    .eq("projectId", projectId)
-    .eq("email", normalizedEmail)
-    .gt("expiresAt", new Date().toISOString())
-    .single();
-
-  if (existingInvite) {
-    throw new Error("An invite has already been sent to this email");
-  }
-
-  // Create invite (expires in 7 days)
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 7);
-
-  const { data, error } = await supabase
-    .from("ProjectInvite")
-    .insert({
-      projectId,
-      email: normalizedEmail,
-      role,
-      createdBy: userId,
-      expiresAt: expiresAt.toISOString(),
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error creating project invite:", error);
-    throw new Error("Failed to create invite");
-  }
+  const invite = await createOrRefreshProjectInvite(
+    projectId,
+    normalizedEmail,
+    role,
+    userId
+  );
 
   const [{ data: project }, { data: inviterProfile }, { data: authData }] = await Promise.all([
     supabase
@@ -256,7 +312,7 @@ export async function createProjectInvite(
     role,
     inviterName,
     inviterEmail,
-    inviteToken: data.token,
+    inviteToken: invite.token,
   });
 
   if (!emailResult.sent && emailResult.error) {
@@ -264,7 +320,7 @@ export async function createProjectInvite(
   }
 
   revalidatePath(`/projects/${projectId}/team`);
-  return data;
+  return invite;
 }
 
 // Resend a project invite
@@ -605,6 +661,7 @@ export async function inviteUserToProject(
 
   const supabase = await createClient();
   const normalizedEmail = email.trim().toLowerCase();
+  void department;
 
   // Check if user is already a member by email
   // First, check if there's a user with this email
@@ -624,39 +681,12 @@ export async function inviteUserToProject(
     }
   }
 
-  // Check if invite already exists
-  const { data: existingInvite } = await supabase
-    .from("ProjectInvite")
-    .select("id")
-    .eq("projectId", projectId)
-    .eq("email", normalizedEmail)
-    .gt("expiresAt", new Date().toISOString())
-    .single();
-
-  if (existingInvite) {
-    throw new Error("An invite has already been sent to this email");
-  }
-
-  // Create invite (expires in 7 days)
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 7);
-
-  const { data: invite, error: inviteError } = await supabase
-    .from("ProjectInvite")
-    .insert({
-      projectId,
-      email: normalizedEmail,
-      role,
-      createdBy: inviterId,
-      expiresAt: expiresAt.toISOString(),
-    })
-    .select()
-    .single();
-
-  if (inviteError) {
-    console.error("Error creating project invite:", inviteError);
-    throw new Error("Failed to create invite");
-  }
+  const invite = await createOrRefreshProjectInvite(
+    projectId,
+    normalizedEmail,
+    role,
+    inviterId
+  );
 
   // Get project name and inviter email for the email
   const { data: project } = await supabase
@@ -682,33 +712,37 @@ export async function inviteUserToProject(
     inviter?.email?.split("@")[0] ||
     "A team member";
 
+  const projectInviteEmailResult = await sendProjectInviteEmail({
+    toEmail: normalizedEmail,
+    projectName,
+    role,
+    inviterName,
+    inviterEmail,
+    inviteToken: invite.token,
+  });
+
+  const projectEmailWarning =
+    !projectInviteEmailResult.sent && projectInviteEmailResult.error
+      ? " Project invite email delivery failed."
+      : "";
+
   if (userCheck.exists) {
     // User exists on platform - they just need to accept the invite
-    const emailResult = await sendProjectInviteEmail({
-      toEmail: normalizedEmail,
-      projectName,
-      role,
-      inviterName,
-      inviterEmail,
-      inviteToken: invite.token,
-    });
-
-    const emailDeliveryWarning =
-      !emailResult.sent && emailResult.error
-        ? " Email delivery failed, but the in-app invite is available on their dashboard."
-        : "";
-
-    if (emailDeliveryWarning) {
+    if (projectEmailWarning) {
       console.warn(
         "Invite created for existing user, but email delivery failed:",
-        emailResult.error
+        projectInviteEmailResult.error
       );
     }
 
     revalidatePath(`/projects/${projectId}/team`);
     return {
       success: true,
-      message: `Invite sent to ${normalizedEmail}. They can accept it from their dashboard.${emailDeliveryWarning}`,
+      message:
+        `Invite sent to ${normalizedEmail}. They can accept it from their dashboard.` +
+        (projectEmailWarning
+          ? " We could not deliver the email, but the in-app invite is available."
+          : ""),
       inviteType: "existing_user",
     };
   } else {
@@ -737,8 +771,9 @@ export async function inviteUserToProject(
       return {
         success: true,
         message:
-          `Invite created for ${normalizedEmail}, but registration email delivery failed. ` +
-          "They can still sign up manually with that email and accept the in-app invite after login.",
+          `Invite created for ${normalizedEmail}.${projectEmailWarning} ` +
+          "Supabase registration email delivery failed, but they can still sign up manually " +
+          "with that email and accept the in-app invite after login.",
         inviteType: "new_user",
       };
     }
@@ -746,7 +781,9 @@ export async function inviteUserToProject(
     revalidatePath(`/projects/${projectId}/team`);
     return {
       success: true,
-      message: `Registration invite sent to ${normalizedEmail}. They'll receive an email to create their account.`,
+      message:
+        `Registration invite sent to ${normalizedEmail}. They'll receive an email to create their account.` +
+        projectEmailWarning,
       inviteType: "new_user",
     };
   }

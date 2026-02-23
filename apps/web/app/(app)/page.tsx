@@ -9,6 +9,7 @@ import { ProjectCard, ProjectsEmptyState } from "@/components/projects/project-c
 import { FeedbackButton } from "@/components/feedback/feedback-button";
 import { getProjects } from "@/lib/actions/projects";
 import { getMyPendingProjectInvites } from "@/lib/actions/project-members";
+import { getMyPendingCastCrewInvites } from "@/lib/actions/cast-crew-invites";
 import type { Project } from "@/lib/actions/projects.types";
 import {
   Plus,
@@ -32,8 +33,11 @@ export default function ProjectsDashboard() {
   const router = useRouter();
   const { user } = useAuth();
   const [projects, setProjects] = React.useState<Project[]>([]);
-  const [pendingInvites, setPendingInvites] = React.useState<
+  const [pendingProjectInvites, setPendingProjectInvites] = React.useState<
     Awaited<ReturnType<typeof getMyPendingProjectInvites>>
+  >([]);
+  const [pendingCastCrewInvites, setPendingCastCrewInvites] = React.useState<
+    Awaited<ReturnType<typeof getMyPendingCastCrewInvites>>
   >([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -41,12 +45,14 @@ export default function ProjectsDashboard() {
   React.useEffect(() => {
     async function loadProjects() {
       try {
-        const [projectData, inviteData] = await Promise.all([
+        const [projectData, projectInviteData, castCrewInviteData] = await Promise.all([
           getProjects(),
           getMyPendingProjectInvites(),
+          getMyPendingCastCrewInvites(),
         ]);
         setProjects(projectData);
-        setPendingInvites(inviteData);
+        setPendingProjectInvites(projectInviteData);
+        setPendingCastCrewInvites(castCrewInviteData);
       } catch (err) {
         console.error("Error loading projects:", err);
         setError("Failed to load projects");
@@ -60,18 +66,29 @@ export default function ProjectsDashboard() {
 
   const reloadProjects = async () => {
     try {
-      const [projectData, inviteData] = await Promise.all([
+      const [projectData, projectInviteData, castCrewInviteData] = await Promise.all([
         getProjects(),
         getMyPendingProjectInvites(),
+        getMyPendingCastCrewInvites(),
       ]);
       setProjects(projectData);
-      setPendingInvites(inviteData);
+      setPendingProjectInvites(projectInviteData);
+      setPendingCastCrewInvites(castCrewInviteData);
     } catch (err) {
       console.error("Error reloading projects:", err);
     }
   };
 
   const hasProjects = projects.length > 0;
+  const ownedProjects = React.useMemo(
+    () => projects.filter((project) => project.isOwnedByCurrentUser),
+    [projects]
+  );
+  const sharedProjects = React.useMemo(
+    () => projects.filter((project) => !project.isOwnedByCurrentUser),
+    [projects]
+  );
+  const pendingAccessCount = pendingProjectInvites.length + pendingCastCrewInvites.length;
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -165,20 +182,20 @@ export default function ProjectsDashboard() {
           {/* Projects Grid */}
           {!loading && !error && (
             <div className="space-y-6">
-              {pendingInvites.length > 0 && (
+              {pendingAccessCount > 0 && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-4">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <h2 className="text-sm font-semibold text-amber-900">
-                      Pending Invites
+                      Pending Access
                     </h2>
                     <span className="text-xs text-amber-800/80">
-                      {pendingInvites.length} waiting
+                      {pendingAccessCount} waiting
                     </span>
                   </div>
                   <div className="space-y-3">
-                    {pendingInvites.map((invite) => (
+                    {pendingProjectInvites.map((invite) => (
                       <div
-                        key={invite.id}
+                        key={`project-${invite.id}`}
                         className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-background p-3"
                       >
                         <div>
@@ -194,15 +211,70 @@ export default function ProjectsDashboard() {
                         </Button>
                       </div>
                     ))}
+                    {pendingCastCrewInvites.map((invite) => (
+                      <div
+                        key={`cast-crew-${invite.id}`}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-background p-3"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">{invite.projectName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {invite.inviteType === "CAST" ? "Cast" : "Crew"} invite for{" "}
+                            {invite.personName} ({invite.roleName}) · Invited by{" "}
+                            {invite.inviterName} · Expires{" "}
+                            {new Date(invite.expiresAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Button size="sm" variant="skeuo" asChild>
+                          <Link href={`/invites/cast-crew/${invite.token}`}>Review Invite</Link>
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
 
               {hasProjects ? (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {projects.map((project) => (
-                    <ProjectCard key={project.id} project={project} onDeleted={reloadProjects} />
-                  ))}
+                <div className="space-y-6">
+                  {ownedProjects.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <h2 className="text-sm font-semibold text-foreground">Owned by you</h2>
+                        <span className="text-xs text-muted-foreground">
+                          {ownedProjects.length}
+                        </span>
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {ownedProjects.map((project) => (
+                          <ProjectCard
+                            key={project.id}
+                            project={project}
+                            onDeleted={reloadProjects}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {sharedProjects.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <h2 className="text-sm font-semibold text-foreground">Shared with you</h2>
+                        <span className="text-xs text-muted-foreground">
+                          {sharedProjects.length}
+                        </span>
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {sharedProjects.map((project) => (
+                          <ProjectCard
+                            key={project.id}
+                            project={project}
+                            onDeleted={reloadProjects}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <ProjectsEmptyState />

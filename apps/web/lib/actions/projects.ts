@@ -1,8 +1,10 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { checkPlanLimit, getCurrentUserId } from "@/lib/permissions/server";
+import { inviteUserToProject } from "./project-members";
 import type {
   ProjectStatus,
   CrewInvite,
@@ -93,24 +95,18 @@ export async function createProject(
 
   // Create project invites for crew members
   if (data.crewInvites && data.crewInvites.length > 0) {
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    const inviteResults = await Promise.allSettled(
+      data.crewInvites.map((invite) =>
+        inviteUserToProject(project.id, invite.email, invite.role)
+      )
+    );
 
-    const invites = data.crewInvites.map((invite) => ({
-      projectId: project.id,
-      email: invite.email.trim().toLowerCase(),
-      role: invite.role,
-      createdBy: userId,
-      expiresAt: expiresAt.toISOString(),
-    }));
+    const failedInvites = inviteResults.filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected"
+    );
 
-    const { error: inviteError } = await supabase
-      .from("ProjectInvite")
-      .insert(invites);
-
-    if (inviteError) {
-      console.error("Error creating project invites:", inviteError);
-      // Non-fatal - project is still created, just invites failed
+    if (failedInvites.length > 0) {
+      console.warn("[createProject] Some invites failed to send:", failedInvites.length);
     }
   }
 
@@ -193,11 +189,18 @@ export async function getProjects(): Promise<Project[]> {
     { data: dayRows, error: daysError },
     { data: castRows, error: castError },
     { data: locationRows, error: locationsError },
+    { data: adminRows, error: adminRowsError },
   ] = await Promise.all([
     supabase.from("Scene").select("projectId").in("projectId", projectIds),
     supabase.from("ShootingDay").select("projectId").in("projectId", projectIds),
     supabase.from("CastMember").select("projectId").in("projectId", projectIds),
     supabase.from("Location").select("projectId").in("projectId", projectIds),
+    supabase
+      .from("ProjectMember")
+      .select("projectId, userId, createdAt")
+      .eq("role", "ADMIN")
+      .in("projectId", projectIds)
+      .order("createdAt", { ascending: true }),
   ]);
 
   if (scenesError) {
@@ -212,6 +215,43 @@ export async function getProjects(): Promise<Project[]> {
   if (locationsError) {
     console.error("[getProjects] Error fetching location counts:", locationsError);
   }
+  if (adminRowsError) {
+    console.error("[getProjects] Error fetching project owners:", adminRowsError);
+  }
+
+  const ownerUserIdByProjectId = new Map<string, string>();
+  for (const row of adminRows || []) {
+    if (!ownerUserIdByProjectId.has(row.projectId)) {
+      ownerUserIdByProjectId.set(row.projectId, row.userId);
+    }
+  }
+
+  const ownerIds = Array.from(new Set(ownerUserIdByProjectId.values()));
+  const ownerNameByUserId = new Map<string, string>();
+
+  if (ownerIds.length > 0) {
+    try {
+      const adminClient = createAdminClient();
+      const { data: ownerProfiles, error: ownerProfilesError } = await adminClient
+        .from("UserProfile")
+        .select("userId, firstName, lastName, displayName")
+        .in("userId", ownerIds);
+
+      if (ownerProfilesError) {
+        console.warn("[getProjects] Unable to resolve owner names:", ownerProfilesError.message);
+      } else {
+        for (const profile of ownerProfiles || []) {
+          const fullName = `${profile.firstName || ""} ${profile.lastName || ""}`.trim();
+          const displayName = profile.displayName || fullName;
+          if (displayName) {
+            ownerNameByUserId.set(profile.userId, displayName);
+          }
+        }
+      }
+    } catch (ownerLookupError) {
+      console.warn("[getProjects] Owner lookup fallback applied:", ownerLookupError);
+    }
+  }
 
   const scenesCountByProjectId = countRowsByProjectId(sceneRows as ProjectIdRow[] | null);
   const daysCountByProjectId = countRowsByProjectId(dayRows as ProjectIdRow[] | null);
@@ -221,6 +261,16 @@ export async function getProjects(): Promise<Project[]> {
   );
 
   const projects = projectData.map(({ project, membershipRole }) => {
+    const ownerUserId = ownerUserIdByProjectId.get(project.id) || null;
+    const isOwnedByCurrentUser = ownerUserId
+      ? ownerUserId === userId
+      : membershipRole === "ADMIN";
+    const ownerName = isOwnedByCurrentUser
+      ? "You"
+      : ownerUserId
+      ? ownerNameByUserId.get(ownerUserId) || "A teammate"
+      : null;
+
     return {
       ...project,
       scenesCount: scenesCountByProjectId.get(project.id) || 0,
@@ -228,6 +278,9 @@ export async function getProjects(): Promise<Project[]> {
       castCount: castCountByProjectId.get(project.id) || 0,
       locationsCount: locationsCountByProjectId.get(project.id) || 0,
       membershipRole,
+      ownerUserId,
+      ownerName,
+      isOwnedByCurrentUser,
     } as Project;
   });
 

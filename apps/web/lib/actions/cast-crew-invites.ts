@@ -23,6 +23,19 @@ export interface CastCrewInvite {
   createdBy: string;
 }
 
+export interface PendingCastCrewInvite {
+  id: string;
+  token: string;
+  projectId: string | null;
+  projectName: string;
+  inviteType: CastCrewType;
+  roleName: string;
+  personName: string;
+  expiresAt: string;
+  createdAt: string;
+  inviterName: string;
+}
+
 export type InviteResult = {
   success: boolean;
   message: string;
@@ -581,6 +594,170 @@ export async function getCastCrewInviteByToken(token: string) {
     isExpired: new Date(invite.expiresAt) < new Date(),
     isAccepted: !!invite.acceptedAt,
   };
+}
+
+export async function getMyPendingCastCrewInvites(): Promise<PendingCastCrewInvite[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const normalizedEmail = user?.email?.trim().toLowerCase();
+
+  if (!normalizedEmail) {
+    return [];
+  }
+
+  try {
+    const adminClient = createAdminClient();
+    const { data, error } = await adminClient
+      .from("CastCrewInvite")
+      .select(`
+        id,
+        token,
+        projectId,
+        inviteType,
+        targetId,
+        expiresAt,
+        createdAt,
+        createdBy,
+        project:Project (
+          id,
+          name
+        )
+      `)
+      .eq("email", normalizedEmail)
+      .is("acceptedAt", null)
+      .gt("expiresAt", new Date().toISOString())
+      .order("createdAt", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching pending cast/crew invites:", error);
+      return [];
+    }
+
+    const castTargetIds = (data || [])
+      .filter((invite) => invite.inviteType === "CAST")
+      .map((invite) => invite.targetId);
+    const crewTargetIds = (data || [])
+      .filter((invite) => invite.inviteType === "CREW")
+      .map((invite) => invite.targetId);
+    const inviterIds = Array.from(new Set((data || []).map((invite) => invite.createdBy)));
+
+    const [{ data: castRows }, { data: crewRows }, { data: inviterRows }] = await Promise.all([
+      castTargetIds.length > 0
+        ? adminClient
+          .from("CastMember")
+          .select("id, characterName, actorName")
+          .in("id", castTargetIds)
+        : Promise.resolve({ data: [] as Array<{ id: string; characterName: string; actorName: string | null }> }),
+      crewTargetIds.length > 0
+        ? adminClient
+          .from("CrewMember")
+          .select("id, name, role")
+          .in("id", crewTargetIds)
+        : Promise.resolve({ data: [] as Array<{ id: string; name: string; role: string }> }),
+      inviterIds.length > 0
+        ? adminClient
+          .from("UserProfile")
+          .select("userId, firstName, lastName, displayName")
+          .in("userId", inviterIds)
+        : Promise.resolve({
+          data: [] as Array<{
+            userId: string;
+            firstName: string | null;
+            lastName: string | null;
+            displayName: string | null;
+          }>,
+        }),
+    ]);
+
+    const castById = new Map((castRows || []).map((row) => [row.id, row]));
+    const crewById = new Map((crewRows || []).map((row) => [row.id, row]));
+    const inviterNameById = new Map<string, string>();
+
+    for (const inviter of inviterRows || []) {
+      const fullName = `${inviter.firstName || ""} ${inviter.lastName || ""}`.trim();
+      inviterNameById.set(inviter.userId, inviter.displayName || fullName || "A teammate");
+    }
+
+    return (data || []).map((invite) => {
+      const project = invite.project as unknown as { id: string; name: string } | null;
+      if (invite.inviteType === "CAST") {
+        const cast = castById.get(invite.targetId);
+        const roleName = cast?.characterName || "Cast role";
+        const personName = cast?.actorName || roleName;
+        return {
+          id: invite.id,
+          token: invite.token,
+          projectId: project?.id ?? null,
+          projectName: project?.name || "Untitled Project",
+          inviteType: "CAST" as const,
+          roleName,
+          personName,
+          expiresAt: invite.expiresAt,
+          createdAt: invite.createdAt,
+          inviterName: inviterNameById.get(invite.createdBy) || "A teammate",
+        };
+      }
+
+      const crew = crewById.get(invite.targetId);
+      const roleName = crew?.role || "Crew role";
+      const personName = crew?.name || roleName;
+      return {
+        id: invite.id,
+        token: invite.token,
+        projectId: project?.id ?? null,
+        projectName: project?.name || "Untitled Project",
+        inviteType: "CREW" as const,
+        roleName,
+        personName,
+        expiresAt: invite.expiresAt,
+        createdAt: invite.createdAt,
+        inviterName: inviterNameById.get(invite.createdBy) || "A teammate",
+      };
+    });
+  } catch (adminError) {
+    console.warn("Falling back to non-admin cast/crew pending invite lookup:", adminError);
+
+    const { data, error } = await supabase
+      .from("CastCrewInvite")
+      .select(`
+        id,
+        token,
+        inviteType,
+        expiresAt,
+        createdAt,
+        project:Project (
+          id,
+          name
+        )
+      `)
+      .eq("email", normalizedEmail)
+      .is("acceptedAt", null)
+      .gt("expiresAt", new Date().toISOString())
+      .order("createdAt", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching pending cast/crew invites (fallback):", error);
+      return [];
+    }
+
+    return (data || []).map((invite) => {
+      const project = invite.project as unknown as { id: string; name: string } | null;
+      return {
+        id: invite.id,
+        token: invite.token,
+        projectId: project?.id ?? null,
+        projectName: project?.name || "Untitled Project",
+        inviteType: invite.inviteType as CastCrewType,
+        roleName: invite.inviteType === "CAST" ? "Cast role" : "Crew role",
+        personName: invite.inviteType === "CAST" ? "Cast member" : "Crew member",
+        expiresAt: invite.expiresAt,
+        createdAt: invite.createdAt,
+        inviterName: "A teammate",
+      };
+    });
+  }
 }
 
 // Get pending cast/crew invites for a project
