@@ -295,27 +295,38 @@ export async function checkUserExistsByEmail(
 
   // Use admin client to search users by email
   const adminClient = createAdminClient();
+  const perPage = 200;
+  const maxPages = 50;
+  let matchingUser:
+    | {
+        id: string;
+        email?: string;
+      }
+    | undefined;
 
-  const { data, error } = await adminClient.auth.admin.listUsers({
-    page: 1,
-    perPage: 1,
-  });
+  // Supabase admin API does not support direct lookups by email in this client,
+  // so we page through users until we find a match or exhaust results.
+  for (let page = 1; page <= maxPages; page += 1) {
+    const { data: pageData, error } = await adminClient.auth.admin.listUsers({
+      page,
+      perPage,
+    });
 
-  if (error) {
-    console.error("Error checking user exists:", error);
-    return { exists: false };
+    if (error) {
+      console.error("Error checking user exists:", error);
+      return { exists: false };
+    }
+
+    const users = pageData?.users || [];
+    matchingUser = users.find((u) => u.email?.toLowerCase() === normalizedEmail);
+    if (matchingUser) {
+      break;
+    }
+
+    if (users.length < perPage) {
+      break;
+    }
   }
-
-  // Search through users to find matching email
-  // Note: Supabase admin API doesn't have a direct "get by email" so we need to filter
-  const { data: allUsers } = await adminClient.auth.admin.listUsers({
-    page: 1,
-    perPage: 1000,
-  });
-
-  const matchingUser = allUsers?.users?.find(
-    (u) => u.email?.toLowerCase() === normalizedEmail
-  );
 
   if (!matchingUser) {
     return { exists: false };

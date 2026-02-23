@@ -38,4 +38,7 @@ export interface Project {
   castCount: number;
   locationsCount: number;
   membershipRole?: "ADMIN" | "COORDINATOR" | "DEPARTMENT_HEAD" | "CREW" | "CAST" | "VIEWER";
+  ownerUserId?: string | null;
+  ownerName?: string | null;
+  isOwnedByCurrentUser?: boolean;
 }

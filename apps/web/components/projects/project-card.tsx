@@ -94,6 +94,12 @@ export function ProjectCard({ project, className, onDeleted }: ProjectCardProps)
     }
   };
 
+  const ownershipLabel = project.isOwnedByCurrentUser
+    ? "Owned by you"
+    : project.ownerName
+    ? `Owned by ${project.ownerName}`
+    : "Shared with you";
+
   return (
     <>
       <Link href={`/projects/${project.id}?section=dashboard`}>
@@ -184,11 +190,12 @@ export function ProjectCard({ project, className, onDeleted }: ProjectCardProps)
             {project.description}
           </p>
 
-          {project.membershipRole && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Access: {projectRoleLabel[project.membershipRole]}
-            </p>
-          )}
+          <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+            <p>{ownershipLabel}</p>
+            {project.membershipRole && (
+              <p>Access: {projectRoleLabel[project.membershipRole]}</p>
+            )}
+          </div>
 
           {/* Stats */}
           <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
