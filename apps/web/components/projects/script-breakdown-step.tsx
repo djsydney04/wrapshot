@@ -100,7 +100,7 @@ export function ScriptBreakdownStep({
       const response = await fetch("/api/scripts/breakdown", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scriptId, fileUrl: scriptUrl }),
+        body: JSON.stringify({ scriptId, fileUrl: scriptUrl, fileName: scriptName }),
       });
 
       if (!response.ok) {

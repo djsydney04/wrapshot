@@ -1,5 +1,5 @@
 /**
- * Script parser utilities for extracting text from PDF and Fountain files
+ * Script parser utilities for extracting text from PDF, Fountain, and FDX files
  */
 
 // Type for pdf-parse since it may not have types installed
@@ -29,6 +29,8 @@ export interface ParsedScriptResult {
     author?: string;
   };
 }
+
+const SCREENPLAY_LINES_PER_PAGE = 55;
 
 /**
  * Parse a PDF file and extract text content
@@ -79,9 +81,7 @@ export async function parsePdfScript(buffer: Buffer): Promise<ParsedScriptResult
  * Fountain is a plain text markup language for screenplays
  */
 export function parseFountainScript(text: string): ParsedScriptResult {
-  // Simple page count estimation (55 lines per page for screenplays)
-  const lines = text.split("\n");
-  const pageCount = Math.ceil(lines.length / 55);
+  const pageCount = estimateScriptPageCount(text);
 
   // Extract title from Fountain title page if present
   let title: string | undefined;
@@ -100,23 +100,120 @@ export function parseFountainScript(text: string): ParsedScriptResult {
   };
 }
 
+function decodeXmlEntities(text: string): string {
+  const namedEntities: Record<string, string> = {
+    amp: "&",
+    lt: "<",
+    gt: ">",
+    quot: "\"",
+    apos: "'",
+    nbsp: " ",
+  };
+
+  return text.replace(/&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (entity, token: string) => {
+    const isValidCodePoint = (value: number) =>
+      Number.isInteger(value) && value >= 0 && value <= 0x10ffff;
+
+    if (token.startsWith("#x")) {
+      const codePoint = parseInt(token.slice(2), 16);
+      return isValidCodePoint(codePoint) ? String.fromCodePoint(codePoint) : entity;
+    }
+
+    if (token.startsWith("#")) {
+      const codePoint = parseInt(token.slice(1), 10);
+      return isValidCodePoint(codePoint) ? String.fromCodePoint(codePoint) : entity;
+    }
+
+    return namedEntities[token] ?? entity;
+  });
+}
+
+function extractFdxParagraphText(paragraphXml: string): string {
+  const textMatches = [...paragraphXml.matchAll(/<Text\b[^>]*>([\s\S]*?)<\/Text>/gi)];
+  if (textMatches.length === 0) {
+    return "";
+  }
+
+  const concatenated = textMatches.map((match) => decodeXmlEntities(match[1])).join("");
+  return concatenated.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+}
+
+function extractFdxMetadata(xml: string): { title?: string; author?: string } {
+  const titleMatch = xml.match(/<Paragraph\b[^>]*Type="Title"[^>]*>([\s\S]*?)<\/Paragraph>/i);
+  const authorMatch = xml.match(
+    /<Paragraph\b[^>]*Type="(?:Author|Credit)"[^>]*>([\s\S]*?)<\/Paragraph>/i
+  );
+
+  const title = titleMatch ? extractFdxParagraphText(titleMatch[1]) : undefined;
+  const author = authorMatch ? extractFdxParagraphText(authorMatch[1]) : undefined;
+  return { title: title || undefined, author: author || undefined };
+}
+
+function estimateScriptPageCount(text: string): number {
+  const lines = text.split("\n");
+  return Math.max(1, Math.ceil(lines.length / SCREENPLAY_LINES_PER_PAGE));
+}
+
+/**
+ * Parse a Final Draft (.fdx) script file.
+ * FDX is XML where script lines are stored in Paragraph/Text nodes.
+ */
+export function parseFdxScript(xml: string): ParsedScriptResult {
+  const paragraphMatches = [...xml.matchAll(/<Paragraph\b[^>]*>([\s\S]*?)<\/Paragraph>/gi)];
+  const lines = paragraphMatches
+    .map((match) => extractFdxParagraphText(match[1]))
+    .filter((line) => line.length > 0);
+
+  const text =
+    lines.length > 0
+      ? lines.join("\n")
+      : decodeXmlEntities(xml.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+
+  return {
+    text,
+    pageCount: estimateScriptPageCount(text),
+    metadata: extractFdxMetadata(xml),
+  };
+}
+
+function resolveScriptExtension(filenameOrUrl: string): string | null {
+  const source = filenameOrUrl.trim();
+  if (!source) {
+    return null;
+  }
+
+  let normalizedPath = source;
+  try {
+    normalizedPath = new URL(source).pathname;
+  } catch {
+    // Non-URL input: keep original value.
+  }
+
+  const withoutQueryOrHash = normalizedPath.split("?")[0].split("#")[0];
+  const basename = withoutQueryOrHash.split("/").pop() || withoutQueryOrHash;
+  const extension = basename.includes(".") ? basename.split(".").pop() : null;
+  return extension ? extension.toLowerCase() : null;
+}
+
 /**
  * Detect script format and parse accordingly
  */
 export async function parseScript(
   buffer: Buffer,
-  filename: string
+  filenameOrUrl: string
 ): Promise<ParsedScriptResult> {
-  const ext = filename.toLowerCase().split(".").pop();
+  const ext = resolveScriptExtension(filenameOrUrl);
 
   switch (ext) {
     case "pdf":
       return parsePdfScript(buffer);
+    case "fdx":
+      return parseFdxScript(buffer.toString("utf-8"));
     case "fountain":
     case "txt":
       return parseFountainScript(buffer.toString("utf-8"));
     default:
-      throw new Error(`Unsupported script format: ${ext}`);
+      throw new Error(`Unsupported script format: ${ext ?? "unknown"}`);
   }
 }
 

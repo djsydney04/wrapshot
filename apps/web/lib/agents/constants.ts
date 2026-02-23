@@ -52,7 +52,7 @@ export const STEP_DEFINITIONS: Record<
   { description: string; weight: number }
 > = {
   pending: { description: 'Waiting to start', weight: 0 },
-  parsing: { description: 'Parsing script PDF', weight: 5 },
+  parsing: { description: 'Parsing script file', weight: 5 },
   chunking: { description: 'Splitting script into chunks', weight: 5 },
   extracting_scenes: { description: 'Extracting scenes from script', weight: 30 },
   extracting_elements: { description: 'Identifying production elements', weight: 25 },
