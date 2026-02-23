@@ -22,7 +22,6 @@ import {
   resendCastCrewInvite,
 } from "@/lib/actions/cast-crew-invites";
 import { CrewDirectoryDialog } from "@/components/crew/crew-directory-dialog";
-import type { InviteStatus } from "@/components/ui/invite-status-badge";
 
 interface CrewSectionProps {
   projectId: string;
@@ -158,13 +157,9 @@ export function CrewSection({ projectId, crew }: CrewSectionProps) {
     try {
       const result = await inviteCrewMember(memberId, projectId);
       if (result.success) {
-        setLocalCrew((prev) =>
-          prev.map((c) =>
-            c.id === memberId
-              ? { ...c, inviteStatus: "invite_sent" as InviteStatus }
-              : c
-          )
-        );
+        await handleCrewAdded();
+      } else {
+        console.error("Failed to send invite:", result.message);
       }
     } catch (error) {
       console.error("Failed to send invite:", error);
@@ -175,13 +170,9 @@ export function CrewSection({ projectId, crew }: CrewSectionProps) {
     try {
       const result = await resendCastCrewInvite(inviteId, projectId);
       if (result.success) {
-        setLocalCrew((prev) =>
-          prev.map((c) =>
-            c.inviteId === inviteId
-              ? { ...c, inviteStatus: "invite_sent" as InviteStatus }
-              : c
-          )
-        );
+        await handleCrewAdded();
+      } else if (result.error) {
+        console.error("Failed to resend invite:", result.error);
       }
     } catch (error) {
       console.error("Failed to resend invite:", error);

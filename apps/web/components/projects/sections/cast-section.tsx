@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
-import { InviteStatusBadge, type InviteStatus } from "@/components/ui/invite-status-badge";
+import { InviteStatusBadge } from "@/components/ui/invite-status-badge";
 import { AddCastForm } from "@/components/forms/add-cast-form";
 import { useProjectStore } from "@/lib/stores/project-store";
 import {
   inviteCastMember,
   resendCastCrewInvite,
 } from "@/lib/actions/cast-crew-invites";
+import { getCastMembersWithInviteStatus } from "@/lib/actions/cast";
 import type { CastMemberWithInviteStatus } from "@/lib/actions/cast";
 
 interface CastSectionProps {
@@ -32,6 +33,15 @@ export function CastSection({ projectId, cast }: CastSectionProps) {
   React.useEffect(() => {
     setLocalCast(cast);
   }, [cast]);
+
+  const refreshCast = React.useCallback(async () => {
+    const { data, error } = await getCastMembersWithInviteStatus(projectId);
+    if (error || !data) {
+      console.error("Failed to refresh cast status:", error);
+      return;
+    }
+    setLocalCast(data);
+  }, [projectId]);
 
   const filteredCast = React.useMemo(() => {
     if (!searchQuery) return localCast;
@@ -58,16 +68,11 @@ export function CastSection({ projectId, cast }: CastSectionProps) {
   const handleSendInvite = async (memberId: string) => {
     try {
       const result = await inviteCastMember(memberId, projectId);
-      if (result.success) {
-        // Update local state to reflect the new status
-        setLocalCast((prev) =>
-          prev.map((c) =>
-            c.id === memberId
-              ? { ...c, inviteStatus: "invite_sent" as InviteStatus }
-              : c
-          )
-        );
+      if (!result.success) {
+        console.error("Failed to send cast invite:", result.message);
+        return;
       }
+      await refreshCast();
     } catch (error) {
       console.error("Failed to send invite:", error);
     }
@@ -77,14 +82,7 @@ export function CastSection({ projectId, cast }: CastSectionProps) {
     try {
       const result = await resendCastCrewInvite(inviteId, projectId);
       if (result.success) {
-        // Update local state
-        setLocalCast((prev) =>
-          prev.map((c) =>
-            c.inviteId === inviteId
-              ? { ...c, inviteStatus: "invite_sent" as InviteStatus }
-              : c
-          )
-        );
+        await refreshCast();
       }
     } catch (error) {
       console.error("Failed to resend invite:", error);

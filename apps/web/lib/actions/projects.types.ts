@@ -37,4 +37,5 @@ export interface Project {
   shootingDaysCount: number;
   castCount: number;
   locationsCount: number;
+  membershipRole?: "ADMIN" | "COORDINATOR" | "DEPARTMENT_HEAD" | "CREW" | "CAST" | "VIEWER";
 }

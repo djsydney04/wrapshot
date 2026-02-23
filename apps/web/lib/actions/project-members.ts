@@ -9,6 +9,17 @@ import { sendProjectInviteEmail } from "@/lib/email/invites";
 import { getAppBaseUrl } from "@/lib/email/resend";
 import { checkUserExistsByEmail } from "./users";
 
+export interface PendingProjectInvite {
+  id: string;
+  token: string;
+  projectId: string | null;
+  projectName: string;
+  role: ProjectRole;
+  expiresAt: string;
+  createdAt: string;
+  inviterName: string;
+}
+
 // Get project members
 export async function getProjectMembers(projectId: string) {
   const supabase = await createClient();
@@ -167,17 +178,21 @@ export async function createProjectInvite(
   const { userId } = await requireProjectPermission(projectId, "project:manage-team");
 
   const supabase = await createClient();
+  const normalizedEmail = email.trim().toLowerCase();
+  const existingUserCheck = await checkUserExistsByEmail(normalizedEmail);
 
   // Check if user is already a member
-  const { data: existingMember } = await supabase
-    .from("ProjectMember")
-    .select("id")
-    .eq("projectId", projectId)
-    .eq("user.email", email)
-    .single();
+  if (existingUserCheck.exists && existingUserCheck.userId) {
+    const { data: existingMember } = await supabase
+      .from("ProjectMember")
+      .select("id")
+      .eq("projectId", projectId)
+      .eq("userId", existingUserCheck.userId)
+      .maybeSingle();
 
-  if (existingMember) {
-    throw new Error("User is already a member of this project");
+    if (existingMember) {
+      throw new Error("User is already a member of this project");
+    }
   }
 
   // Check if invite already exists
@@ -185,7 +200,7 @@ export async function createProjectInvite(
     .from("ProjectInvite")
     .select("id")
     .eq("projectId", projectId)
-    .eq("email", email)
+    .eq("email", normalizedEmail)
     .gt("expiresAt", new Date().toISOString())
     .single();
 
@@ -201,7 +216,7 @@ export async function createProjectInvite(
     .from("ProjectInvite")
     .insert({
       projectId,
-      email: email.toLowerCase(),
+      email: normalizedEmail,
       role,
       createdBy: userId,
       expiresAt: expiresAt.toISOString(),
@@ -213,8 +228,6 @@ export async function createProjectInvite(
     console.error("Error creating project invite:", error);
     throw new Error("Failed to create invite");
   }
-
-  const normalizedEmail = email.trim().toLowerCase();
 
   const [{ data: project }, { data: inviterProfile }, { data: authData }] = await Promise.all([
     supabase
@@ -344,13 +357,8 @@ export async function acceptProjectInvite(token: string) {
     throw new Error("You must be logged in to accept an invite");
   }
 
-  // Check if the user can join another project based on their plan
-  const canJoin = await checkPlanLimit(userId, "projects");
-  if (!canJoin) {
-    throw new Error("You've reached your project limit on the Free plan. Upgrade to Pro to join unlimited projects.");
-  }
-
   const supabase = await createClient();
+  const adminClient = createAdminClient();
 
   // Get the invite
   const { data: invite, error: inviteError } = await supabase
@@ -371,27 +379,42 @@ export async function acceptProjectInvite(token: string) {
     throw new Error("This invite was sent to a different email address");
   }
 
-  // Add user to project
-  const { error: memberError } = await supabase
+  const { data: existingMember } = await adminClient
     .from("ProjectMember")
-    .insert({
-      projectId: invite.projectId,
-      userId,
-      role: invite.role,
-    });
+    .select("id")
+    .eq("projectId", invite.projectId)
+    .eq("userId", userId)
+    .maybeSingle();
 
-  if (memberError) {
-    console.error("Error accepting invite:", memberError);
-    throw new Error("Failed to join project");
+  if (!existingMember) {
+    // Check if the user can join another project based on their plan
+    const canJoin = await checkPlanLimit(userId, "projects");
+    if (!canJoin) {
+      throw new Error("You've reached your project limit on the Free plan. Upgrade to Pro to join unlimited projects.");
+    }
+
+    const { error: memberError } = await adminClient
+      .from("ProjectMember")
+      .insert({
+        projectId: invite.projectId,
+        userId,
+        role: invite.role,
+      });
+
+    if (memberError) {
+      console.error("Error accepting invite:", memberError);
+      throw new Error("Failed to join project");
+    }
   }
 
   // Delete the invite
-  await supabase
+  await adminClient
     .from("ProjectInvite")
     .delete()
     .eq("id", invite.id);
 
   revalidatePath(`/projects/${invite.projectId}`);
+  revalidatePath("/");
   return invite.projectId;
 }
 
@@ -463,6 +486,109 @@ export type InviteResult = {
   message: string;
   inviteType: "existing_user" | "new_user";
 };
+
+export async function getMyPendingProjectInvites(): Promise<PendingProjectInvite[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const normalizedEmail = user?.email?.trim().toLowerCase();
+
+  if (!normalizedEmail) {
+    return [];
+  }
+
+  try {
+    const adminClient = createAdminClient();
+    const { data, error } = await adminClient
+      .from("ProjectInvite")
+      .select(`
+        id,
+        token,
+        role,
+        expiresAt,
+        createdAt,
+        createdBy,
+        project:Project (
+          id,
+          name
+        )
+      `)
+      .eq("email", normalizedEmail)
+      .gt("expiresAt", new Date().toISOString())
+      .order("createdAt", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching pending project invites:", error);
+      return [];
+    }
+
+    const inviterIds = Array.from(new Set((data || []).map((invite) => invite.createdBy)));
+    const { data: inviterProfiles } = inviterIds.length > 0
+      ? await adminClient
+        .from("UserProfile")
+        .select("userId, firstName, lastName, displayName")
+        .in("userId", inviterIds)
+      : { data: null };
+
+    const inviterNameById = new Map<string, string>();
+    for (const profile of inviterProfiles || []) {
+      const fullName = `${profile.firstName || ""} ${profile.lastName || ""}`.trim();
+      const displayName = profile.displayName || fullName || "A teammate";
+      inviterNameById.set(profile.userId, displayName);
+    }
+
+    return (data || []).map((invite) => {
+      const project = invite.project as unknown as { id: string; name: string } | null;
+      return {
+        id: invite.id,
+        token: invite.token,
+        projectId: project?.id ?? null,
+        projectName: project?.name || "Untitled Project",
+        role: invite.role as ProjectRole,
+        expiresAt: invite.expiresAt,
+        createdAt: invite.createdAt,
+        inviterName: inviterNameById.get(invite.createdBy) || "A teammate",
+      };
+    });
+  } catch (adminError) {
+    console.warn("Falling back to non-admin pending invite lookup:", adminError);
+
+    const { data, error } = await supabase
+      .from("ProjectInvite")
+      .select(`
+        id,
+        token,
+        role,
+        expiresAt,
+        createdAt,
+        project:Project (
+          id,
+          name
+        )
+      `)
+      .eq("email", normalizedEmail)
+      .gt("expiresAt", new Date().toISOString())
+      .order("createdAt", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching pending project invites (fallback):", error);
+      return [];
+    }
+
+    return (data || []).map((invite) => {
+      const project = invite.project as unknown as { id: string; name: string } | null;
+      return {
+        id: invite.id,
+        token: invite.token,
+        projectId: project?.id ?? null,
+        projectName: project?.name || "Untitled Project",
+        role: invite.role as ProjectRole,
+        expiresAt: invite.expiresAt,
+        createdAt: invite.createdAt,
+        inviterName: "A teammate",
+      };
+    });
+  }
+}
 
 // Smart invite that handles both existing and new users
 export async function inviteUserToProject(
@@ -567,7 +693,12 @@ export async function inviteUserToProject(
       inviteToken: invite.token,
     });
 
-    if (!emailResult.sent && emailResult.error) {
+    const emailDeliveryWarning =
+      !emailResult.sent && emailResult.error
+        ? " Email delivery failed, but the in-app invite is available on their dashboard."
+        : "";
+
+    if (emailDeliveryWarning) {
       console.warn(
         "Invite created for existing user, but email delivery failed:",
         emailResult.error
@@ -577,7 +708,7 @@ export async function inviteUserToProject(
     revalidatePath(`/projects/${projectId}/team`);
     return {
       success: true,
-      message: `Invite sent to ${normalizedEmail}. They can accept it from their dashboard.`,
+      message: `Invite sent to ${normalizedEmail}. They can accept it from their dashboard.${emailDeliveryWarning}`,
       inviteType: "existing_user",
     };
   } else {
@@ -602,8 +733,14 @@ export async function inviteUserToProject(
 
     if (authError) {
       console.error("Error sending auth invite:", authError);
-      // Still keep the ProjectInvite record - user might sign up manually
-      // Don't throw, just log the issue
+      revalidatePath(`/projects/${projectId}/team`);
+      return {
+        success: true,
+        message:
+          `Invite created for ${normalizedEmail}, but registration email delivery failed. ` +
+          "They can still sign up manually with that email and accept the in-app invite after login.",
+        inviteType: "new_user",
+      };
     }
 
     revalidatePath(`/projects/${projectId}/team`);
