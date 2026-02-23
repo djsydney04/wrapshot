@@ -10,6 +10,8 @@ Start here for how the repo is structured, how it boots, and where core APIs liv
 - docs/usage.md: Local development, scripts, and common workflows
 - docs/api.md: API routes and request/response contracts
 - docs/setup.md: Full setup and environment configuration
+- docs/releases/README.md: Production release process and versioning
+- docs/releases/prod-2026.02.23.1.md: First tracked production release note
 - docs/implementation-guides/finance.md: Finance module implementation guide
 - docs/finance-flow.md: Finance UX flow and design intent
 
