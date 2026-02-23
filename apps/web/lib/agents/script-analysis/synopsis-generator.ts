@@ -46,13 +46,27 @@ interface SynopsisResponse {
   }>;
 }
 
+type SynopsisSceneContext = Pick<
+  ExtractedScene,
+  'synopsis' | 'setName' | 'timeOfDay' | 'intExt' | 'characters'
+>;
+
+const PLACEHOLDER_SYNOPSIS_PATTERNS: RegExp[] = [
+  /^auto[-\s]?detected from scene heading\.?$/i,
+  /^no synopsis available\.?$/i,
+  /^scene heading only\.?$/i,
+  /^n\/a\.?$/i,
+  /^tbd\.?$/i,
+  /^unknown\.?$/i,
+];
+
 export async function executeSynopsisGenerator(
   context: AgentContext,
   tracker: ProgressTracker
 ): Promise<AgentStepResult> {
   // Find scenes needing synopses
   const scenesNeedingSynopsis = context.extractedScenes.filter(
-    scene => !scene.synopsis || scene.synopsis.trim().length < 10
+    (scene) => shouldRegenerateSceneSynopsis(scene)
   );
 
   if (scenesNeedingSynopsis.length === 0) {
@@ -123,11 +137,14 @@ export async function executeSynopsisGenerator(
       // Update scenes with new synopses
       for (const synopsisData of parseResult.data.synopses) {
         const scene = context.extractedScenes.find(
-          s => s.sceneNumber === synopsisData.sceneNumber
+          (s) => s.sceneNumber === synopsisData.sceneNumber
         );
         if (scene && synopsisData.synopsis) {
-          scene.synopsis = synopsisData.synopsis.trim();
-          synopsesGenerated++;
+          const normalizedSynopsis = normalizeGeneratedSynopsis(synopsisData.synopsis, scene);
+          if (normalizedSynopsis !== scene.synopsis) {
+            scene.synopsis = normalizedSynopsis;
+            synopsesGenerated++;
+          }
         }
       }
 
@@ -164,11 +181,90 @@ function batchScenes(scenes: ExtractedScene[], batchSize: number): ExtractedScen
 }
 
 function formatScenesForSynopsis(scenes: ExtractedScene[]): string {
-  return scenes.map(scene => {
+  return scenes.map((scene) => {
     const header = `SCENE ${scene.sceneNumber} - ${scene.intExt}. ${scene.setName} - ${scene.timeOfDay}`;
     const chars = scene.characters.length > 0 ? `Characters: ${scene.characters.join(', ')}` : '';
     const pages = `Pages: ${scene.scriptPageStart} - ${scene.scriptPageEnd}`;
-    const existingSynopsis = scene.synopsis ? `Current synopsis: ${scene.synopsis}` : '';
+    const existingSynopsis =
+      scene.synopsis && !isPlaceholderSynopsis(scene.synopsis)
+        ? `Current synopsis: ${scene.synopsis}`
+        : '';
     return `${header}\n${chars}\n${pages}\n${existingSynopsis}`.trim();
   }).join('\n\n---\n\n');
+}
+
+export function shouldRegenerateSceneSynopsis(scene: SynopsisSceneContext): boolean {
+  const normalized = normalizeSynopsisText(scene.synopsis);
+  if (!normalized || normalized.length < 12) {
+    return true;
+  }
+
+  return isPlaceholderSynopsis(normalized);
+}
+
+export function normalizeGeneratedSynopsis(
+  generatedSynopsis: string,
+  scene: SynopsisSceneContext
+): string {
+  const normalizedInput = normalizeSynopsisText(generatedSynopsis)
+    .replace(/^(?:synopsis|summary)\s*[:\-]\s*/i, '')
+    .replace(/^scene\s+[a-z0-9.-]+\s*[:\-]\s*/i, '')
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .trim();
+
+  const sentences = splitIntoSentences(normalizedInput).slice(0, 2);
+  let cleaned = sentences.join(' ').trim();
+
+  if (cleaned && !/[.!?]$/.test(cleaned)) {
+    cleaned = `${cleaned}.`;
+  }
+
+  if (!cleaned || cleaned.length < 12 || isPlaceholderSynopsis(cleaned)) {
+    return buildFallbackSynopsis(scene);
+  }
+
+  return cleaned;
+}
+
+function splitIntoSentences(text: string): string[] {
+  const matches = text.match(/[^.!?]+[.!?]?/g);
+  if (!matches) {
+    return [];
+  }
+
+  return matches
+    .map((sentence) => normalizeSynopsisText(sentence))
+    .filter((sentence) => sentence.length > 0);
+}
+
+function normalizeSynopsisText(value: string): string {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function isPlaceholderSynopsis(value: string): boolean {
+  const normalized = normalizeSynopsisText(value);
+  if (!normalized) {
+    return true;
+  }
+
+  return PLACEHOLDER_SYNOPSIS_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function buildFallbackSynopsis(scene: SynopsisSceneContext): string {
+  const location = normalizeSynopsisText(scene.setName) || 'UNSPECIFIED LOCATION';
+  const timeOfDay = normalizeSynopsisText(scene.timeOfDay) || 'DAY';
+  const intExtLabel = scene.intExt === 'EXT'
+    ? 'exterior'
+    : scene.intExt === 'BOTH'
+      ? 'interior/exterior'
+      : 'interior';
+  const characters = scene.characters
+    .map((character) => normalizeSynopsisText(character))
+    .filter((character) => character.length > 0)
+    .slice(0, 3);
+  const characterText = characters.length > 0
+    ? `${characters.join(', ')} play through`
+    : 'The story plays through';
+
+  return `${characterText} a ${intExtLabel} scene at ${location} during ${timeOfDay}.`;
 }
