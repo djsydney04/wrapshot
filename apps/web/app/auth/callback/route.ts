@@ -42,17 +42,34 @@ export async function GET(request: Request) {
           }
         }
 
+        // Check if this user came from a cast/crew invite (metadata from invite email)
+        const castCrewInviteToken = user.user_metadata?.cast_crew_invite_token;
+
+        if (castCrewInviteToken) {
+          const { data: castCrewInvite } = await supabase
+            .from("CastCrewInvite")
+            .select("id, token")
+            .eq("token", castCrewInviteToken)
+            .gt("expiresAt", new Date().toISOString())
+            .is("acceptedAt", null)
+            .maybeSingle();
+
+          if (castCrewInvite) {
+            redirectTo = `/invites/cast-crew/${castCrewInvite.token}`;
+          }
+        }
+
         // Check if this user came from a project invite (metadata from invite email)
         const inviteToken = user.user_metadata?.invite_token;
 
-        if (inviteToken) {
+        if (redirectTo === (next ?? "/") && inviteToken) {
           // Check if there's a valid pending invite for this token
           const { data: invite } = await supabase
             .from("ProjectInvite")
             .select("id, token")
             .eq("token", inviteToken)
             .gt("expiresAt", new Date().toISOString())
-            .single();
+            .maybeSingle();
 
           if (invite) {
             // Redirect to accept the invite
@@ -60,15 +77,33 @@ export async function GET(request: Request) {
           }
         }
 
-        // If no invite redirect, check for pending invites by email
+        // If no invite redirect, check for pending cast/crew invites by email
+        if (redirectTo === (next ?? "/") && user.email) {
+          const { data: pendingCastCrewInvite } = await supabase
+            .from("CastCrewInvite")
+            .select("token")
+            .eq("email", user.email.toLowerCase())
+            .gt("expiresAt", new Date().toISOString())
+            .is("acceptedAt", null)
+            .order("createdAt", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+          if (pendingCastCrewInvite) {
+            redirectTo = `/invites/cast-crew/${pendingCastCrewInvite.token}`;
+          }
+        }
+
+        // If no invite redirect, check for pending project invites by email
         if (redirectTo === (next ?? "/") && user.email) {
           const { data: pendingInvite } = await supabase
             .from("ProjectInvite")
             .select("token")
             .eq("email", user.email.toLowerCase())
             .gt("expiresAt", new Date().toISOString())
+            .order("createdAt", { ascending: true })
             .limit(1)
-            .single();
+            .maybeSingle();
 
           if (pendingInvite) {
             redirectTo = `/invites/${pendingInvite.token}`;

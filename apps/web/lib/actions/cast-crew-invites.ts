@@ -29,6 +29,41 @@ export type InviteResult = {
   inviteType: "linked_existing" | "sent_invite" | "no_email";
 };
 
+async function ensureProjectMembershipWithClient(
+  client: any,
+  projectId: string,
+  userId: string,
+  role: "CAST" | "CREW"
+): Promise<void> {
+  const { data: existingMembership, error: existingMembershipError } = await client
+    .from("ProjectMember")
+    .select("id, role")
+    .eq("projectId", projectId)
+    .eq("userId", userId)
+    .maybeSingle();
+
+  if (existingMembershipError) {
+    throw new Error(`Failed to verify project membership: ${existingMembershipError.message}`);
+  }
+
+  if (!existingMembership) {
+    const { error: insertError } = await client
+      .from("ProjectMember")
+      .insert({
+        projectId,
+        userId,
+        role,
+      })
+      .select("id, role")
+      .maybeSingle();
+
+    if (insertError && insertError.code !== "23505") {
+      throw new Error(`Failed to grant project access: ${insertError.message}`);
+    }
+    return;
+  }
+}
+
 // Invite a cast member to the platform (links them to their cast record)
 export async function inviteCastMember(
   castMemberId: string,
@@ -79,11 +114,22 @@ export async function inviteCastMember(
 
   if (userCheck.exists && userCheck.userId) {
     // User exists - link them immediately
-    await linkCastMemberToUser(castMemberId, userCheck.userId);
+    const linkedCast = await linkCastMemberToUser(castMemberId, userCheck.userId);
+    if (linkedCast.error) {
+      throw new Error(linkedCast.error);
+    }
+    await ensureProjectMembershipWithClient(
+      supabase,
+      projectId,
+      userCheck.userId,
+      "CAST"
+    );
 
     return {
       success: true,
-      message: `${castMember.actorName || castMember.characterName} has been linked to their platform account.`,
+      message:
+        `${castMember.actorName || castMember.characterName} has been linked to their platform account ` +
+        "and added to this project's workspace.",
       inviteType: "linked_existing",
     };
   }
@@ -226,11 +272,22 @@ export async function inviteCrewMember(
 
   if (userCheck.exists && userCheck.userId) {
     // User exists - link them immediately
-    await linkCrewMemberToUser(crewMemberId, userCheck.userId);
+    const linkedCrew = await linkCrewMemberToUser(crewMemberId, userCheck.userId);
+    if (linkedCrew.error) {
+      throw new Error(linkedCrew.error);
+    }
+    await ensureProjectMembershipWithClient(
+      supabase,
+      projectId,
+      userCheck.userId,
+      "CREW"
+    );
 
     return {
       success: true,
-      message: `${crewMember.name} has been linked to their platform account.`,
+      message:
+        `${crewMember.name} has been linked to their platform account ` +
+        "and added to this project's workspace.",
       inviteType: "linked_existing",
     };
   }
@@ -337,6 +394,7 @@ export async function acceptCastCrewInvite(token: string): Promise<{
   }
 
   const supabase = await createClient();
+  const adminClient = createAdminClient();
 
   // Get the invite
   const { data: invite, error: inviteError } = await supabase
@@ -358,26 +416,68 @@ export async function acceptCastCrewInvite(token: string): Promise<{
     return { success: false, error: "This invite was sent to a different email address" };
   }
 
-  // Link the user to the cast/crew record
+  // Link the user to the cast/crew record with service role.
+  const linkedAt = new Date().toISOString();
   if (invite.inviteType === "CAST") {
-    const result = await linkCastMemberToUser(invite.targetId, userId);
-    if (result.error) {
-      return { success: false, error: result.error };
+    const { data: linkedCast, error: castLinkError } = await adminClient
+      .from("CastMember")
+      .update({
+        userId,
+        updatedAt: linkedAt,
+      })
+      .eq("id", invite.targetId)
+      .eq("projectId", invite.projectId)
+      .select("id")
+      .maybeSingle();
+
+    if (castLinkError || !linkedCast) {
+      return {
+        success: false,
+        error: castLinkError?.message || "Failed to link cast profile to your account",
+      };
     }
   } else {
-    const result = await linkCrewMemberToUser(invite.targetId, userId);
-    if (result.error) {
-      return { success: false, error: result.error };
+    const { data: linkedCrew, error: crewLinkError } = await adminClient
+      .from("CrewMember")
+      .update({
+        userId,
+        updatedAt: linkedAt,
+      })
+      .eq("id", invite.targetId)
+      .eq("projectId", invite.projectId)
+      .select("id")
+      .maybeSingle();
+
+    if (crewLinkError || !linkedCrew) {
+      return {
+        success: false,
+        error: crewLinkError?.message || "Failed to link crew profile to your account",
+      };
     }
   }
 
+  try {
+    await ensureProjectMembershipWithClient(
+      adminClient,
+      invite.projectId,
+      userId,
+      invite.inviteType === "CAST" ? "CAST" : "CREW"
+    );
+  } catch (membershipError) {
+    return {
+      success: false,
+      error: membershipError instanceof Error ? membershipError.message : "Failed to grant project access",
+    };
+  }
+
   // Mark invite as accepted
-  await supabase
+  await adminClient
     .from("CastCrewInvite")
     .update({ acceptedAt: new Date().toISOString() })
     .eq("id", invite.id);
 
   revalidatePath(`/projects/${invite.projectId}`);
+  revalidatePath("/");
 
   return {
     success: true,
@@ -591,7 +691,7 @@ export async function resendCastCrewInvite(inviteId: string, projectId: string) 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
   const redirectTo = `${siteUrl}/invites/cast-crew/${invite.token}`;
 
-  await adminClient.auth.admin.inviteUserByEmail(invite.email, {
+  const { error: authError } = await adminClient.auth.admin.inviteUserByEmail(invite.email, {
     redirectTo,
     data: {
       cast_crew_invite_token: invite.token,
@@ -602,6 +702,10 @@ export async function resendCastCrewInvite(inviteId: string, projectId: string) 
       role_name: roleName,
     },
   });
+
+  if (authError) {
+    return { success: false, error: authError.message };
+  }
 
   revalidatePath(`/projects/${projectId}`);
 

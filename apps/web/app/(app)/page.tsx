@@ -8,6 +8,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { ProjectCard, ProjectsEmptyState } from "@/components/projects/project-card";
 import { FeedbackButton } from "@/components/feedback/feedback-button";
 import { getProjects } from "@/lib/actions/projects";
+import { getMyPendingProjectInvites } from "@/lib/actions/project-members";
 import type { Project } from "@/lib/actions/projects.types";
 import {
   Plus,
@@ -31,14 +32,21 @@ export default function ProjectsDashboard() {
   const router = useRouter();
   const { user } = useAuth();
   const [projects, setProjects] = React.useState<Project[]>([]);
+  const [pendingInvites, setPendingInvites] = React.useState<
+    Awaited<ReturnType<typeof getMyPendingProjectInvites>>
+  >([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     async function loadProjects() {
       try {
-        const data = await getProjects();
-        setProjects(data);
+        const [projectData, inviteData] = await Promise.all([
+          getProjects(),
+          getMyPendingProjectInvites(),
+        ]);
+        setProjects(projectData);
+        setPendingInvites(inviteData);
       } catch (err) {
         console.error("Error loading projects:", err);
         setError("Failed to load projects");
@@ -52,8 +60,12 @@ export default function ProjectsDashboard() {
 
   const reloadProjects = async () => {
     try {
-      const data = await getProjects();
-      setProjects(data);
+      const [projectData, inviteData] = await Promise.all([
+        getProjects(),
+        getMyPendingProjectInvites(),
+      ]);
+      setProjects(projectData);
+      setPendingInvites(inviteData);
     } catch (err) {
       console.error("Error reloading projects:", err);
     }
@@ -152,15 +164,50 @@ export default function ProjectsDashboard() {
 
           {/* Projects Grid */}
           {!loading && !error && (
-            hasProjects ? (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {projects.map((project) => (
-                  <ProjectCard key={project.id} project={project} onDeleted={reloadProjects} />
-                ))}
-              </div>
-            ) : (
-              <ProjectsEmptyState />
-            )
+            <div className="space-y-6">
+              {pendingInvites.length > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h2 className="text-sm font-semibold text-amber-900">
+                      Pending Invites
+                    </h2>
+                    <span className="text-xs text-amber-800/80">
+                      {pendingInvites.length} waiting
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {pendingInvites.map((invite) => (
+                      <div
+                        key={invite.id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-background p-3"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">{invite.projectName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Invited by {invite.inviterName} as{" "}
+                            {invite.role.toLowerCase().replaceAll("_", " ")} · Expires{" "}
+                            {new Date(invite.expiresAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Button size="sm" variant="skeuo" asChild>
+                          <Link href={`/invites/${invite.token}`}>Review Invite</Link>
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {hasProjects ? (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {projects.map((project) => (
+                    <ProjectCard key={project.id} project={project} onDeleted={reloadProjects} />
+                  ))}
+                </div>
+              ) : (
+                <ProjectsEmptyState />
+              )}
+            </div>
           )}
         </div>
       </div>

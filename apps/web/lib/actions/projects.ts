@@ -93,11 +93,15 @@ export async function createProject(
 
   // Create project invites for crew members
   if (data.crewInvites && data.crewInvites.length > 0) {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
     const invites = data.crewInvites.map((invite) => ({
       projectId: project.id,
-      email: invite.email,
+      email: invite.email.trim().toLowerCase(),
       role: invite.role,
-      invitedBy: userId,
+      createdBy: userId,
+      expiresAt: expiresAt.toISOString(),
     }));
 
     const { error: inviteError } = await supabase
@@ -135,6 +139,7 @@ export async function getProjects(): Promise<Project[]> {
     .from("ProjectMember")
     .select(
       `
+      role,
       project:Project (
         id,
         organizationId,
@@ -172,14 +177,17 @@ export async function getProjects(): Promise<Project[]> {
 
   // Extract projects and add computed counts
   const projectData = (data || [])
-    .map((d) => d.project as unknown as ProjectData | null)
-    .filter((p): p is ProjectData => p !== null);
+    .map((d) => ({
+      project: d.project as unknown as ProjectData | null,
+      membershipRole: d.role as Project["membershipRole"],
+    }))
+    .filter((row): row is { project: ProjectData; membershipRole: Project["membershipRole"] } => row.project !== null);
 
   if (projectData.length === 0) {
     return [];
   }
 
-  const projectIds = projectData.map((project) => project.id);
+  const projectIds = projectData.map((row) => row.project.id);
   const [
     { data: sceneRows, error: scenesError },
     { data: dayRows, error: daysError },
@@ -212,13 +220,14 @@ export async function getProjects(): Promise<Project[]> {
     locationRows as ProjectIdRow[] | null
   );
 
-  const projects = projectData.map((project) => {
+  const projects = projectData.map(({ project, membershipRole }) => {
     return {
       ...project,
       scenesCount: scenesCountByProjectId.get(project.id) || 0,
       shootingDaysCount: daysCountByProjectId.get(project.id) || 0,
       castCount: castCountByProjectId.get(project.id) || 0,
       locationsCount: locationsCountByProjectId.get(project.id) || 0,
+      membershipRole,
     } as Project;
   });
 

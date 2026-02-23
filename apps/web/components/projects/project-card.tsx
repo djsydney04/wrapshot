@@ -50,6 +50,15 @@ const statusLabel: Record<Project["status"], string> = {
   ON_HOLD: "On Hold",
 };
 
+const projectRoleLabel: Record<NonNullable<Project["membershipRole"]>, string> = {
+  ADMIN: "Admin",
+  COORDINATOR: "Coordinator",
+  DEPARTMENT_HEAD: "Department Head",
+  CREW: "Crew",
+  CAST: "Cast",
+  VIEWER: "Viewer",
+};
+
 export function ProjectCard({ project, className, onDeleted }: ProjectCardProps) {
   const router = useRouter();
   const [isHovered, setIsHovered] = React.useState(false);
@@ -174,6 +183,12 @@ export function ProjectCard({ project, className, onDeleted }: ProjectCardProps)
           <p className="mt-3 text-sm text-muted-foreground line-clamp-2">
             {project.description}
           </p>
+
+          {project.membershipRole && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Access: {projectRoleLabel[project.membershipRole]}
+            </p>
+          )}
 
           {/* Stats */}
           <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
