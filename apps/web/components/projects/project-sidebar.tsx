@@ -6,6 +6,7 @@ import {
   MessageSquare,
   FileText,
   Calendar,
+  ListTodo,
   Film,
   Paintbrush2,
   Camera,
@@ -27,6 +28,7 @@ export type ProjectSection =
   | "dashboard"
   | "assistant"
   | "script"
+  | "tasks"
   | "schedule"
   | "callsheets"
   | "art"
@@ -68,6 +70,7 @@ interface ProjectSidebarProps {
   }[];
   counts: {
     scenes: number;
+    tasks?: number;
     cast: number;
     crew: number;
     shootingDays: number;
@@ -79,6 +82,13 @@ interface ProjectSidebarProps {
   };
   className?: string;
 }
+
+const CORE_WORKFLOW_SECTIONS: ProjectSection[] = [
+  "script",
+  "scenes",
+  "schedule",
+  "callsheets",
+];
 
 export function ProjectSidebar({
   activeSection,
@@ -95,6 +105,37 @@ export function ProjectSidebar({
     () => workflow?.filter((step) => step.status === "done").length ?? 0,
     [workflow]
   );
+  const activeInDepartmentWorkflow = React.useMemo(
+    () =>
+      workflow?.some(
+        (step) =>
+          step.section === activeSection &&
+          !CORE_WORKFLOW_SECTIONS.includes(step.section)
+      ) ?? false,
+    [activeSection, workflow]
+  );
+  const [showDepartmentWorkflow, setShowDepartmentWorkflow] = React.useState(
+    () => activeInDepartmentWorkflow
+  );
+
+  React.useEffect(() => {
+    if (activeInDepartmentWorkflow) {
+      setShowDepartmentWorkflow(true);
+    }
+  }, [activeInDepartmentWorkflow]);
+
+  const departmentWorkflowStepCount = React.useMemo(
+    () =>
+      workflow?.filter((step) => !CORE_WORKFLOW_SECTIONS.includes(step.section))
+        .length ?? 0,
+    [workflow]
+  );
+  const visibleWorkflowSteps = React.useMemo(() => {
+    if (!workflow) return [];
+    if (showDepartmentWorkflow) return workflow;
+    return workflow.filter((step) => CORE_WORKFLOW_SECTIONS.includes(step.section));
+  }, [showDepartmentWorkflow, workflow]);
+
   const quickAccessItems = React.useMemo<SidebarItem[]>(
     () => [
       { key: "dashboard", id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -107,6 +148,13 @@ export function ProjectSidebar({
         badge: counts.hasScript ? undefined : "Upload",
       },
       { key: "scenes", id: "scenes", label: "Scenes", icon: Clapperboard, count: counts.scenes },
+      {
+        key: "tasks",
+        id: "tasks",
+        label: "Tasks",
+        icon: ListTodo,
+        count: counts.tasks,
+      },
       {
         key: "schedule",
         id: "schedule",
@@ -280,7 +328,7 @@ export function ProjectSidebar({
               </span>
             </div>
             <ol className="space-y-1">
-              {workflow.map((step, index) => {
+              {visibleWorkflowSteps.map((step, index) => {
                 const isActive = activeSection === step.section;
                 const statusClass =
                   step.status === "done"
@@ -291,7 +339,7 @@ export function ProjectSidebar({
 
                 return (
                   <li key={step.id} className="relative">
-                    {index < workflow.length - 1 && (
+                    {index < visibleWorkflowSteps.length - 1 && (
                       <span className="pointer-events-none absolute left-[11px] top-6 h-3 w-px bg-border/70" />
                     )}
                     <button
@@ -327,6 +375,19 @@ export function ProjectSidebar({
                 );
               })}
             </ol>
+            {departmentWorkflowStepCount > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="mt-2 h-7 w-full justify-start px-1.5 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setShowDepartmentWorkflow((previous) => !previous)}
+              >
+                {showDepartmentWorkflow
+                  ? "Show Core Workflow"
+                  : `Show Department Workflow (+${departmentWorkflowStepCount})`}
+              </Button>
+            )}
             {activeWorkflowStep && activeSection !== activeWorkflowStep.section && (
               <Button
                 type="button"
