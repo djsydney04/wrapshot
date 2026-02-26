@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { MoreHorizontal, Receipt, Eye, Pencil, Check, X, Trash2, FileText } from "lucide-react";
+import { MoreHorizontal, Receipt, Eye, Pencil, Check, X, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

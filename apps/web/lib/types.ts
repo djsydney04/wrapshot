@@ -318,6 +318,52 @@ export interface Transaction {
   updatedAt: string;
 }
 
+export type PurchaseOrderStatus =
+  | "DRAFT"
+  | "APPROVED"
+  | "SENT"
+  | "PARTIAL"
+  | "CLOSED"
+  | "CANCELLED";
+
+export interface PurchaseOrderLine {
+  id: string;
+  purchaseOrderId: string;
+  lineItemId?: string;
+  categoryId?: string;
+  description: string;
+  quantity: number;
+  unitCost: number;
+  amount: number;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  budgetId: string;
+  poNumber: string;
+  status: PurchaseOrderStatus;
+  vendor: string;
+  title: string;
+  description?: string;
+  issueDate: string;
+  expectedDate?: string;
+  totalAmount: number;
+  committedAmount: number;
+  createdBy: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  sentAt?: string;
+  closedAt?: string;
+  cancelledAt?: string;
+  notes?: string;
+  lines: PurchaseOrderLine[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BudgetTemplate {
   id: string;
   name: string;

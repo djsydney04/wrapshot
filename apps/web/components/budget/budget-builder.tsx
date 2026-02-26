@@ -22,6 +22,9 @@ import {
   Plus,
   Lock,
   FileSpreadsheet,
+  ClipboardList,
+  CircleDollarSign,
+  TrendingUp,
   ChevronDown,
   ChevronRight,
   Loader2,
@@ -63,8 +66,15 @@ import {
   reopenDepartmentBudget,
 } from "@/lib/actions/budget-categories";
 import { reorderLineItems, moveLineItemToCategory } from "@/lib/actions/budget-line-items";
+import { getTransactions, type Transaction } from "@/lib/actions/transactions";
+import {
+  getPurchaseOrders,
+  type PurchaseOrder,
+} from "@/lib/actions/purchase-orders";
 import { toast } from "sonner";
 import { DEPARTMENT_BUDGET_STATUS_LABELS, type DepartmentBudgetStatus } from "@/lib/types";
+import { TransactionList } from "@/components/finance/transaction-list";
+import { PurchaseOrdersList } from "@/components/finance/purchase-orders-list";
 import {
   SortableBudgetCategoryCard,
   CategoryOverlay,
@@ -73,6 +83,7 @@ import { LineItemOverlay } from "./budget-line-item-row";
 import { AddCategoryForm } from "./add-category-form";
 import { AddLineItemForm } from "./add-line-item-form";
 import { AddTransactionForm } from "@/components/forms/add-transaction-form";
+import { AddPurchaseOrderForm } from "@/components/forms/add-purchase-order-form";
 
 interface BudgetBuilderProps {
   budgetId: string;
@@ -141,6 +152,14 @@ export function BudgetBuilder({
   const [revisionNotes, setRevisionNotes] = React.useState("");
   const [workflowLoading, setWorkflowLoading] = React.useState<string | null>(null);
   const [showTransactionForm, setShowTransactionForm] = React.useState(false);
+  const [showPurchaseOrderForm, setShowPurchaseOrderForm] = React.useState(false);
+  const [editTransaction, setEditTransaction] = React.useState<Transaction | null>(null);
+
+  // Operational finance data
+  const [transactions, setTransactions] = React.useState<Transaction[]>([]);
+  const [transactionsLoading, setTransactionsLoading] = React.useState(false);
+  const [purchaseOrders, setPurchaseOrders] = React.useState<PurchaseOrder[]>([]);
+  const [purchaseOrdersLoading, setPurchaseOrdersLoading] = React.useState(false);
 
   // Sorted/grouped categories
   const sortedCategories = React.useMemo(
@@ -200,6 +219,35 @@ export function BudgetBuilder({
     }
     return grouped;
   }, [categories, lineItems]);
+
+  const loadOperationalFinance = React.useCallback(async () => {
+    setTransactionsLoading(true);
+    setPurchaseOrdersLoading(true);
+    try {
+      const [transactionData, purchaseOrderData] = await Promise.all([
+        getTransactions(budgetId),
+        getPurchaseOrders(budgetId),
+      ]);
+
+      setTransactions(transactionData);
+      setPurchaseOrders(purchaseOrderData);
+    } catch (loadError) {
+      console.error("Failed to load finance flow data:", loadError);
+      setTransactions([]);
+      setPurchaseOrders([]);
+    } finally {
+      setTransactionsLoading(false);
+      setPurchaseOrdersLoading(false);
+    }
+  }, [budgetId]);
+
+  React.useEffect(() => {
+    void loadOperationalFinance();
+  }, [loadOperationalFinance]);
+
+  const handleRefreshAll = React.useCallback(async () => {
+    await Promise.all([Promise.resolve(onRefresh()), loadOperationalFinance()]);
+  }, [onRefresh, loadOperationalFinance]);
 
   // Per-department editability
   const canEditDepartment = React.useCallback(
@@ -266,7 +314,7 @@ export function BudgetBuilder({
           setIsApplyingChange(true);
           await reorderBudgetCategories(budgetId, newOrder.map((c) => c.id));
           toast.success("Category order updated");
-          onRefresh();
+          await handleRefreshAll();
         } catch {
           toast.error("Failed to reorder categories");
         } finally {
@@ -293,7 +341,7 @@ export function BudgetBuilder({
               setIsApplyingChange(true);
               await reorderLineItems(activeLineItem.categoryId, newOrder.map((li) => li.id));
               toast.success("Line item order updated");
-              onRefresh();
+              await handleRefreshAll();
             } catch {
               toast.error("Failed to reorder line items");
             } finally {
@@ -308,7 +356,7 @@ export function BudgetBuilder({
             setIsApplyingChange(true);
             await moveLineItemToCategory(activeLineItemId, overLineItem.categoryId, overIdx);
             toast.success("Line item moved");
-            onRefresh();
+            await handleRefreshAll();
           } catch {
             toast.error("Failed to move line item");
           } finally {
@@ -328,7 +376,7 @@ export function BudgetBuilder({
           setIsApplyingChange(true);
           await moveLineItemToCategory(activeLineItemId, targetCategoryId, targetItems.length);
           toast.success("Line item moved");
-          onRefresh();
+          await handleRefreshAll();
         } catch {
           toast.error("Failed to move line item");
         } finally {
@@ -394,7 +442,7 @@ export function BudgetBuilder({
       await assignDepartmentHead(assignDialogDept.id, assignUserId || null);
       toast.success(assignUserId ? "Department head assigned" : "Department head unassigned");
       setAssignDialogDept(null);
-      onRefresh();
+      await handleRefreshAll();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to assign");
     } finally {
@@ -407,7 +455,7 @@ export function BudgetBuilder({
     try {
       await submitDepartmentBudget(dept.id);
       toast.success("Department submitted for review");
-      onRefresh();
+      await handleRefreshAll();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to submit");
     } finally {
@@ -420,7 +468,7 @@ export function BudgetBuilder({
     try {
       await reviewDepartmentBudget(dept.id, "APPROVE");
       toast.success("Department approved");
-      onRefresh();
+      await handleRefreshAll();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to approve");
     } finally {
@@ -436,7 +484,7 @@ export function BudgetBuilder({
       toast.success("Revision requested");
       setRevisionDialogDept(null);
       setRevisionNotes("");
-      onRefresh();
+      await handleRefreshAll();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to request revision");
     } finally {
@@ -449,7 +497,7 @@ export function BudgetBuilder({
     try {
       await reopenDepartmentBudget(dept.id);
       toast.success("Department reopened for edits");
-      onRefresh();
+      await handleRefreshAll();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to reopen");
     } finally {
@@ -457,12 +505,22 @@ export function BudgetBuilder({
     }
   };
 
-  // Totals
-  const { totalEstimated, totalActual } = React.useMemo(() => {
-    const estimated = lineItems.reduce((sum, li) => sum + li.estimatedTotal, 0);
-    const actual = lineItems.reduce((sum, li) => sum + li.actualCost, 0);
-    return { totalEstimated: estimated, totalActual: actual };
-  }, [lineItems]);
+  // Finance flow totals: plan -> commit -> spend -> forecast
+  const totalEstimated = React.useMemo(
+    () => lineItems.reduce((sum, lineItem) => sum + Number(lineItem.estimatedTotal), 0),
+    [lineItems],
+  );
+  const totalCommitted = React.useMemo(
+    () => purchaseOrders.reduce((sum, order) => sum + Number(order.committedAmount), 0),
+    [purchaseOrders],
+  );
+  const totalActual = React.useMemo(
+    () => transactions.reduce((sum, transaction) => sum + Number(transaction.amount), 0),
+    [transactions],
+  );
+  const totalReserved = totalCommitted + totalActual;
+  const remainingAvailable = totalEstimated - totalReserved;
+  const projectedFinal = Math.max(totalEstimated, totalReserved);
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-US", {
@@ -473,6 +531,13 @@ export function BudgetBuilder({
     }).format(amount);
 
   const anyCanEdit = canEdit || assignedDeptIds.size > 0;
+
+  const handleTransactionDialogChange = (open: boolean) => {
+    setShowTransactionForm(open);
+    if (!open) {
+      setEditTransaction(null);
+    }
+  };
 
   // Sub-categories for the transaction form (exclude top-level departments)
   const subCategories = React.useMemo(
@@ -489,7 +554,7 @@ export function BudgetBuilder({
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -508,11 +573,24 @@ export function BudgetBuilder({
           )}
         </div>
         <div className="flex items-center gap-2">
-          {anyCanEdit && (
+          {anyCanEdit && budgetStatus !== "LOCKED" && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowTransactionForm(true)}
+              onClick={() => setShowPurchaseOrderForm(true)}
+            >
+              <ClipboardList className="h-4 w-4 mr-1" />
+              Create PO
+            </Button>
+          )}
+          {anyCanEdit && budgetStatus !== "LOCKED" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setEditTransaction(null);
+                setShowTransactionForm(true);
+              }}
             >
               <Receipt className="h-4 w-4 mr-1" />
               Log Expense
@@ -535,21 +613,114 @@ export function BudgetBuilder({
       </div>
 
       {/* Totals */}
-      <div className="flex items-center gap-6 rounded-xl border border-border bg-muted/30 px-4 py-3">
-        <div className="flex-1">
-          <span className="text-xs text-muted-foreground">Estimated</span>
-          <p className="text-xl font-semibold">{formatCurrency(totalEstimated)}</p>
+      <div className="grid gap-3 rounded-xl border border-border bg-muted/20 p-4 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <CircleDollarSign className="h-3.5 w-3.5" />
+            Planned
+          </div>
+          <p className="mt-1 text-lg font-semibold">{formatCurrency(totalEstimated)}</p>
         </div>
-        <div className="flex-1">
-          <span className="text-xs text-muted-foreground">Actual</span>
+
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <ClipboardList className="h-3.5 w-3.5" />
+            Committed
+          </div>
+          <p className="mt-1 text-lg font-semibold">{formatCurrency(totalCommitted)}</p>
+        </div>
+
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Receipt className="h-3.5 w-3.5" />
+            Actual
+          </div>
           <p
             className={cn(
-              "text-xl font-semibold",
+              "mt-1 text-lg font-semibold",
               totalActual > totalEstimated ? "text-red-600" : "text-emerald-600"
             )}
           >
             {formatCurrency(totalActual)}
           </p>
+        </div>
+
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <TrendingUp className="h-3.5 w-3.5" />
+            Forecast
+          </div>
+          <p
+            className={cn(
+              "mt-1 text-lg font-semibold",
+              projectedFinal > totalEstimated && "text-amber-600"
+            )}
+          >
+            {formatCurrency(projectedFinal)}
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="text-xs text-muted-foreground">Remaining</div>
+          <p
+            className={cn(
+              "mt-1 text-lg font-semibold",
+              remainingAvailable < 0 ? "text-red-600" : "text-emerald-600"
+            )}
+          >
+            {formatCurrency(remainingAvailable)}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Planned - Committed - Actual
+          </p>
+        </div>
+      </div>
+
+      {/* Commitment + Spend flow */}
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Commitments (Purchase Orders)</h3>
+            <span className="text-xs text-muted-foreground">{purchaseOrders.length} POs</span>
+          </div>
+          {purchaseOrdersLoading ? (
+            <div className="flex items-center justify-center rounded-xl border border-border py-10">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <PurchaseOrdersList
+              orders={purchaseOrders}
+              canManage={anyCanEdit && budgetStatus !== "LOCKED"}
+              currentUserId={budgetPermissions?.currentUserId}
+              isFinanceManager={isFinanceManager}
+              onRefresh={() => void handleRefreshAll()}
+            />
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Spend (Expenses)</h3>
+            <span className="text-xs text-muted-foreground">
+              {transactions.length} expenses
+            </span>
+          </div>
+          {transactionsLoading ? (
+            <div className="flex items-center justify-center rounded-xl border border-border py-10">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <TransactionList
+              transactions={transactions}
+              budgetId={budgetId}
+              isAdmin={isFinanceManager}
+              onEdit={(transaction) => {
+                setEditTransaction(transaction);
+                setShowTransactionForm(true);
+              }}
+              onRefresh={() => void handleRefreshAll()}
+            />
+          )}
         </div>
       </div>
 
@@ -746,9 +917,9 @@ export function BudgetBuilder({
                                 canEdit={deptCanEdit}
                                 onToggle={() => toggleCategory(category.id)}
                                 onEdit={() => handleEditCategory(category)}
-                                onDelete={onRefresh}
+                                onDelete={() => void handleRefreshAll()}
                                 onAddLineItem={() => handleAddLineItem(category.id)}
-                                onRefresh={onRefresh}
+                                onRefresh={() => void handleRefreshAll()}
                               />
                             ))}
                           </div>
@@ -780,9 +951,9 @@ export function BudgetBuilder({
                       canEdit={isFinanceManager && budgetStatus !== "LOCKED"}
                       onToggle={() => toggleCategory(category.id)}
                       onEdit={() => handleEditCategory(category)}
-                      onDelete={onRefresh}
+                      onDelete={() => void handleRefreshAll()}
                       onAddLineItem={() => handleAddLineItem(category.id)}
-                      onRefresh={onRefresh}
+                      onRefresh={() => void handleRefreshAll()}
                     />
                   ))}
                 </div>
@@ -820,7 +991,7 @@ export function BudgetBuilder({
         categories={categories}
         open={showCategoryForm}
         onOpenChange={handleCategoryFormClose}
-        onSuccess={onRefresh}
+        onSuccess={() => void handleRefreshAll()}
         editCategory={editCategory}
         defaultParentCategoryId={defaultParentCategoryId}
       />
@@ -831,7 +1002,7 @@ export function BudgetBuilder({
           categoryId={activeLineItemCategoryId}
           open={showLineItemForm}
           onOpenChange={handleLineItemFormClose}
-          onSuccess={onRefresh}
+          onSuccess={() => void handleRefreshAll()}
           editLineItem={editLineItem}
         />
       )}
@@ -928,8 +1099,19 @@ export function BudgetBuilder({
         categories={subCategories}
         lineItems={lineItems}
         open={showTransactionForm}
-        onOpenChange={setShowTransactionForm}
-        onSuccess={onRefresh}
+        onOpenChange={handleTransactionDialogChange}
+        onSuccess={() => void handleRefreshAll()}
+        editTransaction={editTransaction}
+      />
+
+      {/* Create Purchase Order Form */}
+      <AddPurchaseOrderForm
+        budgetId={budgetId}
+        categories={subCategories}
+        lineItems={lineItems}
+        open={showPurchaseOrderForm}
+        onOpenChange={setShowPurchaseOrderForm}
+        onSuccess={() => void handleRefreshAll()}
       />
     </div>
   );
