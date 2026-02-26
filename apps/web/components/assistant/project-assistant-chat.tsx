@@ -60,6 +60,18 @@ export function ProjectAssistantChat({
   const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(
     null,
   );
+  const composerRef = React.useRef<HTMLTextAreaElement>(null);
+
+  React.useEffect(() => {
+    const textarea = composerRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = "0px";
+    const scrollHeight = textarea.scrollHeight;
+    const clampedHeight = Math.min(Math.max(scrollHeight, 52), 200);
+    textarea.style.height = `${clampedHeight}px`;
+    textarea.style.overflowY = scrollHeight > 200 ? "auto" : "hidden";
+  }, [query]);
 
   const fetchHistory = React.useCallback(async () => {
     setLoadingHistory(true);
@@ -234,14 +246,14 @@ export function ProjectAssistantChat({
 
       <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex flex-col">
-          <div className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
+          <div className="mx-auto w-full max-w-3xl space-y-5 px-5 py-5 sm:px-6 sm:py-6">
             {loadingHistory ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading conversation...
               </div>
             ) : messages.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border px-5 py-12 text-center">
+              <div className="rounded-xl border border-dashed border-border px-5 py-10 text-center">
                 <Lightbulb className="mx-auto mb-2 h-5 w-5 text-muted-foreground" />
                 <p className="text-sm font-medium">
                   Start with a production question
@@ -321,42 +333,45 @@ export function ProjectAssistantChat({
             )}
           </div>
 
-          <div className="border-t border-border px-5 py-4 sm:px-6 sm:py-5">
-            <div className="flex gap-2">
-              <Textarea
-                rows={3}
-                maxLength={4000}
-                placeholder="Ask a project-aware question..."
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    void handleSend();
-                  }
-                }}
-                className="min-h-[92px] rounded-xl border-border/70 bg-card/90 text-sm leading-5"
-              />
-              <Button
-                variant="secondary"
-                size="sm"
-                className="h-9 min-w-[88px] self-end gap-1.5 rounded-lg border border-border/80 bg-background px-3 shadow-sm hover:bg-muted"
-                onClick={() => void handleSend()}
-                disabled={sending || !query.trim()}
-              >
-                <Send className="h-4 w-4" />
-                Send
-              </Button>
+          <div className="border-t border-border px-5 py-3 sm:px-6 sm:py-4">
+            <div className="mx-auto w-full max-w-3xl">
+              <div className="relative">
+                <Textarea
+                  ref={composerRef}
+                  rows={1}
+                  maxLength={4000}
+                  placeholder="Ask a project-aware question..."
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      void handleSend();
+                    }
+                  }}
+                  className="min-h-[52px] max-h-[200px] rounded-2xl border-border/70 bg-card/90 px-4 py-3 pr-14 text-sm leading-6 shadow-none"
+                />
+                <Button
+                  variant="default"
+                  size="icon"
+                  className="absolute bottom-1.5 right-1.5 h-9 w-9 rounded-xl p-0"
+                  onClick={() => void handleSend()}
+                  disabled={sending || !query.trim()}
+                >
+                  <Send className="h-4 w-4" />
+                  <span className="sr-only">Send message</span>
+                </Button>
+              </div>
+              <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>Press Enter to send, Shift+Enter for newline.</span>
+                <span>{query.length}/4000</span>
+              </div>
+              {error && (
+                <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1 text-xs text-destructive">
+                  {error}
+                </p>
+              )}
             </div>
-            <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
-              <span>Press Enter to send, Shift+Enter for newline.</span>
-              <span>{query.length}/4000</span>
-            </div>
-            {error && (
-              <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1 text-xs text-destructive">
-                {error}
-              </p>
-            )}
           </div>
         </div>
 
