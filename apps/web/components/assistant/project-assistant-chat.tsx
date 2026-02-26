@@ -57,7 +57,9 @@ export function ProjectAssistantChat({
   const [clearing, setClearing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [query, setQuery] = React.useState("");
-  const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(
+    null,
+  );
 
   const fetchHistory = React.useCallback(async () => {
     setLoadingHistory(true);
@@ -65,9 +67,12 @@ export function ProjectAssistantChat({
 
     try {
       const response = await fetch(
-        `/api/ai/project-chat?projectId=${encodeURIComponent(projectId)}`
+        `/api/ai/project-chat?projectId=${encodeURIComponent(projectId)}`,
       );
-      const payload = (await response.json()) as { data?: ChatMessage[]; error?: string };
+      const payload = (await response.json()) as {
+        data?: ChatMessage[];
+        error?: string;
+      };
 
       if (!response.ok) {
         throw new Error(payload.error || "Failed to load chat history");
@@ -75,7 +80,9 @@ export function ProjectAssistantChat({
 
       setMessages(payload.data || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load chat history");
+      setError(
+        err instanceof Error ? err.message : "Failed to load chat history",
+      );
     } finally {
       setLoadingHistory(false);
     }
@@ -112,7 +119,10 @@ export function ProjectAssistantChat({
         body: JSON.stringify({ projectId, message }),
       });
 
-      const payload = (await response.json()) as { data?: ChatMessage; error?: string };
+      const payload = (await response.json()) as {
+        data?: ChatMessage;
+        error?: string;
+      };
 
       if (!response.ok || !payload.data) {
         throw new Error(payload.error || "Failed to send message");
@@ -132,7 +142,7 @@ export function ProjectAssistantChat({
   const handleClearConversation = async () => {
     if (clearing || sending) return;
     const shouldClear = window.confirm(
-      "Clear this conversation history for the selected project?"
+      "Clear this conversation history for the selected project?",
     );
     if (!shouldClear) return;
 
@@ -142,9 +152,12 @@ export function ProjectAssistantChat({
     try {
       const response = await fetch(
         `/api/ai/project-chat?projectId=${encodeURIComponent(projectId)}`,
-        { method: "DELETE" }
+        { method: "DELETE" },
       );
-      const payload = (await response.json()) as { success?: boolean; error?: string };
+      const payload = (await response.json()) as {
+        success?: boolean;
+        error?: string;
+      };
 
       if (!response.ok || !payload.success) {
         throw new Error(payload.error || "Failed to clear conversation");
@@ -152,7 +165,9 @@ export function ProjectAssistantChat({
 
       setMessages([]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to clear conversation");
+      setError(
+        err instanceof Error ? err.message : "Failed to clear conversation",
+      );
     } finally {
       setClearing(false);
     }
@@ -174,7 +189,7 @@ export function ProjectAssistantChat({
     <div
       className={cn(
         "flex flex-col rounded-2xl border border-border bg-card/95",
-        className
+        className,
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border px-5 py-4 sm:px-6 sm:py-5">
@@ -228,7 +243,9 @@ export function ProjectAssistantChat({
             ) : messages.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border px-5 py-12 text-center">
                 <Lightbulb className="mx-auto mb-2 h-5 w-5 text-muted-foreground" />
-                <p className="text-sm font-medium">Start with a production question</p>
+                <p className="text-sm font-medium">
+                  Start with a production question
+                </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Ask for plans, risk checks, next actions, or department prep.
                 </p>
@@ -239,23 +256,28 @@ export function ProjectAssistantChat({
                 return (
                   <div
                     key={message.id}
-                    className={cn("flex gap-3", isAssistant ? "justify-start" : "justify-end")}
+                    className={cn(
+                      "flex gap-3",
+                      isAssistant ? "justify-start" : "justify-end",
+                    )}
                   >
                     <div
                       className={cn(
                         "max-w-[88%] rounded-xl border px-4 py-3 text-sm",
                         isAssistant
                           ? "border-border bg-muted/45 text-foreground"
-                          : "border-primary/15 bg-primary text-primary-foreground"
+                          : "border-primary/15 bg-primary text-primary-foreground",
                       )}
                     >
-                      <p className="whitespace-pre-wrap leading-6">{message.content}</p>
+                      <p className="whitespace-pre-wrap leading-6">
+                        {message.content}
+                      </p>
                       <div
                         className={cn(
                           "mt-2 flex items-center justify-between gap-2 text-[11px]",
                           isAssistant
                             ? "text-muted-foreground"
-                            : "text-primary-foreground/75"
+                            : "text-primary-foreground/75",
                         )}
                       >
                         <span>{formatMessageTime(message.createdAt)}</span>
@@ -313,9 +335,12 @@ export function ProjectAssistantChat({
                     void handleSend();
                   }
                 }}
+                className="min-h-[92px] rounded-xl border-border/70 bg-card/90 text-sm leading-5"
               />
               <Button
-                className="h-auto min-w-[98px] gap-1.5"
+                variant="secondary"
+                size="sm"
+                className="h-9 min-w-[88px] self-end gap-1.5 rounded-lg border border-border/80 bg-background px-3 shadow-sm hover:bg-muted"
                 onClick={() => void handleSend()}
                 disabled={sending || !query.trim()}
               >
@@ -355,8 +380,8 @@ export function ProjectAssistantChat({
               Context Scope
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
-              Scenes, schedule, locations, permits, cast, crew, and recent script context from
-              the selected project.
+              Scenes, schedule, locations, permits, cast, crew, and recent
+              script context from the selected project.
             </p>
           </div>
         </aside>
