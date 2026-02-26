@@ -350,16 +350,15 @@ export function ProjectAssistantChat({
                 }}
                 className="min-h-[52px] max-h-[200px] rounded-2xl border-border/70 bg-card/90 px-4 py-3 pr-14 text-sm leading-6 shadow-none"
               />
-              <Button
-                variant="default"
-                size="icon"
-                className="absolute bottom-1.5 right-1.5 h-9 w-9 rounded-xl p-0"
+              <button
+                type="button"
+                className="absolute bottom-2 right-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-foreground text-background shadow-sm transition-colors hover:bg-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                 onClick={() => void handleSend()}
                 disabled={sending || !query.trim()}
               >
                 <Send className="h-4 w-4" />
                 <span className="sr-only">Send message</span>
-              </Button>
+              </button>
             </div>
             <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
               <span>Press Enter to send, Shift+Enter for newline.</span>
