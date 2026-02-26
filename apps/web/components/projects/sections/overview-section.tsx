@@ -6,14 +6,10 @@ import {
   Calendar,
   Users,
   UserCircle,
-  Package,
   FileText,
   Clock,
   ChevronRight,
   Plus,
-  Check,
-  X,
-  Lightbulb,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
@@ -48,30 +44,58 @@ export function OverviewSection({
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 3);
 
-  const hasContent = scenes.length > 0 || cast.length > 0 || crew.length > 0 || shootingDays.length > 0;
+  const hasContent =
+    scenes.length > 0 ||
+    cast.length > 0 ||
+    crew.length > 0 ||
+    shootingDays.length > 0;
 
-  // Setup checklist state
   const setupSteps = [
-    { key: "script", label: "Upload script", description: "Auto-generate scenes, cast & elements", icon: FileText, done: scripts.length > 0, section: "script" },
-    { key: "scenes", label: "Add scenes", description: "Break down your script into scenes", icon: Clapperboard, done: scenes.length > 0, section: "scenes" },
-    { key: "cast", label: "Add cast members", description: "Build your cast list", icon: Users, done: cast.length > 0, section: "cast" },
-    { key: "crew", label: "Add crew members", description: "Organize your production team", icon: UserCircle, done: crew.length > 0, section: "crew" },
-    { key: "schedule", label: "Add shooting days", description: "Set up your production schedule", icon: Calendar, done: shootingDays.length > 0, section: "schedule" },
+    {
+      key: "script",
+      label: "Upload script",
+      description: "Auto-generate scenes, cast & elements",
+      icon: FileText,
+      done: scripts.length > 0,
+      section: "script",
+    },
+    {
+      key: "scenes",
+      label: "Add scenes",
+      description: "Break down your script into scenes",
+      icon: Clapperboard,
+      done: scenes.length > 0,
+      section: "scenes",
+    },
+    {
+      key: "cast",
+      label: "Add cast members",
+      description: "Build your cast list",
+      icon: Users,
+      done: cast.length > 0,
+      section: "cast",
+    },
+    {
+      key: "crew",
+      label: "Add crew members",
+      description: "Organize your production team",
+      icon: UserCircle,
+      done: crew.length > 0,
+      section: "crew",
+    },
+    {
+      key: "schedule",
+      label: "Add shooting days",
+      description: "Set up your production schedule",
+      icon: Calendar,
+      done: shootingDays.length > 0,
+      section: "schedule",
+    },
   ];
-  const completedCount = setupSteps.filter((s) => s.done).length;
-  const allDone = completedCount === setupSteps.length;
-
-  const [checklistDismissed, setChecklistDismissed] = React.useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem(`checklist-dismissed-${project.id}`) === "true";
-  });
-
-  const dismissChecklist = () => {
-    setChecklistDismissed(true);
-    localStorage.setItem(`checklist-dismissed-${project.id}`, "true");
-  };
-
-  const showChecklist = !allDone && !checklistDismissed;
+  const pendingSetupSteps = setupSteps.filter((step) => !step.done);
+  const nextSetupStep = pendingSetupSteps[0];
+  const NextSetupStepIcon = nextSetupStep ? nextSetupStep.icon : null;
+  const completedCount = setupSteps.length - pendingSetupSteps.length;
 
   // Show full-page getting started for completely empty projects
   if (!hasContent && scripts.length === 0) {
@@ -101,64 +125,36 @@ export function OverviewSection({
 
   return (
     <div className="space-y-8">
-      {/* Setup Checklist — shown until all steps done or dismissed */}
-      {showChecklist && (
-        <section className="rounded-lg border border-border bg-card">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <div className="flex items-center gap-2">
-              <Lightbulb className="h-4 w-4 text-primary" />
-              <h3 className="font-medium">Getting Started</h3>
-              <span className="text-xs text-muted-foreground">
-                {completedCount}/{setupSteps.length}
-              </span>
+      {nextSetupStep && (
+        <section className="rounded-lg border border-border bg-card/60">
+          <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                {NextSetupStepIcon && <NextSetupStepIcon className="h-5 w-5" />}
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Recommended next step
+                </p>
+                <h3 className="font-medium">{nextSetupStep.label}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {nextSetupStep.description}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {completedCount}/{setupSteps.length} essentials complete
+                </p>
+              </div>
             </div>
-            <Button variant="ghost" size="icon-sm" onClick={dismissChecklist}>
-              <X className="h-4 w-4" />
+            <Button size="sm" onClick={() => onNavigate(nextSetupStep.section)}>
+              Continue
+              <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
-          {/* Progress bar */}
-          <div className="px-4 pt-3">
-            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full rounded-full bg-primary transition-all duration-500"
-                style={{ width: `${(completedCount / setupSteps.length) * 100}%` }}
-              />
+          {pendingSetupSteps.length > 1 && (
+            <div className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
+              Up next: {pendingSetupSteps.slice(1, 3).map((step) => step.label).join(" • ")}
             </div>
-          </div>
-          <div className="p-2">
-            {setupSteps.map((step) => (
-              <button
-                key={step.key}
-                onClick={() => !step.done && onNavigate(step.section)}
-                className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-left transition-colors ${
-                  step.done
-                    ? "opacity-60"
-                    : "hover:bg-muted/50 cursor-pointer"
-                }`}
-              >
-                <div
-                  className={`flex h-6 w-6 items-center justify-center rounded-full shrink-0 ${
-                    step.done
-                      ? "bg-primary text-primary-foreground"
-                      : "border-2 border-muted-foreground/30"
-                  }`}
-                >
-                  {step.done && <Check className="h-3.5 w-3.5" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium ${step.done ? "line-through text-muted-foreground" : ""}`}>
-                    {step.label}
-                  </p>
-                  {!step.done && (
-                    <p className="text-xs text-muted-foreground">{step.description}</p>
-                  )}
-                </div>
-                {!step.done && (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                )}
-              </button>
-            ))}
-          </div>
+          )}
         </section>
       )}
 

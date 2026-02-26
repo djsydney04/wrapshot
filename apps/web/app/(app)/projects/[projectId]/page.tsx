@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
+import { Select } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -198,6 +199,19 @@ const SECTION_ORDER: ProjectSection[] = [
   "settings",
 ];
 
+const MOBILE_PRIMARY_SECTIONS: ProjectSection[] = [
+  "dashboard",
+  "assistant",
+  "script",
+  "scenes",
+  "schedule",
+  "callsheets",
+];
+
+const MOBILE_ADVANCED_SECTIONS: ProjectSection[] = SECTION_ORDER.filter(
+  (section) => !MOBILE_PRIMARY_SECTIONS.includes(section)
+);
+
 const WORKFLOW_PLAN: { id: string; label: string; section: ProjectSection }[] = [
   { id: "script", label: "Script Ready", section: "script" },
   { id: "breakdown", label: "Scene Breakdowns", section: "scenes" },
@@ -216,6 +230,14 @@ function normalizeSection(section: string | null): ProjectSection | null {
     return section as ProjectSection;
   }
   return null;
+}
+
+function getSectionLabel(section: ProjectSection): string {
+  if (section === "callsheets") return "Call Sheets";
+  if (section === "assistant") return "Agent";
+  if (section === "ge") return "G&E";
+  if (section === "post") return "Post";
+  return section.charAt(0).toUpperCase() + section.slice(1);
 }
 
 export default function ProjectDetailPage() {
@@ -1022,34 +1044,40 @@ export default function ProjectDetailPage() {
           {/* Mobile Section Tabs (hidden on desktop) */}
           <div className="border-b border-border px-4 py-2 md:hidden">
             <div className="scrollbar-thin flex gap-2 overflow-x-auto pb-1">
-              {SECTION_ORDER.map(
-                (section) => (
-                  <button
-                    key={section}
-                    onClick={() => handleSectionChange(section)}
-                    className={cn(
-                      "whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm transition-colors",
-                      activeSection === section
-                        ? "border-border bg-foreground text-background"
-                        : "border-border/70 text-muted-foreground hover:bg-muted"
-                    )}
-                  >
-                    {section === "callsheets"
-                      ? "Call Sheets"
-                      : section === "assistant"
-                        ? "Agent"
-                      : section === "art"
-                        ? "Art"
-                      : section === "camera"
-                        ? "Camera"
-                        : section === "ge"
-                          ? "G&E"
-                        : section === "post"
-                          ? "Post"
-                        : section.charAt(0).toUpperCase() + section.slice(1)}
-                  </button>
-                )
-              )}
+              {MOBILE_PRIMARY_SECTIONS.map((section) => (
+                <button
+                  key={section}
+                  onClick={() => handleSectionChange(section)}
+                  className={cn(
+                    "whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm transition-colors",
+                    activeSection === section
+                      ? "border-border bg-foreground text-background"
+                      : "border-border/70 text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  {getSectionLabel(section)}
+                </button>
+              ))}
+              <div className="min-w-[150px] shrink-0">
+                <Select
+                  value={
+                    MOBILE_PRIMARY_SECTIONS.includes(activeSection)
+                      ? ""
+                      : activeSection
+                  }
+                  onChange={(event) => {
+                    if (event.target.value) {
+                      handleSectionChange(event.target.value as ProjectSection);
+                    }
+                  }}
+                  options={MOBILE_ADVANCED_SECTIONS.map((section) => ({
+                    value: section,
+                    label: getSectionLabel(section),
+                  }))}
+                  placeholder="More tools"
+                  className="h-[34px] border-border/70 bg-background text-sm text-muted-foreground"
+                />
+              </div>
             </div>
           </div>
 
