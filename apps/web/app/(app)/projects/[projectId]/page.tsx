@@ -33,6 +33,7 @@ import { OverviewSection } from "@/components/projects/sections/overview-section
 import { StripeboardSection } from "@/components/projects/sections/stripeboard-section";
 import { CastSection } from "@/components/projects/sections/cast-section";
 import { CrewSection } from "@/components/projects/sections/crew-section";
+import { TasksSection } from "@/components/projects/sections/tasks-section";
 import { ScheduleSection } from "@/components/projects/sections/schedule-section";
 import { ElementsSection } from "@/components/projects/sections/elements-section";
 import { LocationsSection } from "@/components/projects/sections/locations-section";
@@ -56,6 +57,7 @@ import { getCastMembersWithInviteStatus, type CastMemberWithInviteStatus } from 
 import { getScripts, type Script as DBScript } from "@/lib/actions/scripts";
 import { getLocationsWithSceneCounts, type Location as DBLocation } from "@/lib/actions/locations";
 import { getElementsWithSceneCounts, type Element as DBElement } from "@/lib/actions/elements";
+import { getProjectTasks, type ProjectTask as DBProjectTask } from "@/lib/actions/project-tasks";
 import { useShootingDays } from "@/lib/hooks/use-shooting-days";
 import { useAgentJob } from "@/lib/hooks/use-agent-job";
 import { useAgentProgressToast } from "@/lib/hooks/use-agent-progress-toast";
@@ -96,6 +98,11 @@ const SECTION_META: Record<ProjectSection, { title: string; description: string 
   schedule: {
     title: "Schedule & Stripboard",
     description: "Build shooting days, assign scenes, and optimize run-of-show planning.",
+  },
+  tasks: {
+    title: "Tasks",
+    description:
+      "Create, assign, and track production tickets across cast, crew, and departments.",
   },
   callsheets: {
     title: "Call Sheets",
@@ -150,12 +157,20 @@ const SECTION_META: Record<ProjectSection, { title: string; description: string 
   },
 };
 
-type DataKey = "scenes" | "scripts" | "cast" | "crew" | "locations" | "elements";
+type DataKey =
+  | "scenes"
+  | "scripts"
+  | "cast"
+  | "crew"
+  | "locations"
+  | "elements"
+  | "tasks";
 
 const SECTION_DATA_KEYS: Record<ProjectSection, DataKey[]> = {
   dashboard: ["scenes", "scripts", "cast", "crew"],
   assistant: [],
   script: ["scripts"],
+  tasks: ["tasks"],
   schedule: ["scenes", "locations", "cast"],
   callsheets: ["scenes", "cast", "crew"],
   art: ["scenes", "crew"],
@@ -178,6 +193,7 @@ const DATA_KEY_LABEL: Record<DataKey, string> = {
   crew: "crew",
   locations: "locations",
   elements: "elements",
+  tasks: "tasks",
 };
 
 const SECTION_ORDER: ProjectSection[] = [
@@ -185,6 +201,7 @@ const SECTION_ORDER: ProjectSection[] = [
   "assistant",
   "script",
   "scenes",
+  "tasks",
   "schedule",
   "callsheets",
   "art",
@@ -204,6 +221,7 @@ const MOBILE_PRIMARY_SECTIONS: ProjectSection[] = [
   "assistant",
   "script",
   "scenes",
+  "tasks",
   "schedule",
   "callsheets",
 ];
@@ -276,6 +294,7 @@ export default function ProjectDetailPage() {
   const [cast, setCast] = React.useState<CastMemberWithInviteStatus[]>([]);
   const [dbLocations, setDbLocations] = React.useState<DBLocation[]>([]);
   const [dbElements, setDbElements] = React.useState<DBElement[]>([]);
+  const [dbTasks, setDbTasks] = React.useState<DBProjectTask[]>([]);
   const [loadedData, setLoadedData] = React.useState<Record<DataKey, boolean>>({
     scenes: false,
     scripts: false,
@@ -283,6 +302,7 @@ export default function ProjectDetailPage() {
     crew: false,
     locations: false,
     elements: false,
+    tasks: false,
   });
   const [loadErrors, setLoadErrors] = React.useState<Record<DataKey, string | null>>({
     scenes: null,
@@ -291,6 +311,7 @@ export default function ProjectDetailPage() {
     crew: null,
     locations: null,
     elements: null,
+    tasks: null,
   });
   const loadedDataRef = React.useRef<Record<DataKey, boolean>>({
     scenes: false,
@@ -299,6 +320,7 @@ export default function ProjectDetailPage() {
     crew: false,
     locations: false,
     elements: false,
+    tasks: false,
   });
   const inFlightLoadsRef = React.useRef<Partial<Record<DataKey, Promise<void>>>>({});
   const trackedProjectRef = React.useRef<string | null>(null);
@@ -371,6 +393,14 @@ export default function ProjectDetailPage() {
     setDbElements(elementsResult.data || []);
   }, [projectId]);
 
+  const loadTasksData = React.useCallback(async () => {
+    const tasksResult = await getProjectTasks(projectId);
+    if (tasksResult.error) {
+      throw new Error(tasksResult.error);
+    }
+    setDbTasks(tasksResult.data || []);
+  }, [projectId]);
+
   const loadDataKey = React.useCallback(
     async (key: DataKey, force = false) => {
       if (!force && loadedDataRef.current[key]) return;
@@ -404,6 +434,9 @@ export default function ProjectDetailPage() {
             case "elements":
               await loadElementsData();
               break;
+            case "tasks":
+              await loadTasksData();
+              break;
             default:
               break;
           }
@@ -436,6 +469,7 @@ export default function ProjectDetailPage() {
       loadLocationsData,
       loadScenesData,
       loadScriptsData,
+      loadTasksData,
     ]
   );
 
@@ -458,6 +492,7 @@ export default function ProjectDetailPage() {
         crew: false,
         locations: false,
         elements: false,
+        tasks: false,
       };
       setLoadedData({
         scenes: false,
@@ -466,6 +501,7 @@ export default function ProjectDetailPage() {
         crew: false,
         locations: false,
         elements: false,
+        tasks: false,
       });
       setLoadErrors({
         scenes: null,
@@ -474,6 +510,7 @@ export default function ProjectDetailPage() {
         crew: null,
         locations: null,
         elements: null,
+        tasks: null,
       });
       inFlightLoadsRef.current = {};
       trackedProjectRef.current = null;
@@ -483,6 +520,7 @@ export default function ProjectDetailPage() {
       setCrew([]);
       setDbLocations([]);
       setDbElements([]);
+      setDbTasks([]);
       setLoading(true);
 
       try {
@@ -559,6 +597,7 @@ export default function ProjectDetailPage() {
     ? (dbLocations as any[])
     : [];
   const elements = loadedData.elements ? dbElements : [];
+  const tasks = loadedData.tasks ? dbTasks : [];
 
   const monitoredScriptId = React.useMemo(() => {
     if (scripts.length === 0) return undefined;
@@ -721,6 +760,7 @@ export default function ProjectDetailPage() {
   const sidebarLocationsCount = loadedData.locations
     ? dbLocations.length
     : project.locationsCount;
+  const sidebarTasksCount = loadedData.tasks ? dbTasks.length : 0;
   const sidebarShootingDaysCount =
     dbShootingDays.length > 0
       ? dbShootingDays.length
@@ -839,6 +879,16 @@ export default function ProjectDetailPage() {
             stripeboardScenes={dbScenes}
             stripeboardCast={cast}
             useMockData={false}
+          />
+        );
+      case "tasks":
+        return (
+          <TasksSection
+            projectId={projectId}
+            tasks={tasks}
+            cast={cast}
+            crew={crew}
+            currentUserId={user?.id}
           />
         );
       case "callsheets":
@@ -1027,6 +1077,7 @@ export default function ProjectDetailPage() {
             workflow={workflowSteps}
             counts={{
               scenes: sidebarScenesCount,
+              tasks: sidebarTasksCount,
               cast: sidebarCastCount,
               crew: crew.length,
               locations: sidebarLocationsCount,

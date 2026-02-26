@@ -95,7 +95,6 @@ export function OverviewSection({
   const pendingSetupSteps = setupSteps.filter((step) => !step.done);
   const nextSetupStep = pendingSetupSteps[0];
   const NextSetupStepIcon = nextSetupStep ? nextSetupStep.icon : null;
-  const completedCount = setupSteps.length - pendingSetupSteps.length;
 
   // Show full-page getting started for completely empty projects
   if (!hasContent && scripts.length === 0) {
@@ -134,27 +133,19 @@ export function OverviewSection({
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Recommended next step
+                  Project focus
                 </p>
                 <h3 className="font-medium">{nextSetupStep.label}</h3>
                 <p className="text-sm text-muted-foreground">
                   {nextSetupStep.description}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  {completedCount}/{setupSteps.length} essentials complete
-                </p>
               </div>
             </div>
             <Button size="sm" onClick={() => onNavigate(nextSetupStep.section)}>
-              Continue
+              Open
               <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
-          {pendingSetupSteps.length > 1 && (
-            <div className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
-              Up next: {pendingSetupSteps.slice(1, 3).map((step) => step.label).join(" • ")}
-            </div>
-          )}
         </section>
       )}
 
