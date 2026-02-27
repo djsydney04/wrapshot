@@ -61,6 +61,8 @@ export function ProjectAssistantChat({
     null,
   );
   const composerRef = React.useRef<HTMLTextAreaElement>(null);
+  const messagesViewportRef = React.useRef<HTMLDivElement>(null);
+  const previousMessageCountRef = React.useRef(0);
 
   React.useEffect(() => {
     const textarea = composerRef.current;
@@ -72,6 +74,18 @@ export function ProjectAssistantChat({
     textarea.style.height = `${clampedHeight}px`;
     textarea.style.overflowY = scrollHeight > 200 ? "auto" : "hidden";
   }, [query]);
+
+  React.useEffect(() => {
+    const viewport = messagesViewportRef.current;
+    if (!viewport) return;
+
+    const hasNewMessage = messages.length > previousMessageCountRef.current;
+    viewport.scrollTo({
+      top: viewport.scrollHeight,
+      behavior: hasNewMessage ? "smooth" : "auto",
+    });
+    previousMessageCountRef.current = messages.length;
+  }, [messages, sending, loadingHistory]);
 
   const fetchHistory = React.useCallback(async () => {
     setLoadingHistory(true);
@@ -200,7 +214,7 @@ export function ProjectAssistantChat({
   return (
     <div
       className={cn(
-        "flex flex-col rounded-2xl border border-border bg-card/95",
+        "flex h-full min-h-[420px] flex-col rounded-2xl border border-border bg-card/95",
         className,
       )}
     >
@@ -244,93 +258,98 @@ export function ProjectAssistantChat({
         </div>
       </div>
 
-      <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex flex-col">
-          <div className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
-            {loadingHistory ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading conversation...
-              </div>
-            ) : messages.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border px-5 py-10 text-center">
-                <Lightbulb className="mx-auto mb-2 h-5 w-5 text-muted-foreground" />
-                <p className="text-sm font-medium">
-                  Start with a production question
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Ask for plans, risk checks, next actions, or department prep.
-                </p>
-              </div>
-            ) : (
-              messages.map((message) => {
-                const isAssistant = message.role === "assistant";
-                return (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      "flex gap-3",
-                      isAssistant ? "justify-start" : "justify-end",
-                    )}
-                  >
+      <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex min-h-0 flex-col">
+          <div
+            ref={messagesViewportRef}
+            className="min-h-0 flex-1 overflow-y-auto"
+          >
+            <div className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
+              {loadingHistory ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading conversation...
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border px-5 py-10 text-center">
+                  <Lightbulb className="mx-auto mb-2 h-5 w-5 text-muted-foreground" />
+                  <p className="text-sm font-medium">
+                    Start with a production question
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Ask for plans, risk checks, next actions, or department prep.
+                  </p>
+                </div>
+              ) : (
+                messages.map((message) => {
+                  const isAssistant = message.role === "assistant";
+                  return (
                     <div
+                      key={message.id}
                       className={cn(
-                        "max-w-[88%] rounded-xl border px-4 py-3 text-sm",
-                        isAssistant
-                          ? "border-border bg-muted/45 text-foreground"
-                          : "border-primary/15 bg-primary text-primary-foreground",
+                        "flex gap-3",
+                        isAssistant ? "justify-start" : "justify-end",
                       )}
                     >
-                      <p className="whitespace-pre-wrap leading-6">
-                        {message.content}
-                      </p>
                       <div
                         className={cn(
-                          "mt-2 flex items-center justify-between gap-2 text-[11px]",
+                          "max-w-[88%] rounded-xl border px-4 py-3 text-sm",
                           isAssistant
-                            ? "text-muted-foreground"
-                            : "text-primary-foreground/75",
+                            ? "border-border bg-muted/45 text-foreground"
+                            : "border-primary/15 bg-primary text-primary-foreground",
                         )}
                       >
-                        <span>{formatMessageTime(message.createdAt)}</span>
-                        {isAssistant && (
-                          <button
-                            type="button"
-                            onClick={() => void handleCopyMessage(message)}
-                            className="inline-flex items-center gap-1 rounded-sm px-1 py-0.5 hover:bg-background/70"
-                          >
-                            {copiedMessageId === message.id ? (
-                              <>
-                                <Check className="h-3 w-3" />
-                                Copied
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="h-3 w-3" />
-                                Copy
-                              </>
-                            )}
-                          </button>
-                        )}
+                        <p className="whitespace-pre-wrap leading-6">
+                          {message.content}
+                        </p>
+                        <div
+                          className={cn(
+                            "mt-2 flex items-center justify-between gap-2 text-[11px]",
+                            isAssistant
+                              ? "text-muted-foreground"
+                              : "text-primary-foreground/75",
+                          )}
+                        >
+                          <span>{formatMessageTime(message.createdAt)}</span>
+                          {isAssistant && (
+                            <button
+                              type="button"
+                              onClick={() => void handleCopyMessage(message)}
+                              className="inline-flex items-center gap-1 rounded-sm px-1 py-0.5 hover:bg-background/70"
+                            >
+                              {copiedMessageId === message.id ? (
+                                <>
+                                  <Check className="h-3 w-3" />
+                                  Copied
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-3 w-3" />
+                                  Copy
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
+
+                      {!isAssistant && (
+                        <span className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-primary/20 bg-primary/10">
+                          <User2 className="h-4 w-4 text-primary" />
+                        </span>
+                      )}
                     </div>
+                  );
+                })
+              )}
 
-                    {!isAssistant && (
-                      <span className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-primary/20 bg-primary/10">
-                        <User2 className="h-4 w-4 text-primary" />
-                      </span>
-                    )}
-                  </div>
-                );
-              })
-            )}
-
-            {sending && (
-              <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Thinking...
-              </div>
-            )}
+              {sending && (
+                <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Thinking...
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="border-t border-border px-5 py-3 sm:px-6 sm:py-4">
@@ -372,7 +391,7 @@ export function ProjectAssistantChat({
           </div>
         </div>
 
-        <aside className="border-t border-border px-5 py-5 sm:px-6 lg:border-l lg:border-t-0">
+        <aside className="border-t border-border px-5 py-5 sm:px-6 lg:overflow-y-auto lg:border-l lg:border-t-0">
           <p className="text-xs font-semibold uppercase tracking-[0.11em] text-muted-foreground">
             Quick Prompts
           </p>

@@ -850,7 +850,13 @@ export default function ProjectDetailPage() {
           />
         );
       case "assistant":
-        return <AssistantSection projectId={projectId} projectName={project.name} />;
+        return (
+          <AssistantSection
+            projectId={projectId}
+            projectName={project.name}
+            className="h-full"
+          />
+        );
       case "script":
         return (
           <ScriptSection
@@ -1091,7 +1097,7 @@ export default function ProjectDetailPage() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto">
+        <main className="flex min-h-0 flex-1 flex-col overflow-auto">
           {/* Mobile Section Tabs (hidden on desktop) */}
           <div className="border-b border-border px-4 py-2 md:hidden">
             <div className="scrollbar-thin flex gap-2 overflow-x-auto pb-1">
@@ -1132,7 +1138,12 @@ export default function ProjectDetailPage() {
             </div>
           </div>
 
-          <div className="mx-auto w-full max-w-[1320px] p-4 md:p-6">
+          <div
+            className={cn(
+              "mx-auto w-full max-w-[1320px] p-4 md:p-6",
+              isAssistantSection && "flex min-h-full flex-1 flex-col",
+            )}
+          >
             <div className="skeuo-panel mb-4 rounded-xl px-4 py-3">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 {sectionMeta.title}
@@ -1145,7 +1156,7 @@ export default function ProjectDetailPage() {
               className={cn(
                 "min-h-[220px]",
                 isAssistantSection
-                  ? "rounded-2xl"
+                  ? "flex min-h-0 flex-1 rounded-2xl"
                   : "skeuo-panel rounded-2xl p-4 md:p-5"
               )}
             >
