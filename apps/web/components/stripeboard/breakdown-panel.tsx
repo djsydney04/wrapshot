@@ -284,6 +284,7 @@ export function BreakdownPanel({
               sceneElements={sceneElements}
               locations={locations}
               onUpdate={fetchBreakdownData}
+              compact={!expanded}
             />
           )}
         </div>

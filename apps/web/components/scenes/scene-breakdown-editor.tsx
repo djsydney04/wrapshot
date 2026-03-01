@@ -103,6 +103,7 @@ interface SceneBreakdownEditorProps {
   sceneElements: SceneElementItem[];
   locations: Location[];
   onUpdate?: () => void;
+  compact?: boolean;
 }
 
 export function SceneBreakdownEditor({
@@ -113,6 +114,7 @@ export function SceneBreakdownEditor({
   sceneElements: initialSceneElements,
   locations,
   onUpdate,
+  compact = false,
 }: SceneBreakdownEditorProps) {
   const [sceneElements, setSceneElements] = React.useState<SceneElementItem[]>(initialSceneElements);
   const [sceneCast, setSceneCast] = React.useState<string[]>(
@@ -334,7 +336,7 @@ export function SceneBreakdownEditor({
   const rightCategories = BREAKDOWN_CATEGORIES.filter((c) => c.column === "right");
 
   return (
-    <div className="space-y-6">
+    <div className={cn("min-w-0", compact ? "space-y-4" : "space-y-6")}>
       {/* Cast Section */}
       <div className="border border-border rounded-lg overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3 bg-blue-500/10 text-blue-700 font-medium text-sm border-b border-blue-200">
@@ -352,9 +354,9 @@ export function SceneBreakdownEditor({
             const member = cast.find((c) => c.id === castId);
             if (!member) return null;
             return (
-              <div key={castId} className="flex items-center gap-2 text-sm group">
+              <div key={castId} className="group flex min-w-0 items-center gap-2 text-sm">
                 <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                <span className="flex-1">
+                <span className="min-w-0 flex-1 truncate">
                   {member.characterName}
                   {member.actorName && (
                     <span className="text-muted-foreground"> ({member.actorName})</span>
@@ -384,9 +386,9 @@ export function SceneBreakdownEditor({
       </div>
 
       {/* Two-column grid for categories */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className={cn("grid gap-4", compact ? "grid-cols-1" : "md:grid-cols-2")}>
         {/* Left column */}
-        <div className="space-y-3">
+        <div className="min-w-0 space-y-3">
           {leftCategories.map((cat) => (
             <BreakdownCategory
               key={cat.category}
@@ -407,7 +409,7 @@ export function SceneBreakdownEditor({
         </div>
 
         {/* Right column */}
-        <div className="space-y-3">
+        <div className="min-w-0 space-y-3">
           {rightCategories.map((cat) => (
             <BreakdownCategory
               key={cat.category}

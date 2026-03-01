@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { Calendar, Clock, Loader2 } from "lucide-react";
+import { Calendar, Clock, Loader2, Focus, ChevronsUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { SortableSceneStrip } from "./scene-strip";
 import { cn } from "@/lib/utils";
 import { formatPageEighths, sumPageEighths } from "@/lib/utils/page-eighths";
@@ -19,6 +20,10 @@ interface ShootDayContainerProps {
   activeId?: string | null;
   isSaving?: boolean;
   sceneSize?: SceneStripSize;
+  collapsed?: boolean;
+  focused?: boolean;
+  onToggleCollapsed?: () => void;
+  onToggleFocused?: () => void;
 }
 
 const STATUS_COLORS: Record<ShootingDay["status"], string> = {
@@ -37,6 +42,10 @@ export function ShootDayContainer({
   activeId,
   isSaving,
   sceneSize = "comfortable",
+  collapsed = false,
+  focused = false,
+  onToggleCollapsed,
+  onToggleFocused,
 }: ShootDayContainerProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: `day-${shootingDay.id}`,
@@ -66,7 +75,7 @@ export function ShootDayContainer({
       {/* Day Header */}
       <div
         className={cn(
-          "px-4 py-3 text-white flex items-center justify-between",
+          "flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-white",
           STATUS_COLORS[shootingDay.status]
         )}
       >
@@ -83,8 +92,34 @@ export function ShootDayContainer({
           </span>
         </div>
 
-        <div className="flex items-center gap-4 text-sm">
-          <span className="flex items-center gap-1 opacity-80">
+        <div className="flex flex-wrap items-center justify-end gap-2 text-xs sm:text-sm">
+          <div className="flex items-center gap-1">
+            {onToggleFocused && (
+              <Button
+                type="button"
+                variant={focused ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 bg-white/20 px-2 text-white hover:bg-white/30 hover:text-white"
+                onClick={onToggleFocused}
+              >
+                <Focus className="h-3.5 w-3.5" />
+                {focused ? "Focused" : "Focus"}
+              </Button>
+            )}
+            {onToggleCollapsed && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 bg-white/20 px-2 text-white hover:bg-white/30 hover:text-white"
+                onClick={onToggleCollapsed}
+              >
+                <ChevronsUpDown className="h-3.5 w-3.5" />
+                {collapsed ? "Expand" : "Collapse"}
+              </Button>
+            )}
+          </div>
+          <span className="flex max-w-[250px] items-center gap-1 truncate opacity-80">
             <Clock className="h-3.5 w-3.5" />
             {shootingDay.generalCall}
             {shootingDay.wrapTime && ` - ${shootingDay.wrapTime}`}
@@ -97,27 +132,29 @@ export function ShootDayContainer({
       </div>
 
       {/* Scenes */}
-      <div className="p-2 space-y-1.5 min-h-[60px] bg-muted/30">
-        {scenes.length > 0 ? (
-          scenes.map((scene) => (
-            <SortableSceneStrip
-              key={scene.id}
-              scene={scene}
-              onClick={() => onSceneClick?.(scene.id)}
-              isSelected={selectedSceneId === scene.id}
-              layout="strip"
-              sceneSize={sceneSize}
-            />
-          ))
-        ) : (
-          <div className="flex items-center justify-center h-12 border-2 border-dashed border-border rounded-lg">
-            <p className="text-xs text-muted-foreground">Drop scenes here</p>
-          </div>
-        )}
-      </div>
+      {!collapsed && (
+        <div className="p-2 space-y-1.5 min-h-[60px] bg-muted/30">
+          {scenes.length > 0 ? (
+            scenes.map((scene) => (
+              <SortableSceneStrip
+                key={scene.id}
+                scene={scene}
+                onClick={() => onSceneClick?.(scene.id)}
+                isSelected={selectedSceneId === scene.id}
+                layout="strip"
+                sceneSize={sceneSize}
+              />
+            ))
+          ) : (
+            <div className="flex items-center justify-center h-12 border-2 border-dashed border-border rounded-lg">
+              <p className="text-xs text-muted-foreground">Drop scenes here</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Footer Notes */}
-      {shootingDay.notes && (
+      {shootingDay.notes && !collapsed && (
         <div className="px-4 py-2 bg-muted/50 border-t border-border">
           <p className="text-xs text-muted-foreground">{shootingDay.notes}</p>
         </div>
