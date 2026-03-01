@@ -323,6 +323,7 @@ export default function ProjectDetailPage() {
     tasks: false,
   });
   const inFlightLoadsRef = React.useRef<Partial<Record<DataKey, Promise<void>>>>({});
+  const loadAbortControllersRef = React.useRef<Partial<Record<DataKey, AbortController>>>({});
   const trackedProjectRef = React.useRef<string | null>(null);
 
   // Still using store for other data (not yet migrated to DB)
@@ -335,8 +336,18 @@ export default function ProjectDetailPage() {
     getScriptsForProject,
   } = useProjectStore();
 
-  const loadProjectData = React.useCallback(async () => {
+  const cancelAllDataLoads = React.useCallback(() => {
+    Object.values(loadAbortControllersRef.current).forEach((controller) =>
+      controller?.abort()
+    );
+    loadAbortControllersRef.current = {};
+    inFlightLoadsRef.current = {};
+  }, []);
+
+  const loadProjectData = React.useCallback(async (signal?: AbortSignal) => {
+    throwIfAborted(signal);
     const projectData = await getProject(projectId);
+    throwIfAborted(signal);
     setProject(projectData);
 
     if (projectData && trackedProjectRef.current !== projectData.id) {
@@ -345,52 +356,64 @@ export default function ProjectDetailPage() {
     }
   }, [projectId]);
 
-  const loadScenesData = React.useCallback(async () => {
+  const loadScenesData = React.useCallback(async (signal?: AbortSignal) => {
+    throwIfAborted(signal);
     const scenesResult = await getScenes(projectId);
+    throwIfAborted(signal);
     if (scenesResult.error) {
       throw new Error(scenesResult.error);
     }
-    setDbScenes(scenesResult.data || []);
+    return scenesResult.data || [];
   }, [projectId]);
 
-  const loadScriptsData = React.useCallback(async () => {
+  const loadScriptsData = React.useCallback(async (signal?: AbortSignal) => {
+    throwIfAborted(signal);
     const scriptsResult = await getScripts(projectId);
+    throwIfAborted(signal);
     if (scriptsResult.error) {
       throw new Error(scriptsResult.error);
     }
-    setDbScripts(scriptsResult.data || []);
+    return scriptsResult.data || [];
   }, [projectId]);
 
-  const loadCastData = React.useCallback(async () => {
+  const loadCastData = React.useCallback(async (signal?: AbortSignal) => {
+    throwIfAborted(signal);
     const castResult = await getCastMembersWithInviteStatus(projectId);
+    throwIfAborted(signal);
     if (castResult.error) {
       throw new Error(castResult.error);
     }
-    setCast(castResult.data || []);
+    return castResult.data || [];
   }, [projectId]);
 
-  const loadCrewData = React.useCallback(async () => {
+  const loadCrewData = React.useCallback(async (signal?: AbortSignal) => {
+    throwIfAborted(signal);
     const crewResult = await getCrewMembersWithInviteStatus(projectId);
+    throwIfAborted(signal);
     if (crewResult.error) {
       throw new Error(crewResult.error);
     }
-    setCrew(crewResult.data || []);
+    return crewResult.data || [];
   }, [projectId]);
 
-  const loadLocationsData = React.useCallback(async () => {
+  const loadLocationsData = React.useCallback(async (signal?: AbortSignal) => {
+    throwIfAborted(signal);
     const locationsResult = await getLocationsWithSceneCounts(projectId);
+    throwIfAborted(signal);
     if (locationsResult.error) {
       throw new Error(locationsResult.error);
     }
-    setDbLocations(locationsResult.data || []);
+    return locationsResult.data || [];
   }, [projectId]);
 
-  const loadElementsData = React.useCallback(async () => {
+  const loadElementsData = React.useCallback(async (signal?: AbortSignal) => {
+    throwIfAborted(signal);
     const elementsResult = await getElementsWithSceneCounts(projectId);
+    throwIfAborted(signal);
     if (elementsResult.error) {
       throw new Error(elementsResult.error);
     }
-    setDbElements(elementsResult.data || []);
+    return elementsResult.data || [];
   }, [projectId]);
 
   const loadTasksData = React.useCallback(async () => {
@@ -402,12 +425,22 @@ export default function ProjectDetailPage() {
   }, [projectId]);
 
   const loadDataKey = React.useCallback(
-    async (key: DataKey, force = false) => {
+    async (key: DataKey, force = false, signal?: AbortSignal) => {
+      if (signal?.aborted) return;
       if (!force && loadedDataRef.current[key]) return;
       if (inFlightLoadsRef.current[key]) {
+        if (force) {
+          loadAbortControllersRef.current[key]?.abort();
+        }
         await inFlightLoadsRef.current[key];
-        if (!force || loadedDataRef.current[key]) return;
+        if (signal?.aborted) return;
+        if (!force && loadedDataRef.current[key]) return;
       }
+
+      const controller = new AbortController();
+      const abortFromParent = () => controller.abort();
+      signal?.addEventListener("abort", abortFromParent, { once: true });
+      loadAbortControllersRef.current[key] = controller;
 
       const loadPromise = (async () => {
         setLoadErrors((previous) =>
@@ -416,23 +449,40 @@ export default function ProjectDetailPage() {
 
         try {
           switch (key) {
-            case "scenes":
-              await loadScenesData();
+            case "scenes": {
+              const scenes = await loadScenesData(controller.signal);
+              throwIfAborted(controller.signal);
+              setDbScenes(scenes);
               break;
-            case "scripts":
-              await loadScriptsData();
+            }
+            case "scripts": {
+              const scripts = await loadScriptsData(controller.signal);
+              throwIfAborted(controller.signal);
+              setDbScripts(scripts);
               break;
-            case "cast":
-              await loadCastData();
+            }
+            case "cast": {
+              const castMembers = await loadCastData(controller.signal);
+              throwIfAborted(controller.signal);
+              setCast(castMembers);
               break;
-            case "crew":
-              await loadCrewData();
+            }
+            case "crew": {
+              const crewMembers = await loadCrewData(controller.signal);
+              throwIfAborted(controller.signal);
+              setCrew(crewMembers);
               break;
-            case "locations":
-              await loadLocationsData();
+            }
+            case "locations": {
+              const locations = await loadLocationsData(controller.signal);
+              throwIfAborted(controller.signal);
+              setDbLocations(locations);
               break;
-            case "elements":
-              await loadElementsData();
+            }
+            case "elements": {
+              const elements = await loadElementsData(controller.signal);
+              throwIfAborted(controller.signal);
+              setDbElements(elements);
               break;
             case "tasks":
               await loadTasksData();
@@ -441,6 +491,7 @@ export default function ProjectDetailPage() {
               break;
           }
 
+          throwIfAborted(controller.signal);
           loadedDataRef.current[key] = true;
           setLoadedData((previous) =>
             previous[key] ? previous : { ...previous, [key]: true }
@@ -449,13 +500,20 @@ export default function ProjectDetailPage() {
             previous[key] === null ? previous : { ...previous, [key]: null }
           );
         } catch (error) {
+          if (isAbortError(error)) {
+            return;
+          }
           const errorMessage =
             error instanceof Error ? error.message : `Failed to load ${key}`;
           console.error(`Error loading ${key}:`, error);
           loadedDataRef.current[key] = false;
           setLoadErrors((previous) => ({ ...previous, [key]: errorMessage }));
         } finally {
-          delete inFlightLoadsRef.current[key];
+          signal?.removeEventListener("abort", abortFromParent);
+          if (loadAbortControllersRef.current[key] === controller) {
+            delete loadAbortControllersRef.current[key];
+            delete inFlightLoadsRef.current[key];
+          }
         }
       })();
 
@@ -474,17 +532,18 @@ export default function ProjectDetailPage() {
   );
 
   const loadSectionData = React.useCallback(
-    async (section: ProjectSection, force = false) => {
+    async (section: ProjectSection, force = false, signal?: AbortSignal) => {
       const dataKeys = SECTION_DATA_KEYS[section];
-      await Promise.all(dataKeys.map((key) => loadDataKey(key, force)));
+      await Promise.all(dataKeys.map((key) => loadDataKey(key, force, signal)));
     },
     [loadDataKey]
   );
 
   React.useEffect(() => {
-    let active = true;
+    const initialLoadController = new AbortController();
 
     async function loadInitialData() {
+      cancelAllDataLoads();
       loadedDataRef.current = {
         scenes: false,
         scripts: false,
@@ -524,11 +583,16 @@ export default function ProjectDetailPage() {
       setLoading(true);
 
       try {
-        await Promise.all([loadProjectData(), loadSectionData("scenes", true)]);
+        await Promise.all([
+          loadProjectData(initialLoadController.signal),
+          loadSectionData("scenes", true, initialLoadController.signal),
+        ]);
       } catch (error) {
-        console.error("Error loading project:", error);
+        if (!isAbortError(error)) {
+          console.error("Error loading project:", error);
+        }
       } finally {
-        if (active) {
+        if (!initialLoadController.signal.aborted) {
           setLoading(false);
         }
       }
@@ -537,14 +601,23 @@ export default function ProjectDetailPage() {
     void loadInitialData();
 
     return () => {
-      active = false;
+      initialLoadController.abort();
+      cancelAllDataLoads();
     };
-  }, [loadProjectData, loadSectionData, projectId]);
+  }, [cancelAllDataLoads, loadProjectData, loadSectionData, projectId]);
 
   React.useEffect(() => {
     if (loading) return;
+    const dataKeys = SECTION_DATA_KEYS[activeSection];
+    const shouldLoadSectionData = dataKeys.some(
+      (key) =>
+        !loadedData[key] &&
+        !loadErrors[key] &&
+        !inFlightLoadsRef.current[key]
+    );
+    if (!shouldLoadSectionData) return;
     void loadSectionData(activeSection);
-  }, [activeSection, loadSectionData, loading]);
+  }, [activeSection, loadErrors, loadSectionData, loadedData, loading]);
 
   React.useEffect(() => {
     if (sectionFromQuery) {
@@ -682,10 +755,10 @@ export default function ProjectDetailPage() {
   React.useEffect(() => {
     const totalScenes = loadedData.scenes
       ? dbScenes.length
-      : dbScenes.length + storeScenes.length;
+      : storeScenes.length;
     const totalCast = loadedData.cast
       ? cast.length
-      : cast.length + storeCast.length;
+      : storeCast.length;
     const isNewProject = totalScenes === 0 && totalCast === 0 && shootingDays.length === 0 && !wizardDismissed;
 
     // Check localStorage for wizard dismissal (per-project and global)
@@ -767,33 +840,6 @@ export default function ProjectDetailPage() {
       : project.shootingDaysCount;
   const sidebarElementsCount = loadedData.elements ? elements.length : 0;
   const hasScript = scripts.length > 0;
-  const hasBreakdown = sidebarScenesCount > 0 && sidebarElementsCount > 0;
-  const hasSchedule = sidebarShootingDaysCount > 0;
-  const hasCallSheets = (sidebarShootingDaysCount > 0) && (crew.length > 0 || cast.length > 0);
-  const hasArtPlan = sidebarScenesCount > 0 && sidebarShootingDaysCount > 0;
-  const hasCameraPlan = sidebarScenesCount > 0 && sidebarShootingDaysCount > 0;
-  const hasGePlan = sidebarScenesCount > 0 && sidebarShootingDaysCount > 0;
-  const hasPostReadiness = sidebarScenesCount > 0 && sidebarShootingDaysCount > 0;
-
-  const workflowCompletion = [
-    hasScript,
-    hasBreakdown,
-    hasSchedule,
-    hasCallSheets,
-    hasArtPlan,
-    hasCameraPlan,
-    hasGePlan,
-    hasPostReadiness,
-  ];
-  const firstPendingWorkflowIndex = workflowCompletion.findIndex((isComplete) => !isComplete);
-  const workflowSteps = WORKFLOW_PLAN.map((step, index) => ({
-    ...step,
-    status: workflowCompletion[index]
-      ? ("done" as const)
-      : index === firstPendingWorkflowIndex
-        ? ("current" as const)
-        : ("upcoming" as const),
-  }));
 
   const activeSectionDataKeys = SECTION_DATA_KEYS[activeSection];
   const activeSectionErrorKeys = activeSectionDataKeys.filter(
@@ -1041,7 +1087,7 @@ export default function ProjectDetailPage() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="hidden w-72 flex-shrink-0 border-r border-border/85 bg-background/65 md:flex md:flex-col">
+        <aside className="hidden w-80 flex-shrink-0 border-r border-border/85 bg-background/65 md:flex md:flex-col">
           {/* Project Mini Header */}
           <div className="border-b border-border/85 p-4">
             <div className="skeuo-panel relative overflow-hidden rounded-xl p-3">
@@ -1080,7 +1126,6 @@ export default function ProjectDetailPage() {
           <ProjectSidebar
             activeSection={activeSection}
             onSectionChange={handleSectionChange}
-            workflow={workflowSteps}
             counts={{
               scenes: sidebarScenesCount,
               tasks: sidebarTasksCount,
