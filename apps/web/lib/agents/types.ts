@@ -106,6 +106,13 @@ export interface AgentContext {
 
   // Crew suggestions
   suggestedCrewRoles: SuggestedCrewRole[];
+
+  // Scene-level analysis metadata
+  sceneWarnings: Array<{
+    sceneNumber: string;
+    warnings: string[];
+    confidence: number;
+  }>;
 }
 
 // Reference types for cross-chunk consistency
@@ -143,6 +150,10 @@ export interface ExtractedScene {
   characters: string[];
   scriptPageStart: number;
   scriptPageEnd: number;
+  sourceText?: string;
+  confidence?: number;
+  warnings?: string[];
+  analysisEvidence?: string[];
   elements?: ExtractedElement[];
   estimatedHours?: number;
 }
@@ -196,6 +207,7 @@ export interface SuggestedCrewRole {
   department: string;
   reason: string;
   priority: 'high' | 'medium' | 'low';
+  confidence: number;
 }
 
 // Linked cast member result
@@ -217,6 +229,10 @@ export interface AgentJobResult {
   chunksProcessed: number;
   totalChunks: number;
   warnings: string[];
+  lowConfidenceSceneCount?: number;
+  missingSynopsisCount?: number;
+  unlinkedElementCount?: number;
+  castLinkCoverage?: number;
   sceneIds: string[];
   elementIds: string[];
   castIds: string[];

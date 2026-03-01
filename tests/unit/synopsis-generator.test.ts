@@ -40,10 +40,9 @@ describe('synopsis-generator', () => {
     );
   });
 
-  it('falls back to deterministic scene context when generation is empty', () => {
+  it('returns empty synopsis when generation is empty', () => {
     const cleaned = normalizeGeneratedSynopsis('N/A', BASE_SCENE);
 
-    expect(cleaned).toContain('APARTMENT KITCHEN');
-    expect(cleaned).toContain('NIGHT');
+    expect(cleaned).toBe('');
   });
 });

@@ -20,6 +20,7 @@ function makeBaseContext(scenes: ExtractedScene[]): AgentContext {
     createdElementIds: [],
     createdCastIds: [],
     suggestedCrewRoles: [],
+    sceneWarnings: [],
   };
 }
 

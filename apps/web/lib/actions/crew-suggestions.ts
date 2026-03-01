@@ -12,6 +12,7 @@ export interface CrewSuggestion {
   department: string;
   reason: string;
   priority: "high" | "medium" | "low";
+  confidence?: number;
   accepted: boolean | null;
   crewMemberId: string | null;
   createdAt: string;
