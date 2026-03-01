@@ -5,8 +5,19 @@ import { ProjectAssistantChat } from "@/components/assistant/project-assistant-c
 interface AssistantSectionProps {
   projectId: string;
   projectName?: string;
+  className?: string;
 }
 
-export function AssistantSection({ projectId, projectName }: AssistantSectionProps) {
-  return <ProjectAssistantChat projectId={projectId} projectName={projectName} />;
+export function AssistantSection({
+  projectId,
+  projectName,
+  className,
+}: AssistantSectionProps) {
+  return (
+    <ProjectAssistantChat
+      projectId={projectId}
+      projectName={projectName}
+      className={className}
+    />
+  );
 }
