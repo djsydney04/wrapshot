@@ -5,9 +5,9 @@
  * 1. Parse PDF
  * 2. Chunk script
  * 3. Extract scenes
- * 4. Extract elements
- * 5. Link cast
- * 6. Generate synopses
+ * 4. Complete scene fields (synopsis + characters)
+ * 5. Extract elements
+ * 6. Link cast
  * 7. Estimate time
  * 8. Create database records
  */
@@ -33,9 +33,9 @@ const SCRIPT_ANALYSIS_STEPS: Array<{
   { status: 'parsing', execute: executeParserStep },
   { status: 'chunking', execute: executeChunkingStep },
   { status: 'extracting_scenes', execute: executeSceneExtractor },
+  { status: 'generating_synopses', execute: executeSynopsisGenerator },
   { status: 'extracting_elements', execute: executeElementExtractor },
   { status: 'linking_cast', execute: executeCastLinker },
-  { status: 'generating_synopses', execute: executeSynopsisGenerator },
   { status: 'estimating_time', execute: executeTimeEstimator },
   // Final step: create all records in database
   { status: 'creating_records', execute: executeSceneCreator },
