@@ -18,7 +18,20 @@ import {
   arrayMove,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Plus, LayoutGrid, Columns3, Clapperboard, PanelLeftClose, PanelLeftOpen, Loader2, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
+import {
+  Plus,
+  LayoutGrid,
+  Columns3,
+  Clapperboard,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  Loader2,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Focus,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { SceneStrip, type SceneStripSize } from "@/components/stripeboard/scene-strip";
@@ -40,6 +53,7 @@ import type { ShootingDay } from "@/lib/types";
 import type { CastMemberWithInviteStatus } from "@/lib/actions/cast";
 
 type ViewMode = "stripeboard" | "list";
+type StripLayoutMode = "vertical" | "horizontal";
 
 interface StripeboardSectionProps {
   projectId: string;
@@ -49,6 +63,12 @@ interface StripeboardSectionProps {
 }
 
 const UNSCHEDULED_CONTAINER_ID = "unscheduled-pool";
+const DEFAULT_BREAKDOWN_WIDTH = 320;
+const DEFAULT_UNSCHEDULED_WIDTH = 256;
+const INSPECTOR_MIN_WIDTH = 280;
+const INSPECTOR_MAX_WIDTH = 480;
+const UNSCHEDULED_MIN_WIDTH = 220;
+const UNSCHEDULED_MAX_WIDTH = 420;
 
 function findContainerInMap(
   containers: Record<string, string[]>,
@@ -67,6 +87,33 @@ function getSortableContainerId(
   return sortable?.containerId;
 }
 
+function formatDayBreakLabel(currentDay: ShootingDay, nextDay: ShootingDay): string {
+  const currentDate = new Date(currentDay.date);
+  const nextDate = new Date(nextDay.date);
+  if (Number.isNaN(currentDate.getTime()) || Number.isNaN(nextDate.getTime())) {
+    return "Day break";
+  }
+
+  const currentUtc = Date.UTC(
+    currentDate.getFullYear(),
+    currentDate.getMonth(),
+    currentDate.getDate()
+  );
+  const nextUtc = Date.UTC(nextDate.getFullYear(), nextDate.getMonth(), nextDate.getDate());
+  const dayGap = Math.max(0, Math.round((nextUtc - currentUtc) / 86_400_000));
+  const darkDays = Math.max(0, dayGap - 1);
+
+  if (darkDays > 0) {
+    return `${darkDays} dark day${darkDays === 1 ? "" : "s"}`;
+  }
+
+  return "Standard turnaround";
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
 export function StripeboardSection({
   projectId,
   scenes,
@@ -77,11 +124,18 @@ export function StripeboardSection({
   const [showAddScene, setShowAddScene] = React.useState(false);
   const [selectedSceneId, setSelectedSceneId] = React.useState<string | null>(null);
   const [showBreakdownPanel, setShowBreakdownPanel] = React.useState(true);
+  const [stripLayoutMode, setStripLayoutMode] = React.useState<StripLayoutMode>("vertical");
   const [localScenes, setLocalScenes] = React.useState(scenes);
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const [itemsByContainer, setItemsByContainer] = React.useState<Record<string, string[]>>({});
   const [isSaving, setIsSaving] = React.useState(false);
   const [expandedSceneIds, setExpandedSceneIds] = React.useState<Set<string>>(new Set());
+  const [showUnscheduledPanel, setShowUnscheduledPanel] = React.useState(true);
+  const [focusedDayId, setFocusedDayId] = React.useState<string | null>(null);
+  const [collapsedDayIds, setCollapsedDayIds] = React.useState<Set<string>>(new Set());
+  const [breakdownWidth, setBreakdownWidth] = React.useState(DEFAULT_BREAKDOWN_WIDTH);
+  const [unscheduledWidth, setUnscheduledWidth] = React.useState(DEFAULT_UNSCHEDULED_WIDTH);
+  const [activeResizeTarget, setActiveResizeTarget] = React.useState<"inspector" | "unscheduled" | null>(null);
 
   // Update local scenes when props change
   React.useEffect(() => {
@@ -114,6 +168,11 @@ export function StripeboardSection({
     const unscheduled = localScenes
       .filter((scene) => !assigned.has(scene.id))
       .sort((a, b) => {
+        const aSort = typeof a.sortOrder === "number" ? a.sortOrder : Number.MAX_SAFE_INTEGER;
+        const bSort = typeof b.sortOrder === "number" ? b.sortOrder : Number.MAX_SAFE_INTEGER;
+        if (aSort !== bSort) {
+          return aSort - bSort;
+        }
         const aNum = parseInt(a.sceneNumber);
         const bNum = parseInt(b.sceneNumber);
         if (!isNaN(aNum) && !isNaN(bNum)) {
@@ -134,6 +193,20 @@ export function StripeboardSection({
     if (activeId) return;
     setItemsByContainer(buildItemsByContainer());
   }, [buildItemsByContainer, activeId]);
+
+  React.useEffect(() => {
+    const dayIds = new Set(shootingDays.map((day) => day.id));
+    if (focusedDayId && !dayIds.has(focusedDayId)) {
+      setFocusedDayId(null);
+    }
+    setCollapsedDayIds((prev) => {
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (dayIds.has(id)) next.add(id);
+      });
+      return next;
+    });
+  }, [shootingDays, focusedDayId]);
 
   const assignedSceneIds = React.useMemo(() => {
     const ids = new Set<string>();
@@ -173,6 +246,29 @@ export function StripeboardSection({
   );
 
   const getDayId = (containerId: string) => containerId.replace("day-", "");
+
+  const persistUnscheduledOrder = React.useCallback(
+    async (sceneIds: string[]) => {
+      const results = await Promise.all(
+        sceneIds.map((sceneId, index) =>
+          updateSceneAction(sceneId, { sortOrder: index, projectId })
+        )
+      );
+      const failed = results.find((result) => result.error);
+      if (failed?.error) {
+        throw new Error(failed.error);
+      }
+
+      const orderMap = new Map(sceneIds.map((id, index) => [id, index]));
+      setLocalScenes((prev) =>
+        prev.map((scene) => ({
+          ...scene,
+          sortOrder: orderMap.get(scene.id) ?? scene.sortOrder,
+        }))
+      );
+    },
+    [projectId]
+  );
 
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
@@ -245,18 +341,21 @@ export function StripeboardSection({
         const nextItems = arrayMove(items, oldIndex, newIndex);
         setItemsByContainer((prev) => ({ ...prev, [activeContainer]: nextItems }));
 
-        if (activeContainer !== UNSCHEDULED_CONTAINER_ID) {
-          setIsSaving(true);
-          try {
+        setIsSaving(true);
+        try {
+          if (activeContainer !== UNSCHEDULED_CONTAINER_ID) {
             await updateSceneOrder(getDayId(activeContainer), nextItems);
-            toast.success("Scene order updated");
-          } catch (error) {
-            console.error("Failed to update scene order:", error);
-            setItemsByContainer(previousItems);
-            toast.error("Failed to update scene order");
-          } finally {
-            setIsSaving(false);
+          } else {
+            await persistUnscheduledOrder(nextItems);
           }
+          toast.success("Scene order updated");
+        } catch (error) {
+          console.error("Failed to update scene order:", error);
+          setItemsByContainer(previousItems);
+          setLocalScenes(previousScenes);
+          toast.error("Failed to update scene order");
+        } finally {
+          setIsSaving(false);
         }
       }
 
@@ -359,6 +458,11 @@ export function StripeboardSection({
   }, []);
 
   const allExpanded = expandedSceneIds.size > 0 && expandedSceneIds.size >= localScenes.length;
+  const hasShootingDays = shootingDays.length > 0;
+  const visibleShootingDays = React.useMemo(() => {
+    if (!focusedDayId) return shootingDays;
+    return shootingDays.filter((day) => day.id === focusedDayId);
+  }, [shootingDays, focusedDayId]);
 
   const toggleExpandAll = React.useCallback(() => {
     if (allExpanded) {
@@ -367,6 +471,61 @@ export function StripeboardSection({
       setExpandedSceneIds(new Set(localScenes.map((s) => s.id)));
     }
   }, [allExpanded, localScenes]);
+
+  const toggleFocusedDay = React.useCallback((dayId: string) => {
+    setFocusedDayId((prev) => (prev === dayId ? null : dayId));
+  }, []);
+
+  const toggleCollapsedDay = React.useCallback((dayId: string) => {
+    setCollapsedDayIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(dayId)) {
+        next.delete(dayId);
+      } else {
+        next.add(dayId);
+      }
+      return next;
+    });
+  }, []);
+
+  const startResize = React.useCallback(
+    (
+      event: React.PointerEvent<HTMLDivElement>,
+      target: "inspector" | "unscheduled",
+      direction: "left" | "right"
+    ) => {
+      event.preventDefault();
+
+      const startX = event.clientX;
+      const startWidth = target === "inspector" ? breakdownWidth : unscheduledWidth;
+      setActiveResizeTarget(target);
+
+      const handlePointerMove = (moveEvent: PointerEvent) => {
+        const delta = moveEvent.clientX - startX;
+        const rawWidth = startWidth + (direction === "right" ? delta : -delta);
+        const nextWidth =
+          target === "inspector"
+            ? clamp(rawWidth, INSPECTOR_MIN_WIDTH, INSPECTOR_MAX_WIDTH)
+            : clamp(rawWidth, UNSCHEDULED_MIN_WIDTH, UNSCHEDULED_MAX_WIDTH);
+
+        if (target === "inspector") {
+          setBreakdownWidth(nextWidth);
+        } else {
+          setUnscheduledWidth(nextWidth);
+        }
+      };
+
+      const handlePointerUp = () => {
+        setActiveResizeTarget(null);
+        window.removeEventListener("pointermove", handlePointerMove);
+        window.removeEventListener("pointerup", handlePointerUp);
+      };
+
+      window.addEventListener("pointermove", handlePointerMove);
+      window.addEventListener("pointerup", handlePointerUp);
+    },
+    [breakdownWidth, unscheduledWidth]
+  );
 
   return (
     <DndContext
@@ -379,9 +538,9 @@ export function StripeboardSection({
     >
       <div className="space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <span>{localScenes.length} scenes</span>
               <span>·</span>
               <span>{formatPageEighths(totalPageEighths)} pages</span>
@@ -392,7 +551,7 @@ export function StripeboardSection({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {/* View Mode Toggle */}
             <div className="flex items-center rounded-lg border border-border p-1">
               <button
@@ -435,6 +594,34 @@ export function StripeboardSection({
                 {allExpanded ? "Collapse" : "Expand"}
               </Button>
             )}
+            {viewMode === "stripeboard" && (
+              <div className="flex items-center rounded-lg border border-border p-1">
+                <button
+                  type="button"
+                  onClick={() => setStripLayoutMode("vertical")}
+                  className={cn(
+                    "rounded-md px-2 py-1 text-xs font-medium transition-colors",
+                    stripLayoutMode === "vertical"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Vertical
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStripLayoutMode("horizontal")}
+                  className={cn(
+                    "rounded-md px-2 py-1 text-xs font-medium transition-colors",
+                    stripLayoutMode === "horizontal"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Horizontal
+                </button>
+              </div>
+            )}
 
             <Button
               variant="outline"
@@ -448,6 +635,32 @@ export function StripeboardSection({
               )}
             </Button>
 
+            {viewMode === "stripeboard" && hasShootingDays && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowUnscheduledPanel(!showUnscheduledPanel)}
+              >
+                {showUnscheduledPanel ? (
+                  <PanelRightClose className="h-4 w-4" />
+                ) : (
+                  <PanelRightOpen className="h-4 w-4" />
+                )}
+              </Button>
+            )}
+
+            {focusedDayId && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setFocusedDayId(null)}
+              >
+                <Focus className="h-3.5 w-3.5" />
+                Exit Focus
+              </Button>
+            )}
+
             <Button size="sm" onClick={() => setShowAddScene(true)}>
               <Plus className="h-4 w-4" />
               Add Scene
@@ -457,10 +670,13 @@ export function StripeboardSection({
 
         {/* Content */}
         {localScenes.length > 0 ? (
-          <div className="flex gap-4">
+          <div className="flex min-w-0 gap-4">
             {/* Breakdown Panel (Left) */}
             {showBreakdownPanel && selectedScene && (
-              <div className="w-80 flex-shrink-0 sticky top-4 self-start max-h-[calc(100vh-6rem)]">
+              <div
+                className="sticky top-4 max-h-[calc(100vh-6rem)] flex-shrink-0 self-start"
+                style={{ width: breakdownWidth }}
+              >
                 <BreakdownPanel
                   scene={selectedScene}
                   projectId={projectId}
@@ -470,38 +686,154 @@ export function StripeboardSection({
                 />
               </div>
             )}
+            {showBreakdownPanel && selectedScene && (
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize inspector panel"
+                onPointerDown={(event) => startResize(event, "inspector", "right")}
+                className="hidden w-2 flex-shrink-0 cursor-col-resize md:block"
+              >
+                <div
+                  className={cn(
+                    "mx-auto h-full w-px bg-border transition-colors",
+                    activeResizeTarget === "inspector" && "bg-primary"
+                  )}
+                />
+              </div>
+            )}
 
             {/* Main Stripboard (Center) */}
             <div className="flex-1 min-w-0">
               {viewMode === "stripeboard" ? (
                 <div className="space-y-4">
                   {/* Shooting Days */}
-                  {shootingDays.length > 0 ? (
-                    shootingDays.map((day) => (
-                      <SortableContext
-                        key={day.id}
-                        items={itemsByContainer[`day-${day.id}`] || []}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        <ShootDayContainer
-                          shootingDay={day}
-                          scenes={resolveScenes(itemsByContainer[`day-${day.id}`] || [])}
-                          onSceneClick={setSelectedSceneId}
-                          selectedSceneId={selectedSceneId}
-                          activeId={activeId}
-                          isSaving={isSaving}
-                          sceneSize={sceneSize}
-                        />
-                      </SortableContext>
-                    ))
+                  {hasShootingDays ? (
+                    stripLayoutMode === "vertical" ? (
+                      visibleShootingDays.map((day, index) => {
+                        const nextDay = visibleShootingDays[index + 1];
+                        return (
+                          <React.Fragment key={day.id}>
+                            <SortableContext
+                              items={itemsByContainer[`day-${day.id}`] || []}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              <ShootDayContainer
+                                shootingDay={day}
+                                scenes={resolveScenes(itemsByContainer[`day-${day.id}`] || [])}
+                                onSceneClick={setSelectedSceneId}
+                                selectedSceneId={selectedSceneId}
+                                activeId={activeId}
+                                isSaving={isSaving}
+                                sceneSize={sceneSize}
+                                collapsed={collapsedDayIds.has(day.id)}
+                                focused={focusedDayId === day.id}
+                                onToggleCollapsed={() => toggleCollapsedDay(day.id)}
+                                onToggleFocused={() => toggleFocusedDay(day.id)}
+                              />
+                            </SortableContext>
+                            {nextDay && (
+                              <div className="flex items-center gap-2 px-2">
+                                <span className="h-px flex-1 bg-border/80" />
+                                <span className="rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                                  Day Break · {formatDayBreakLabel(day, nextDay)}
+                                </span>
+                                <span className="h-px flex-1 bg-border/80" />
+                              </div>
+                            )}
+                          </React.Fragment>
+                        );
+                      })
+                    ) : (
+                      <div className="overflow-x-auto pb-2">
+                        <div className="flex min-w-max items-start gap-4">
+                          {showUnscheduledPanel && (
+                            <div
+                              className="flex-shrink-0"
+                              style={{ width: unscheduledWidth }}
+                            >
+                              <UnscheduledPool
+                                scenes={resolveScenes(itemsByContainer[UNSCHEDULED_CONTAINER_ID] || [])}
+                                onSceneClick={setSelectedSceneId}
+                                selectedSceneId={selectedSceneId}
+                                activeId={activeId}
+                                sceneSize={sceneSize}
+                                layout="board"
+                              />
+                            </div>
+                          )}
+                          {showUnscheduledPanel && (
+                            <div
+                              role="separator"
+                              aria-orientation="vertical"
+                              aria-label="Resize unscheduled panel"
+                              onPointerDown={(event) => startResize(event, "unscheduled", "right")}
+                              className="w-2 flex-shrink-0 cursor-col-resize"
+                            >
+                              <div
+                                className={cn(
+                                  "mx-auto h-full w-px bg-border transition-colors",
+                                  activeResizeTarget === "unscheduled" && "bg-primary"
+                                )}
+                              />
+                            </div>
+                          )}
+                          {visibleShootingDays.map((day, index) => {
+                            const nextDay = visibleShootingDays[index + 1];
+                            return (
+                              <React.Fragment key={day.id}>
+                                <div className="w-[340px] max-w-[80vw] flex-shrink-0">
+                                  <SortableContext
+                                    items={itemsByContainer[`day-${day.id}`] || []}
+                                    strategy={verticalListSortingStrategy}
+                                  >
+                                    <ShootDayContainer
+                                      shootingDay={day}
+                                      scenes={resolveScenes(itemsByContainer[`day-${day.id}`] || [])}
+                                      onSceneClick={setSelectedSceneId}
+                                      selectedSceneId={selectedSceneId}
+                                      activeId={activeId}
+                                      isSaving={isSaving}
+                                      sceneSize={sceneSize}
+                                      collapsed={collapsedDayIds.has(day.id)}
+                                      focused={focusedDayId === day.id}
+                                      onToggleCollapsed={() => toggleCollapsedDay(day.id)}
+                                      onToggleFocused={() => toggleFocusedDay(day.id)}
+                                    />
+                                  </SortableContext>
+                                </div>
+                                {nextDay && (
+                                  <div className="flex min-h-[120px] flex-shrink-0 items-center">
+                                    <span className="h-px w-10 bg-border/80" />
+                                    <span className="mx-2 whitespace-nowrap rounded-md border border-border bg-muted/40 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                                      Day Break · {formatDayBreakLabel(day, nextDay)}
+                                    </span>
+                                    <span className="h-px w-10 bg-border/80" />
+                                  </div>
+                                )}
+                              </React.Fragment>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )
                   ) : (
-                    <div className="rounded-lg border border-dashed border-border p-8 text-center">
-                      <p className="text-sm text-muted-foreground mb-2">
-                        No shooting days scheduled yet
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Add shooting days in the Schedule section to start organizing scenes
-                      </p>
+                    <div className="space-y-3">
+                      <div className="rounded-lg border border-dashed border-border p-4">
+                        <p className="text-sm font-medium">Build your stripboard before shoot days</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          You can sequence scenes now. Create shooting days later and drag strips
+                          into day columns when ready.
+                        </p>
+                      </div>
+                      <UnscheduledPool
+                        scenes={resolveScenes(itemsByContainer[UNSCHEDULED_CONTAINER_ID] || [])}
+                        onSceneClick={setSelectedSceneId}
+                        selectedSceneId={selectedSceneId}
+                        activeId={activeId}
+                        sceneSize={sceneSize}
+                        layout="board"
+                      />
                     </div>
                   )}
                 </div>
@@ -525,8 +857,33 @@ export function StripeboardSection({
             </div>
 
             {/* Unscheduled Pool (Right) */}
-            {viewMode === "stripeboard" && (
-              <div className="w-64 flex-shrink-0">
+            {viewMode === "stripeboard" &&
+              hasShootingDays &&
+              stripLayoutMode === "vertical" &&
+              showUnscheduledPanel && (
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize unscheduled panel"
+                onPointerDown={(event) => startResize(event, "unscheduled", "left")}
+                className="hidden w-2 flex-shrink-0 cursor-col-resize md:block"
+              >
+                <div
+                  className={cn(
+                    "mx-auto h-full w-px bg-border transition-colors",
+                    activeResizeTarget === "unscheduled" && "bg-primary"
+                  )}
+                />
+              </div>
+            )}
+            {viewMode === "stripeboard" &&
+              hasShootingDays &&
+              stripLayoutMode === "vertical" &&
+              showUnscheduledPanel && (
+              <div
+                className="flex-shrink-0"
+                style={{ width: unscheduledWidth }}
+              >
                 <UnscheduledPool
                   scenes={resolveScenes(itemsByContainer[UNSCHEDULED_CONTAINER_ID] || [])}
                   onSceneClick={setSelectedSceneId}

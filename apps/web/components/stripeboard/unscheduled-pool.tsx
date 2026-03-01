@@ -17,6 +17,7 @@ interface UnscheduledPoolProps {
   selectedSceneId?: string | null;
   activeId?: string | null;
   sceneSize?: SceneStripSize;
+  layout?: "sidebar" | "board";
 }
 
 export function UnscheduledPool({
@@ -25,6 +26,7 @@ export function UnscheduledPool({
   selectedSceneId,
   activeId,
   sceneSize = "comfortable",
+  layout = "sidebar",
 }: UnscheduledPoolProps) {
   const [search, setSearch] = React.useState("");
 
@@ -50,23 +52,9 @@ export function UnscheduledPool({
     );
   }, [scenes, search]);
 
-  // Sort by scene number
-  const sortedScenes = React.useMemo(() => {
-    return [...filteredScenes].sort((a, b) => {
-      // Try numeric sort first
-      const aNum = parseInt(a.sceneNumber);
-      const bNum = parseInt(b.sceneNumber);
-      if (!isNaN(aNum) && !isNaN(bNum)) {
-        return aNum - bNum;
-      }
-      // Fallback to string sort
-      return a.sceneNumber.localeCompare(b.sceneNumber, undefined, { numeric: true });
-    });
-  }, [filteredScenes]);
-
   const sortableIds = React.useMemo(
-    () => sortedScenes.map((scene) => scene.id),
-    [sortedScenes]
+    () => filteredScenes.map((scene) => scene.id),
+    [filteredScenes]
   );
 
   const totalPageEighths = sumPageEighths(scenes);
@@ -75,7 +63,9 @@ export function UnscheduledPool({
     <div
       ref={setNodeRef}
       className={cn(
-        "sticky top-0 flex flex-col border border-border rounded-lg bg-card transition-all duration-200 max-h-[calc(100vh-10rem)]",
+        "flex flex-col border border-border rounded-lg bg-card transition-all duration-200",
+        layout === "sidebar" && "sticky top-0 max-h-[calc(100vh-10rem)]",
+        layout === "board" && "min-h-[420px] max-h-[calc(100vh-18rem)]",
         isOver && "ring-2 ring-primary bg-primary/5 scale-[1.01]",
         isDimmed && "opacity-60"
       )}
@@ -105,8 +95,8 @@ export function UnscheduledPool({
       {/* Scenes List */}
       <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
         <div className="overflow-auto p-2 space-y-1.5 scrollbar-thin">
-          {sortedScenes.length > 0 ? (
-            sortedScenes.map((scene) => (
+          {filteredScenes.length > 0 ? (
+            filteredScenes.map((scene) => (
               <SortableSceneStrip
                 key={scene.id}
                 scene={scene}

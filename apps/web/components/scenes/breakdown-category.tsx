@@ -191,7 +191,7 @@ export function BreakdownCategory({
   };
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden">
+    <div className="min-w-0 border border-border rounded-lg overflow-hidden">
       {/* Header */}
       <button
         type="button"
@@ -209,7 +209,7 @@ export function BreakdownCategory({
         )}
         <span className="flex items-center gap-1.5">
           {icon}
-          {label}
+          <span className="truncate">{label}</span>
         </span>
         <span className="ml-auto flex items-center gap-1.5">
           {pendingSuggestions.length > 0 && (
@@ -237,7 +237,7 @@ export function BreakdownCategory({
                   <div
                     key={suggestion.id}
                     className={cn(
-                      "flex items-center gap-2 text-sm group",
+                      "group flex min-w-0 items-center gap-2 text-sm",
                       "bg-primary/5 rounded-md px-2 py-1.5",
                       "border border-dashed border-primary/30",
                       "transition-all duration-150",
@@ -298,10 +298,10 @@ export function BreakdownCategory({
             {items.map((item) => (
             <div
               key={item.id}
-              className="flex items-center gap-2 text-sm group"
+              className="group flex min-w-0 items-center gap-2 text-sm"
             >
               <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <span className="flex-1 truncate">{item.element.name}</span>
+              <span className="min-w-0 flex-1 truncate">{item.element.name}</span>
               {onUpdateQuantity && item.quantity > 1 && (
                 <span className="text-xs text-muted-foreground">
                   x{item.quantity}
