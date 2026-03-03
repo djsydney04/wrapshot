@@ -6,6 +6,7 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin';
+import { extractCharacterCuesFromSceneText } from '@/lib/scripts/scene-heuristics';
 import { nanoid } from 'nanoid';
 import type { AgentContext, AgentStepResult, LinkedCastMember } from '../types';
 import type { ProgressTracker } from '../orchestrator/progress-tracker';
@@ -15,6 +16,23 @@ interface ExistingCastMember {
   characterName: string;
   actorName: string | null;
 }
+
+const CHARACTER_STOP_WORDS = new Set([
+  'INT',
+  'EXT',
+  'DAY',
+  'NIGHT',
+  'MORNING',
+  'AFTERNOON',
+  'EVENING',
+  'CONTINUOUS',
+  'CUT TO',
+  'FADE IN',
+  'FADE OUT',
+  'CAMERA',
+  'SFX',
+  'VFX',
+]);
 
 export async function executeCastLinker(
   context: AgentContext,
@@ -32,8 +50,20 @@ export async function executeCastLinker(
   // Get all unique character names from scenes
   const characterNames = new Set<string>();
   for (const scene of context.extractedScenes) {
+    if (scene.characters.length === 0 && scene.sourceText) {
+      scene.characters = mergeCharacterNames(
+        scene.characters,
+        extractCharacterCuesFromSceneText(scene.sourceText)
+      );
+      if (scene.characters.length === 0 && !(scene.warnings || []).includes('missing_characters')) {
+        scene.warnings = [...(scene.warnings || []), 'missing_characters'];
+      }
+    }
+
     for (const char of scene.characters) {
-      characterNames.add(char.toUpperCase().trim());
+      const normalized = normalizeCharacterName(char);
+      if (!normalized) continue;
+      characterNames.add(normalized);
     }
   }
 
@@ -65,7 +95,10 @@ export async function executeCastLinker(
   const existingCastMap = new Map<string, ExistingCastMember>();
   for (const member of existingCast || []) {
     if (member.characterName) {
-      existingCastMap.set(member.characterName.toUpperCase(), member);
+      const normalized = normalizeCharacterName(member.characterName);
+      if (normalized) {
+        existingCastMap.set(normalized, member);
+      }
     }
   }
 
@@ -159,4 +192,29 @@ export async function executeCastLinker(
       characters: Array.from(characterNames),
     },
   };
+}
+
+function normalizeCharacterName(value: string): string {
+  const normalized = String(value || '')
+    .toUpperCase()
+    .replace(/\s*\(.*?\)\s*/g, ' ')
+    .replace(/[^A-Z0-9 '\-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!normalized) return '';
+  if (CHARACTER_STOP_WORDS.has(normalized)) return '';
+  if (normalized.length < 2) return '';
+
+  return normalized;
+}
+
+function mergeCharacterNames(existing: string[], incoming: string[]): string[] {
+  const merged = new Set<string>();
+  for (const name of [...existing, ...incoming]) {
+    const normalized = normalizeCharacterName(name);
+    if (!normalized) continue;
+    merged.add(normalized);
+  }
+  return Array.from(merged);
 }

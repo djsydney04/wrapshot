@@ -167,6 +167,27 @@ export class AgentOrchestrator {
       warnings.push(`${scenesWithoutTime} scenes are missing time estimates`);
     }
 
+    const lowConfidenceSceneCount = this.context.extractedScenes.filter((scene) => {
+      const confidence = typeof scene.confidence === 'number' ? scene.confidence : 0;
+      const hasWarnings = Array.isArray(scene.warnings) && scene.warnings.length > 0;
+      return confidence < 0.6 || hasWarnings;
+    }).length;
+    if (lowConfidenceSceneCount > 0) {
+      warnings.push(`${lowConfidenceSceneCount} scenes are flagged for review`);
+    }
+
+    const unlinkedElementCount = this.context.extractedElements.filter(
+      (element) => element.sceneNumbers.length === 0
+    ).length;
+    if (unlinkedElementCount > 0) {
+      warnings.push(`${unlinkedElementCount} elements were not linked to any scene`);
+    }
+
+    const castWithSceneLinks = this.context.linkedCast.filter((cast) => cast.sceneIds.length > 0).length;
+    const castLinkCoverage = this.context.linkedCast.length > 0
+      ? castWithSceneLinks / this.context.linkedCast.length
+      : 1;
+
     return {
       scenesCreated: this.context.createdSceneIds.length,
       elementsCreated: this.context.createdElementIds.length,
@@ -177,6 +198,10 @@ export class AgentOrchestrator {
       chunksProcessed: this.context.chunks?.filter(c => c.processed).length ?? 1,
       totalChunks: this.context.chunks?.length ?? 1,
       warnings,
+      lowConfidenceSceneCount,
+      missingSynopsisCount: scenesWithoutSynopsis,
+      unlinkedElementCount,
+      castLinkCoverage,
       sceneIds: this.context.createdSceneIds,
       elementIds: this.context.createdElementIds,
       castIds: this.context.createdCastIds,
@@ -219,6 +244,7 @@ export class AgentOrchestrator {
       createdElementIds: [],
       createdCastIds: [],
       suggestedCrewRoles: [],
+      sceneWarnings: [],
     };
   }
 }

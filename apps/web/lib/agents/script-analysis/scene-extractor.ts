@@ -60,8 +60,17 @@ Important:
 - Return ONLY valid JSON, no other text`;
 
 interface SceneExtractionResponse {
-  scenes: ExtractedScene[];
+  scenes: unknown[];
 }
+
+const PLACEHOLDER_SYNOPSIS_PATTERNS: RegExp[] = [
+  /^auto[-\s]?detected from scene heading\.?$/i,
+  /^no synopsis available\.?$/i,
+  /^scene heading only\.?$/i,
+  /^n\/a\.?$/i,
+  /^tbd\.?$/i,
+  /^unknown\.?$/i,
+];
 
 function isSceneExtractionResponse(data: unknown): boolean {
   if (!data || typeof data !== 'object') return false;
@@ -174,14 +183,16 @@ export async function executeSceneExtractor(
           )
           .filter((scene): scene is ExtractedScene => scene !== null);
 
-        if (normalizedLlmScenes.length === 0 && chunkFallbackScenes.length > 0) {
+        const llmScenesWithSource = attachHeuristicSourceText(normalizedLlmScenes, chunkFallbackScenes);
+
+        if (llmScenesWithSource.length === 0 && chunkFallbackScenes.length > 0) {
           scenesToApply = chunkFallbackScenes;
           usedSluglineFallback = true;
-        } else if (shouldSupplementWithHeuristicScenes(normalizedLlmScenes, chunkFallbackScenes)) {
-          scenesToApply = mergeScenesWithHeuristicFallback(normalizedLlmScenes, chunkFallbackScenes);
-          usedSluglineFallback = scenesToApply.length > normalizedLlmScenes.length || usedSluglineFallback;
+        } else if (shouldSupplementWithHeuristicScenes(llmScenesWithSource, chunkFallbackScenes)) {
+          scenesToApply = mergeScenesWithHeuristicFallback(llmScenesWithSource, chunkFallbackScenes);
+          usedSluglineFallback = scenesToApply.length > llmScenesWithSource.length || usedSluglineFallback;
         } else {
-          scenesToApply = normalizedLlmScenes;
+          scenesToApply = llmScenesWithSource;
         }
       }
 
@@ -234,6 +245,13 @@ export async function executeSceneExtractor(
   );
 
   context.extractedScenes = dedupedScenes;
+  context.sceneWarnings = dedupedScenes
+    .filter((scene) => (scene.warnings?.length || 0) > 0 || (scene.confidence || 0) < 0.6)
+    .map((scene) => ({
+      sceneNumber: scene.sceneNumber,
+      warnings: scene.warnings || [],
+      confidence: scene.confidence || 0,
+    }));
 
   await tracker.updateProgress(totalChunks, totalChunks, `Extracted ${dedupedScenes.length} scenes`);
 
@@ -251,6 +269,7 @@ export async function executeSceneExtractor(
       failedChunks,
       parseFailures,
       usedSluglineFallback,
+      lowConfidenceScenes: context.sceneWarnings.length,
     },
   };
 }
@@ -310,31 +329,62 @@ function updateKnownLocations(locations: LocationReference[], scene: ExtractedSc
   }
 }
 
-function normalizeExtractedSceneForChunk(
-  scene: Partial<ExtractedScene>,
+export function normalizeExtractedSceneForChunk(
+  scene: unknown,
   chunkPageStart: number,
   fallbackSceneNumber: number
 ): ExtractedScene | null {
-  if (!scene.setName || !String(scene.setName).trim()) {
+  const setName = getSceneStringField(scene, ['setName', 'set_name', 'location', 'sceneHeading']);
+  if (!setName) {
     return null;
   }
 
+  const rawCharacters = getSceneArrayField(scene, ['characters', 'characterNames', 'character_names']);
+  const rawSynopsis = getSceneStringField(scene, ['synopsis', 'summary', 'description']) || '';
+  const sanitizedSynopsis = sanitizeSceneSynopsis(rawSynopsis);
+  const sourceText = getSceneStringField(scene, ['sourceText', 'source_text', 'sceneText', 'scene_text']);
+
+  const warnings: string[] = [];
+  if (!sanitizedSynopsis) {
+    warnings.push('missing_synopsis');
+  }
+  if (rawCharacters.length === 0) {
+    warnings.push('missing_characters');
+  }
+
   const normalized: ExtractedScene = {
-    sceneNumber: normalizeSceneNumber(scene.sceneNumber, fallbackSceneNumber),
-    intExt: normalizeIntExt(scene.intExt || 'INT'),
-    setName: String(scene.setName).trim(),
-    timeOfDay: normalizeTimeOfDay(scene.timeOfDay || 'DAY'),
-    pageLengthEighths: normalizePageLengthEighths(scene.pageLengthEighths),
-    synopsis: String(scene.synopsis || '').trim(),
-    characters: (scene.characters || [])
+    sceneNumber: normalizeSceneNumber(
+      getSceneStringField(scene, ['sceneNumber', 'scene_number']),
+      fallbackSceneNumber
+    ),
+    intExt: normalizeIntExt(getSceneStringField(scene, ['intExt', 'int_ext']) || 'INT'),
+    setName: setName.trim(),
+    timeOfDay: normalizeTimeOfDay(getSceneStringField(scene, ['timeOfDay', 'time_of_day']) || 'DAY'),
+    pageLengthEighths: normalizePageLengthEighths(getSceneNumberField(scene, ['pageLengthEighths', 'page_length_eighths'])),
+    synopsis: sanitizedSynopsis,
+    characters: rawCharacters
       .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
       .map((c) => c.toUpperCase().trim()),
     scriptPageStart: chunkPageStart,
     scriptPageEnd: chunkPageStart,
+    sourceText: sourceText || undefined,
+    warnings,
+    confidence: calculateSceneConfidence({
+      synopsis: sanitizedSynopsis,
+      characters: rawCharacters,
+      sourceText,
+      warnings,
+    }),
   };
 
-  const adjustedPageStart = adjustChunkLocalPage(scene.scriptPageStart, chunkPageStart);
-  const adjustedPageEnd = adjustChunkLocalPage(scene.scriptPageEnd, chunkPageStart);
+  const adjustedPageStart = adjustChunkLocalPage(
+    getSceneNumberField(scene, ['scriptPageStart', 'script_page_start']),
+    chunkPageStart
+  );
+  const adjustedPageEnd = adjustChunkLocalPage(
+    getSceneNumberField(scene, ['scriptPageEnd', 'script_page_end']),
+    chunkPageStart
+  );
   normalized.scriptPageStart = adjustedPageStart || chunkPageStart;
   normalized.scriptPageEnd =
     (adjustedPageEnd && adjustedPageStart
@@ -342,6 +392,24 @@ function normalizeExtractedSceneForChunk(
       : adjustedPageEnd) || normalized.scriptPageStart;
 
   return normalized;
+}
+
+type SceneConfidenceInput = {
+  synopsis: string;
+  characters: string[];
+  sourceText?: string;
+  warnings: string[];
+};
+
+function calculateSceneConfidence(input: SceneConfidenceInput): number {
+  let score = 0.55;
+  if (input.synopsis.length >= 24) score += 0.2;
+  if (input.characters.length > 0) score += 0.15;
+  if (input.characters.length >= 2) score += 0.05;
+  if ((input.sourceText || '').length >= 120) score += 0.08;
+  if (input.warnings.includes('missing_synopsis')) score -= 0.15;
+  if (input.warnings.includes('missing_characters')) score -= 0.12;
+  return clamp(score, 0.1, 0.98);
 }
 
 function normalizePageLengthEighths(value: number | undefined): number {
@@ -355,6 +423,69 @@ function normalizePageLengthEighths(value: number | undefined): number {
   }
 
   return Math.min(normalized, 64);
+}
+
+function getSceneRecord(scene: unknown): Record<string, unknown> {
+  if (!scene || typeof scene !== 'object') {
+    return {};
+  }
+  return scene as Record<string, unknown>;
+}
+
+function getSceneStringField(scene: unknown, keys: string[]): string {
+  const record = getSceneRecord(scene);
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+  return '';
+}
+
+function getSceneNumberField(scene: unknown, keys: string[]): number | undefined {
+  const record = getSceneRecord(scene);
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+  return undefined;
+}
+
+function getSceneArrayField(scene: unknown, keys: string[]): string[] {
+  const record = getSceneRecord(scene);
+  for (const key of keys) {
+    const value = record[key];
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => String(item || '').trim())
+        .filter((item) => item.length > 0);
+    }
+  }
+  return [];
+}
+
+function sanitizeSceneSynopsis(value: string): string {
+  const normalized = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return '';
+  }
+  if (PLACEHOLDER_SYNOPSIS_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return '';
+  }
+  return normalized;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 function buildHeuristicScenesForChunk(
@@ -375,6 +506,10 @@ function buildHeuristicScenesForChunk(
   return scenes.map((scene) => ({
     ...scene,
     sceneNumber: normalizeSceneNumber(scene.sceneNumber, startingSceneNumber + 1),
+    synopsis: sanitizeSceneSynopsis(scene.synopsis),
+    confidence: 0.35,
+    warnings: ['heuristic_fallback', 'missing_synopsis'],
+    sourceText: scene.sourceText || undefined,
   }));
 }
 
@@ -400,6 +535,41 @@ function mergeScenesWithHeuristicFallback(
   }
 
   return merged;
+}
+
+function attachHeuristicSourceText(
+  primaryScenes: ExtractedScene[],
+  heuristicScenes: ExtractedScene[]
+): ExtractedScene[] {
+  if (primaryScenes.length === 0 || heuristicScenes.length === 0) {
+    return primaryScenes;
+  }
+
+  const heuristicMap = new Map(
+    heuristicScenes.map((scene) => [makeSceneKey(scene.sceneNumber, scene.setName), scene])
+  );
+
+  return primaryScenes.map((scene) => {
+    const match = heuristicMap.get(makeSceneKey(scene.sceneNumber, scene.setName));
+    const warnings = new Set(scene.warnings || []);
+
+    if (!scene.sourceText && match?.sourceText) {
+      scene.sourceText = match.sourceText;
+    }
+
+    if (!scene.synopsis) {
+      warnings.add('missing_synopsis');
+    }
+
+    if (scene.characters.length === 0 && (match?.characters.length || 0) > 0) {
+      scene.characters = match?.characters || [];
+      warnings.add('characters_from_heuristic');
+      scene.confidence = clamp((scene.confidence || 0.6) - 0.08, 0.1, 0.98);
+    }
+
+    scene.warnings = Array.from(warnings);
+    return scene;
+  });
 }
 
 function shouldSupplementWithHeuristicScenes(
