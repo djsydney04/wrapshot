@@ -6,6 +6,7 @@ import {
   MessageSquare,
   FileText,
   Calendar,
+  ListTodo,
   Film,
   Paintbrush2,
   Camera,
@@ -27,6 +28,7 @@ export type ProjectSection =
   | "dashboard"
   | "assistant"
   | "script"
+  | "tasks"
   | "schedule"
   | "callsheets"
   | "art"
@@ -68,6 +70,7 @@ interface ProjectSidebarProps {
   }[];
   counts: {
     scenes: number;
+    tasks?: number;
     cast: number;
     crew: number;
     shootingDays: number;
@@ -79,6 +82,13 @@ interface ProjectSidebarProps {
   };
   className?: string;
 }
+
+const CORE_WORKFLOW_SECTIONS: ProjectSection[] = [
+  "script",
+  "scenes",
+  "schedule",
+  "callsheets",
+];
 
 export function ProjectSidebar({
   activeSection,
@@ -95,38 +105,95 @@ export function ProjectSidebar({
     () => workflow?.filter((step) => step.status === "done").length ?? 0,
     [workflow]
   );
-  const activeInWorkflow = React.useMemo(
-    () => workflow?.some((step) => step.section === activeSection) ?? false,
+  const activeInDepartmentWorkflow = React.useMemo(
+    () =>
+      workflow?.some(
+        (step) =>
+          step.section === activeSection &&
+          !CORE_WORKFLOW_SECTIONS.includes(step.section)
+      ) ?? false,
     [activeSection, workflow]
   );
-  const [showDepartments, setShowDepartments] = React.useState(() => !activeInWorkflow);
+  const [showDepartmentWorkflow, setShowDepartmentWorkflow] = React.useState(
+    () => activeInDepartmentWorkflow
+  );
 
   React.useEffect(() => {
-    if (!activeInWorkflow) {
-      setShowDepartments(true);
+    if (activeInDepartmentWorkflow) {
+      setShowDepartmentWorkflow(true);
     }
-  }, [activeInWorkflow]);
+  }, [activeInDepartmentWorkflow]);
 
-  const groups = React.useMemo<SidebarGroup[]>(
+  const departmentWorkflowStepCount = React.useMemo(
+    () =>
+      workflow?.filter((step) => !CORE_WORKFLOW_SECTIONS.includes(step.section))
+        .length ?? 0,
+    [workflow]
+  );
+  const visibleWorkflowSteps = React.useMemo(() => {
+    if (!workflow) return [];
+    if (showDepartmentWorkflow) return workflow;
+    return workflow.filter((step) => CORE_WORKFLOW_SECTIONS.includes(step.section));
+  }, [showDepartmentWorkflow, workflow]);
+
+  const quickAccessItems = React.useMemo<SidebarItem[]>(
     () => [
+      { key: "dashboard", id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { key: "assistant", id: "assistant", label: "Agent", icon: MessageSquare },
       {
-        id: "planning",
-        label: "Planning",
-        items: [
-          { key: "dashboard", id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-          { key: "assistant", id: "assistant", label: "Agent", icon: MessageSquare },
-          {
-            key: "script",
-            id: "script",
-            label: "Script",
-            icon: FileText,
-            badge: counts.hasScript ? undefined : "Upload",
-          },
-        ],
+        key: "script",
+        id: "script",
+        label: "Script",
+        icon: FileText,
+        badge: counts.hasScript ? undefined : "Upload",
+      },
+      { key: "scenes", id: "scenes", label: "Scenes", icon: Clapperboard, count: counts.scenes },
+      {
+        key: "tasks",
+        id: "tasks",
+        label: "Tasks",
+        icon: ListTodo,
+        count: counts.tasks,
       },
       {
-        id: "production",
-        label: "Production Department",
+        key: "schedule",
+        id: "schedule",
+        label: "Schedule",
+        icon: Calendar,
+        count: counts.shootingDays,
+      },
+      {
+        key: "callsheets",
+        id: "callsheets",
+        label: "Call Sheets",
+        icon: ClipboardList,
+        count: counts.callSheets,
+      },
+    ],
+    [counts]
+  );
+
+  const quickAccessSectionIds = React.useMemo(
+    () =>
+      quickAccessItems
+        .map((item) => item.id)
+        .filter((id): id is ProjectSection => Boolean(id)),
+    [quickAccessItems]
+  );
+  const activeInQuickAccess = quickAccessSectionIds.includes(activeSection);
+  const [showAdvancedTools, setShowAdvancedTools] = React.useState(() => !activeInQuickAccess);
+
+  React.useEffect(() => {
+    if (!activeInQuickAccess) {
+      setShowAdvancedTools(true);
+    }
+  }, [activeInQuickAccess]);
+
+  const advancedGroups = React.useMemo<SidebarGroup[]>(
+    () => [
+      {
+        id: "departments",
+        label: "Departments",
         items: [
           {
             key: "art",
@@ -146,27 +213,20 @@ export function ProjectSidebar({
             label: "G&E",
             icon: Lightbulb,
           },
-          { key: "scenes", id: "scenes", label: "Scenes", icon: Clapperboard, count: counts.scenes },
-          {
-            key: "schedule",
-            id: "schedule",
-            label: "Schedule",
-            icon: Calendar,
-            count: counts.shootingDays,
-          },
-          {
-            key: "callsheets",
-            id: "callsheets",
-            label: "Call Sheets",
-            icon: ClipboardList,
-            count: counts.callSheets,
-          },
           {
             key: "post",
             id: "post",
             label: "Post Production",
             icon: Film,
           },
+        ],
+      },
+      {
+        id: "team-resources",
+        label: "Team & Resources",
+        items: [
+          { key: "cast", id: "cast", label: "Cast", icon: Users, count: counts.cast },
+          { key: "crew", id: "crew", label: "Crew", icon: UserCircle, count: counts.crew },
           {
             key: "locations",
             id: "locations",
@@ -174,14 +234,6 @@ export function ProjectSidebar({
             icon: MapPin,
             count: counts.locations,
           },
-        ],
-      },
-      {
-        id: "team",
-        label: "People Department",
-        items: [
-          { key: "cast", id: "cast", label: "Cast", icon: Users, count: counts.cast },
-          { key: "crew", id: "crew", label: "Crew", icon: UserCircle, count: counts.crew },
           {
             key: "gear",
             id: "gear",
@@ -209,6 +261,59 @@ export function ProjectSidebar({
     [counts]
   );
 
+  const renderItem = (item: SidebarItem) => {
+    const Icon = item.icon;
+    const isActive = item.id ? activeSection === item.id : false;
+
+    return (
+      <li key={item.key}>
+        <button
+          type="button"
+          disabled={item.disabled || !item.id}
+          onClick={() => item.id && onSectionChange(item.id)}
+          className={cn(
+            "group w-full rounded-md border border-transparent px-2 py-1.5 text-sm transition-all",
+            isActive
+              ? "skeuo-pressed text-foreground"
+              : "text-muted-foreground hover:border-border/60 hover:bg-muted/50 hover:text-foreground",
+            (item.disabled || !item.id) &&
+              "cursor-not-allowed opacity-65 hover:border-transparent hover:bg-transparent hover:text-muted-foreground"
+          )}
+        >
+          <span className="flex items-center gap-2">
+            <span
+              className={cn(
+                "flex h-6 w-6 items-center justify-center rounded-md",
+                isActive
+                  ? "skeuo-chip border-border/90 bg-card text-foreground"
+                  : "bg-muted/80 text-muted-foreground group-hover:text-foreground",
+                (item.disabled || !item.id) && "bg-muted/55 text-muted-foreground"
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+            </span>
+            <span className="flex-1 text-left">{item.label}</span>
+            {item.count !== undefined && item.count > 0 && (
+              <span
+                className={cn(
+                  "rounded-sm px-1.5 py-0.5 text-[11px] leading-none tabular-nums",
+                  isActive ? "bg-foreground/10 text-foreground" : "bg-muted text-muted-foreground"
+                )}
+              >
+                {item.count}
+              </span>
+            )}
+            {item.badge && (
+              <span className="rounded-sm border border-border/70 bg-card/70 px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground">
+                {item.badge}
+              </span>
+            )}
+          </span>
+        </button>
+      </li>
+    );
+  };
+
   return (
     <nav className={cn("flex h-full flex-col py-2", className)}>
       <div className="flex-1 space-y-3 overflow-y-auto px-2 pb-2 scrollbar-thin">
@@ -223,7 +328,7 @@ export function ProjectSidebar({
               </span>
             </div>
             <ol className="space-y-1">
-              {workflow.map((step, index) => {
+              {visibleWorkflowSteps.map((step, index) => {
                 const isActive = activeSection === step.section;
                 const statusClass =
                   step.status === "done"
@@ -234,7 +339,7 @@ export function ProjectSidebar({
 
                 return (
                   <li key={step.id} className="relative">
-                    {index < workflow.length - 1 && (
+                    {index < visibleWorkflowSteps.length - 1 && (
                       <span className="pointer-events-none absolute left-[11px] top-6 h-3 w-px bg-border/70" />
                     )}
                     <button
@@ -244,7 +349,7 @@ export function ProjectSidebar({
                         "flex w-full items-center gap-2 rounded-md border border-transparent px-1.5 py-1 text-left text-xs transition-colors",
                         isActive
                           ? "skeuo-pressed"
-                          : "text-muted-foreground hover:border-border/70 hover:bg-muted/40 hover:text-foreground"
+                          : "text-muted-foreground hover:border-border/60 hover:bg-muted/50 hover:text-foreground",
                       )}
                     >
                       <span
@@ -270,6 +375,19 @@ export function ProjectSidebar({
                 );
               })}
             </ol>
+            {departmentWorkflowStepCount > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="mt-2 h-7 w-full justify-start px-1.5 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setShowDepartmentWorkflow((previous) => !previous)}
+              >
+                {showDepartmentWorkflow
+                  ? "Show Core Workflow"
+                  : `Show Department Workflow (+${departmentWorkflowStepCount})`}
+              </Button>
+            )}
             {activeWorkflowStep && activeSection !== activeWorkflowStep.section && (
               <Button
                 type="button"
@@ -285,85 +403,40 @@ export function ProjectSidebar({
         )}
 
         <section className="space-y-2">
+          <div>
+            <p className="mb-1 flex items-center gap-2 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              <span className="h-1.5 w-1.5 rounded-full bg-border" />
+              <span>Quick Access</span>
+            </p>
+            <ul className="space-y-0.5">{quickAccessItems.map((item) => renderItem(item))}</ul>
+          </div>
+
           <button
             type="button"
-            onClick={() => setShowDepartments((previous) => !previous)}
+            onClick={() => setShowAdvancedTools((previous) => !previous)}
             className="flex w-full items-center justify-between rounded-md border border-transparent px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:border-border/70 hover:bg-muted/40 hover:text-foreground"
           >
-            <span>All Departments</span>
+            <span>Advanced Tools</span>
             <ChevronDown
               className={cn(
                 "h-3.5 w-3.5 transition-transform",
-                showDepartments ? "rotate-180" : ""
+                showAdvancedTools ? "rotate-180" : ""
               )}
             />
           </button>
+          <p className="px-2 text-[11px] text-muted-foreground/80">
+            Hidden by default. Open when you need deeper planning and admin tools.
+          </p>
 
-          {showDepartments && (
+          {showAdvancedTools && (
             <div className="space-y-3">
-              {groups.map((group) => (
+              {advancedGroups.map((group) => (
                 <section key={group.id}>
                   <p className="mb-1 flex items-center gap-2 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     <span className="h-1.5 w-1.5 rounded-full bg-border" />
                     <span>{group.label}</span>
                   </p>
-                  <ul className="space-y-0.5">
-                    {group.items.map((item) => {
-                      const Icon = item.icon;
-                      const isActive = item.id ? activeSection === item.id : false;
-
-                      return (
-                        <li key={item.key}>
-                          <button
-                            type="button"
-                            disabled={item.disabled || !item.id}
-                            onClick={() => item.id && onSectionChange(item.id)}
-                            className={cn(
-                              "group w-full rounded-md border border-transparent px-2 py-1.5 text-sm transition-all",
-                              isActive
-                                ? "skeuo-pressed text-foreground"
-                                : "text-muted-foreground hover:border-border/60 hover:bg-muted/50 hover:text-foreground",
-                              (item.disabled || !item.id) &&
-                                "cursor-not-allowed opacity-65 hover:border-transparent hover:bg-transparent hover:text-muted-foreground"
-                            )}
-                          >
-                            <span className="flex items-center gap-2">
-                              <span
-                                className={cn(
-                                  "flex h-6 w-6 items-center justify-center rounded-md",
-                                  isActive
-                                    ? "skeuo-chip border-border/90 bg-card text-foreground"
-                                    : "bg-muted/80 text-muted-foreground group-hover:text-foreground",
-                                  (item.disabled || !item.id) &&
-                                    "bg-muted/55 text-muted-foreground"
-                                )}
-                              >
-                                <Icon className="h-3.5 w-3.5" />
-                              </span>
-                              <span className="flex-1 text-left">{item.label}</span>
-                              {item.count !== undefined && item.count > 0 && (
-                                <span
-                                  className={cn(
-                                    "rounded-sm px-1.5 py-0.5 text-[11px] leading-none tabular-nums",
-                                    isActive
-                                      ? "bg-foreground/10 text-foreground"
-                                      : "bg-muted text-muted-foreground"
-                                  )}
-                                >
-                                  {item.count}
-                                </span>
-                              )}
-                              {item.badge && (
-                                <span className="rounded-sm border border-border/70 bg-card/70 px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground">
-                                  {item.badge}
-                                </span>
-                              )}
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <ul className="space-y-0.5">{group.items.map((item) => renderItem(item))}</ul>
                 </section>
               ))}
             </div>

@@ -205,7 +205,7 @@ export function BreakdownPreviewModal({
                     </div>
                     <div>
                       <label className="text-xs font-medium text-muted-foreground">
-                        Set Name
+                        Scene Heading
                       </label>
                       <Input
                         value={editValues.set_name || ""}

@@ -57,7 +57,35 @@ export function ProjectAssistantChat({
   const [clearing, setClearing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [query, setQuery] = React.useState("");
-  const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(
+    null,
+  );
+  const composerRef = React.useRef<HTMLTextAreaElement>(null);
+  const messagesViewportRef = React.useRef<HTMLDivElement>(null);
+  const previousMessageCountRef = React.useRef(0);
+
+  React.useEffect(() => {
+    const textarea = composerRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = "0px";
+    const scrollHeight = textarea.scrollHeight;
+    const clampedHeight = Math.min(Math.max(scrollHeight, 52), 200);
+    textarea.style.height = `${clampedHeight}px`;
+    textarea.style.overflowY = scrollHeight > 200 ? "auto" : "hidden";
+  }, [query]);
+
+  React.useEffect(() => {
+    const viewport = messagesViewportRef.current;
+    if (!viewport) return;
+
+    const hasNewMessage = messages.length > previousMessageCountRef.current;
+    viewport.scrollTo({
+      top: viewport.scrollHeight,
+      behavior: hasNewMessage ? "smooth" : "auto",
+    });
+    previousMessageCountRef.current = messages.length;
+  }, [messages, sending, loadingHistory]);
 
   const fetchHistory = React.useCallback(async () => {
     setLoadingHistory(true);
@@ -65,9 +93,12 @@ export function ProjectAssistantChat({
 
     try {
       const response = await fetch(
-        `/api/ai/project-chat?projectId=${encodeURIComponent(projectId)}`
+        `/api/ai/project-chat?projectId=${encodeURIComponent(projectId)}`,
       );
-      const payload = (await response.json()) as { data?: ChatMessage[]; error?: string };
+      const payload = (await response.json()) as {
+        data?: ChatMessage[];
+        error?: string;
+      };
 
       if (!response.ok) {
         throw new Error(payload.error || "Failed to load chat history");
@@ -75,7 +106,9 @@ export function ProjectAssistantChat({
 
       setMessages(payload.data || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load chat history");
+      setError(
+        err instanceof Error ? err.message : "Failed to load chat history",
+      );
     } finally {
       setLoadingHistory(false);
     }
@@ -112,7 +145,10 @@ export function ProjectAssistantChat({
         body: JSON.stringify({ projectId, message }),
       });
 
-      const payload = (await response.json()) as { data?: ChatMessage; error?: string };
+      const payload = (await response.json()) as {
+        data?: ChatMessage;
+        error?: string;
+      };
 
       if (!response.ok || !payload.data) {
         throw new Error(payload.error || "Failed to send message");
@@ -132,7 +168,7 @@ export function ProjectAssistantChat({
   const handleClearConversation = async () => {
     if (clearing || sending) return;
     const shouldClear = window.confirm(
-      "Clear this conversation history for the selected project?"
+      "Clear this conversation history for the selected project?",
     );
     if (!shouldClear) return;
 
@@ -142,9 +178,12 @@ export function ProjectAssistantChat({
     try {
       const response = await fetch(
         `/api/ai/project-chat?projectId=${encodeURIComponent(projectId)}`,
-        { method: "DELETE" }
+        { method: "DELETE" },
       );
-      const payload = (await response.json()) as { success?: boolean; error?: string };
+      const payload = (await response.json()) as {
+        success?: boolean;
+        error?: string;
+      };
 
       if (!response.ok || !payload.success) {
         throw new Error(payload.error || "Failed to clear conversation");
@@ -152,7 +191,9 @@ export function ProjectAssistantChat({
 
       setMessages([]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to clear conversation");
+      setError(
+        err instanceof Error ? err.message : "Failed to clear conversation",
+      );
     } finally {
       setClearing(false);
     }
@@ -173,8 +214,8 @@ export function ProjectAssistantChat({
   return (
     <div
       className={cn(
-        "flex flex-col rounded-2xl border border-border bg-card/95",
-        className
+        "flex h-[78dvh] min-h-[520px] w-full flex-col overflow-hidden rounded-2xl border border-border bg-card/95",
+        className,
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border px-5 py-4 sm:px-6 sm:py-5">
@@ -217,92 +258,107 @@ export function ProjectAssistantChat({
         </div>
       </div>
 
-      <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex flex-col">
-          <div className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
-            {loadingHistory ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading conversation...
-              </div>
-            ) : messages.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border px-5 py-12 text-center">
-                <Lightbulb className="mx-auto mb-2 h-5 w-5 text-muted-foreground" />
-                <p className="text-sm font-medium">Start with a production question</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Ask for plans, risk checks, next actions, or department prep.
-                </p>
-              </div>
-            ) : (
-              messages.map((message) => {
-                const isAssistant = message.role === "assistant";
-                return (
-                  <div
-                    key={message.id}
-                    className={cn("flex gap-3", isAssistant ? "justify-start" : "justify-end")}
-                  >
+      <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex min-h-0 flex-col">
+          <div
+            ref={messagesViewportRef}
+            className="min-h-0 flex-1 overflow-y-auto"
+          >
+            <div className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
+              {loadingHistory ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading conversation...
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border px-5 py-10 text-center">
+                  <Lightbulb className="mx-auto mb-2 h-5 w-5 text-muted-foreground" />
+                  <p className="text-sm font-medium">
+                    Start with a production question
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Ask for plans, risk checks, next actions, or department prep.
+                  </p>
+                </div>
+              ) : (
+                messages.map((message) => {
+                  const isAssistant = message.role === "assistant";
+                  return (
                     <div
+                      key={message.id}
                       className={cn(
-                        "max-w-[88%] rounded-xl border px-4 py-3 text-sm",
-                        isAssistant
-                          ? "border-border bg-muted/45 text-foreground"
-                          : "border-primary/15 bg-primary text-primary-foreground"
+                        "flex gap-3",
+                        isAssistant ? "justify-start" : "justify-end",
                       )}
                     >
-                      <p className="whitespace-pre-wrap leading-6">{message.content}</p>
                       <div
                         className={cn(
-                          "mt-2 flex items-center justify-between gap-2 text-[11px]",
+                          "max-w-[88%] rounded-xl border px-4 py-3 text-sm",
                           isAssistant
-                            ? "text-muted-foreground"
-                            : "text-primary-foreground/75"
+                            ? "border-border bg-muted/45 text-foreground"
+                            : "border-primary/15 bg-primary text-primary-foreground",
                         )}
                       >
-                        <span>{formatMessageTime(message.createdAt)}</span>
-                        {isAssistant && (
-                          <button
-                            type="button"
-                            onClick={() => void handleCopyMessage(message)}
-                            className="inline-flex items-center gap-1 rounded-sm px-1 py-0.5 hover:bg-background/70"
-                          >
-                            {copiedMessageId === message.id ? (
-                              <>
-                                <Check className="h-3 w-3" />
-                                Copied
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="h-3 w-3" />
-                                Copy
-                              </>
-                            )}
-                          </button>
-                        )}
+                        <p className="whitespace-pre-wrap leading-6">
+                          {message.content}
+                        </p>
+                        <div
+                          className={cn(
+                            "mt-2 flex items-center justify-between gap-2 text-[11px]",
+                            isAssistant
+                              ? "text-muted-foreground"
+                              : "text-primary-foreground/75",
+                          )}
+                        >
+                          <span>{formatMessageTime(message.createdAt)}</span>
+                          {isAssistant && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void handleCopyMessage(message)}
+                              className="h-6 gap-1 rounded-sm px-1.5 text-[11px]"
+                            >
+                              {copiedMessageId === message.id ? (
+                                <>
+                                  <Check className="h-3 w-3" />
+                                  Copied
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-3 w-3" />
+                                  Copy
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
                       </div>
+
+                      {!isAssistant && (
+                        <span className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-primary/20 bg-primary/10">
+                          <User2 className="h-4 w-4 text-primary" />
+                        </span>
+                      )}
                     </div>
+                  );
+                })
+              )}
 
-                    {!isAssistant && (
-                      <span className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-primary/20 bg-primary/10">
-                        <User2 className="h-4 w-4 text-primary" />
-                      </span>
-                    )}
-                  </div>
-                );
-              })
-            )}
-
-            {sending && (
-              <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Thinking...
-              </div>
-            )}
+              {sending && (
+                <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Thinking...
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="border-t border-border px-5 py-4 sm:px-6 sm:py-5">
-            <div className="flex gap-2">
+          <div className="shrink-0 border-t border-border px-5 py-3 sm:px-6 sm:py-4">
+            <div className="relative">
               <Textarea
-                rows={3}
+                ref={composerRef}
+                rows={1}
                 maxLength={4000}
                 placeholder="Ask a project-aware question..."
                 value={query}
@@ -313,17 +369,19 @@ export function ProjectAssistantChat({
                     void handleSend();
                   }
                 }}
+                className="min-h-[52px] max-h-[200px] rounded-2xl border-border/70 bg-card/90 px-4 py-3 pr-14 text-sm leading-6 shadow-none"
               />
-              <Button
-                className="h-auto min-w-[98px] gap-1.5"
+              <button
+                type="button"
+                className="absolute bottom-2 right-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-foreground text-background shadow-sm transition-colors hover:bg-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                 onClick={() => void handleSend()}
                 disabled={sending || !query.trim()}
               >
                 <Send className="h-4 w-4" />
-                Send
-              </Button>
+                <span className="sr-only">Send message</span>
+              </button>
             </div>
-            <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
+            <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
               <span>Press Enter to send, Shift+Enter for newline.</span>
               <span>{query.length}/4000</span>
             </div>
@@ -335,19 +393,22 @@ export function ProjectAssistantChat({
           </div>
         </div>
 
-        <aside className="border-t border-border px-5 py-5 sm:px-6 lg:border-l lg:border-t-0">
+        <aside className="border-t border-border px-5 py-5 sm:px-6 lg:overflow-y-auto lg:border-l lg:border-t-0">
           <p className="text-xs font-semibold uppercase tracking-[0.11em] text-muted-foreground">
             Quick Prompts
           </p>
           <div className="mt-3 space-y-2">
             {QUICK_PROMPTS.map((prompt) => (
-              <button
+              <Button
                 key={prompt}
+                type="button"
+                variant="skeuo-outline"
+                size="sm"
                 onClick={() => setQuery(prompt)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-left text-xs transition-colors hover:bg-muted/50"
+                className="h-auto w-full justify-start whitespace-normal px-3 py-2 text-left text-xs"
               >
                 {prompt}
-              </button>
+              </Button>
             ))}
           </div>
           <div className="mt-6 rounded-lg border border-border bg-muted/30 px-3 py-3">
@@ -355,8 +416,8 @@ export function ProjectAssistantChat({
               Context Scope
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
-              Scenes, schedule, locations, permits, cast, crew, and recent script context from
-              the selected project.
+              Scenes, schedule, locations, permits, cast, crew, and recent
+              script context from the selected project.
             </p>
           </div>
         </aside>

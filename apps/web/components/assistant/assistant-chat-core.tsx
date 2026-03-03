@@ -1,13 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  Check,
-  Copy,
-  Lightbulb,
-  Loader2,
-  Send,
-} from "lucide-react";
+import { Check, Copy, Lightbulb, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -37,6 +31,11 @@ const QUICK_PROMPTS = [
   "What prep should departments complete before day one?",
 ];
 
+interface ChatAgentPayload {
+  data?: ChatMessage;
+  error?: string;
+}
+
 function formatMessageTime(createdAt: string): string {
   return new Date(createdAt).toLocaleString(undefined, {
     month: "short",
@@ -57,7 +56,9 @@ export function AssistantChatCore({
   const [sending, setSending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [query, setQuery] = React.useState("");
-  const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(
+    null,
+  );
   const [resolvedConfirmations, setResolvedConfirmations] = React.useState<
     Record<string, "approved" | "declined">
   >({});
@@ -68,13 +69,19 @@ export function AssistantChatCore({
     setError(null);
     try {
       const response = await fetch(
-        `/api/ai/project-chat?projectId=${encodeURIComponent(projectId)}`
+        `/api/ai/project-chat?projectId=${encodeURIComponent(projectId)}`,
       );
-      const payload = (await response.json()) as { data?: ChatMessage[]; error?: string };
-      if (!response.ok) throw new Error(payload.error || "Failed to load chat history");
+      const payload = (await response.json()) as {
+        data?: ChatMessage[];
+        error?: string;
+      };
+      if (!response.ok)
+        throw new Error(payload.error || "Failed to load chat history");
       setMessages(payload.data || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load chat history");
+      setError(
+        err instanceof Error ? err.message : "Failed to load chat history",
+      );
     } finally {
       setLoadingHistory(false);
     }
@@ -115,16 +122,15 @@ export function AssistantChatCore({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, message }),
       });
-      const payload = (await response.json()) as {
-        data?: ChatMessage;
-        error?: string;
-        status?: string;
-        confirmationId?: string;
-      };
-      if (!response.ok || !payload.data) {
+      const payload = (await response.json()) as ChatAgentPayload;
+      if (!response.ok) {
         throw new Error(payload.error || "Failed to send message");
       }
-      setMessages((prev) => [...prev, payload.data!]);
+      if (!payload.data) {
+        throw new Error("Failed to send message");
+      }
+      const agentReply = payload.data;
+      setMessages((prev) => [...prev, agentReply]);
     } catch (err) {
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
       setError(err instanceof Error ? err.message : "Failed to send message");
@@ -135,7 +141,7 @@ export function AssistantChatCore({
 
   const handleConfirmation = async (
     confirmationId: string,
-    approved: boolean
+    approved: boolean,
   ) => {
     setSending(true);
     setError(null);
@@ -159,7 +165,9 @@ export function AssistantChatCore({
       }
       setMessages((prev) => [...prev, payload.data!]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to process confirmation");
+      setError(
+        err instanceof Error ? err.message : "Failed to process confirmation",
+      );
     } finally {
       setSending(false);
     }
@@ -179,15 +187,15 @@ export function AssistantChatCore({
   return (
     <div
       className={cn(
-        "flex h-full flex-col",
-        !compact && "min-h-[400px]",
-        className
+        "flex h-full min-h-0 flex-col",
+        !compact && "min-h-[420px]",
+        className,
       )}
     >
       {/* Messages area */}
       <div
         ref={viewportRef}
-        className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3"
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 scrollbar-thin"
       >
         {loadingHistory ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -195,25 +203,28 @@ export function AssistantChatCore({
             Loading...
           </div>
         ) : messages.length === 0 ? (
-          <div className="space-y-3 pt-4">
+          <div className="space-y-3 rounded-xl border border-dashed border-border/80 bg-muted/20 p-4">
             <div className="text-center">
               <Lightbulb className="mx-auto mb-2 h-5 w-5 text-muted-foreground" />
-              <p className="text-sm font-medium">
+              <p className="text-sm font-semibold">
                 {projectName ? `Ask about ${projectName}` : "Ask a question"}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                I can read and modify your project data.
+              <p className="mt-1 text-xs text-muted-foreground/90">
+                I can inspect and update your project data.
               </p>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {QUICK_PROMPTS.map((prompt) => (
-                <button
+                <Button
                   key={prompt}
+                  type="button"
+                  variant="skeuo-outline"
+                  size="sm"
                   onClick={() => void handleSend(prompt)}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-left text-xs transition-colors hover:bg-muted/50"
+                  className="h-auto w-full justify-start whitespace-normal px-3 py-2 text-left text-xs"
                 >
                   {prompt}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -227,15 +238,15 @@ export function AssistantChatCore({
                 <div
                   className={cn(
                     "flex",
-                    isAssistant ? "justify-start" : "justify-end"
+                    isAssistant ? "justify-start" : "justify-end",
                   )}
                 >
                   <div
                     className={cn(
-                      "max-w-[85%] rounded-2xl px-3 py-2.5 text-sm",
+                      "max-w-[88%] rounded-xl border px-3 py-2.5 text-sm shadow-sm",
                       isAssistant
-                        ? "bg-muted/50 text-foreground"
-                        : "bg-primary text-primary-foreground"
+                        ? "border-border/80 bg-card text-foreground"
+                        : "border-primary/20 bg-primary text-primary-foreground",
                     )}
                   >
                     <p className="whitespace-pre-wrap text-[13px] leading-relaxed">
@@ -246,22 +257,24 @@ export function AssistantChatCore({
                         "mt-1.5 flex items-center justify-between gap-2 text-[10px]",
                         isAssistant
                           ? "text-muted-foreground"
-                          : "text-primary-foreground/70"
+                          : "text-primary-foreground/70",
                       )}
                     >
                       <span>{formatMessageTime(message.createdAt)}</span>
                       {isAssistant && (
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="icon-sm"
                           onClick={() => void handleCopyMessage(message)}
-                          className="inline-flex items-center gap-1 rounded-sm px-1 py-0.5 hover:bg-background/70"
+                          className="h-5 w-5 rounded-sm"
                         >
                           {copiedMessageId === message.id ? (
                             <Check className="h-3 w-3" />
                           ) : (
                             <Copy className="h-3 w-3" />
                           )}
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -295,7 +308,7 @@ export function AssistantChatCore({
         )}
 
         {sending && (
-          <div className="inline-flex items-center gap-2 rounded-2xl bg-muted/50 px-3 py-2.5 text-sm text-muted-foreground">
+          <div className="inline-flex items-center gap-2 rounded-xl border border-border/70 bg-muted/35 px-3 py-2 text-sm text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             Thinking...
           </div>
@@ -303,7 +316,7 @@ export function AssistantChatCore({
       </div>
 
       {/* Input area */}
-      <div className="border-t border-border px-3 py-3">
+      <div className="border-t border-border/80 bg-muted/20 px-4 py-3">
         <div className="relative">
           <Textarea
             rows={compact ? 2 : 3}
@@ -317,19 +330,24 @@ export function AssistantChatCore({
                 void handleSend();
               }
             }}
-            className="pr-12 text-sm"
+            className="min-h-[84px] rounded-xl border-border/70 bg-card/90 pr-12 text-[13px] leading-5"
           />
           <Button
-            size="icon"
-            className="absolute bottom-2 right-2 h-7 w-7 rounded-lg"
+            variant="secondary"
+            size="icon-sm"
+            className="absolute bottom-2.5 right-2.5 h-8 w-8 rounded-lg border border-border/70 bg-background p-0 shadow-sm hover:bg-muted"
             onClick={() => void handleSend()}
             disabled={sending || !query.trim()}
           >
-            <Send className="h-3.5 w-3.5" />
+            {sending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Send className="h-3.5 w-3.5" />
+            )}
           </Button>
         </div>
         <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
-          <span>Enter to send</span>
+          <span>Enter to send, Shift+Enter for newline</span>
           <span>{query.length}/4000</span>
         </div>
         {error && (

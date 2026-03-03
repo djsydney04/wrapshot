@@ -1,38 +1,49 @@
-name: CI
+name: Web CI
 
 on:
   pull_request:
+    paths:
+      - "apps/web/**"
+      - "packages/**"
+      - "package.json"
+      - "package-lock.json"
+      - "turbo.json"
+      - ".github/workflows/web-ci.yml"
   push:
-    branches: [main]
+    branches:
+      - main
+      - staging
+      - production
+    paths:
+      - "apps/web/**"
+      - "packages/**"
+      - "package.json"
+      - "package-lock.json"
+      - "turbo.json"
+      - ".github/workflows/web-ci.yml"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: web-ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
+  web:
     runs-on: ubuntu-latest
-
     env:
-      # Build-time env vars (non-secret placeholders for CI build validation)
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       NEXT_PUBLIC_APP_URL: "https://example.com"
-
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-
-      - name: Install Turbo
-        run: npm install -g turbo
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -40,11 +51,11 @@ jobs:
       - name: Generate Prisma client
         run: npm run db:generate
 
-      - name: Type check
-        run: npm run typecheck
+      - name: Lint web
+        run: npm run lint --workspace=web
 
-      - name: Lint
-        run: npm run lint
+      - name: Typecheck web
+        run: npm run typecheck --workspace=web
 
-      - name: Build
-        run: npm run build
+      - name: Build web
+        run: npm run build --workspace=web

@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "ProdAI Mobile",
+    "slug": "prodai-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "prodai",
+    "platforms": ["ios", "android", "web"]
+  }
+}

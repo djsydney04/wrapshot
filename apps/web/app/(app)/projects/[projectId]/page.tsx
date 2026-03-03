@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
+import { Select } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +33,7 @@ import { OverviewSection } from "@/components/projects/sections/overview-section
 import { StripeboardSection } from "@/components/projects/sections/stripeboard-section";
 import { CastSection } from "@/components/projects/sections/cast-section";
 import { CrewSection } from "@/components/projects/sections/crew-section";
+import { TasksSection } from "@/components/projects/sections/tasks-section";
 import { ScheduleSection } from "@/components/projects/sections/schedule-section";
 import { ElementsSection } from "@/components/projects/sections/elements-section";
 import { LocationsSection } from "@/components/projects/sections/locations-section";
@@ -55,6 +57,7 @@ import { getCastMembersWithInviteStatus, type CastMemberWithInviteStatus } from 
 import { getScripts, type Script as DBScript } from "@/lib/actions/scripts";
 import { getLocationsWithSceneCounts, type Location as DBLocation } from "@/lib/actions/locations";
 import { getElementsWithSceneCounts, type Element as DBElement } from "@/lib/actions/elements";
+import { getProjectTasks, type ProjectTask as DBProjectTask } from "@/lib/actions/project-tasks";
 import { useShootingDays } from "@/lib/hooks/use-shooting-days";
 import { useAgentJob } from "@/lib/hooks/use-agent-job";
 import { useAgentProgressToast } from "@/lib/hooks/use-agent-progress-toast";
@@ -95,6 +98,11 @@ const SECTION_META: Record<ProjectSection, { title: string; description: string 
   schedule: {
     title: "Schedule & Stripboard",
     description: "Build shooting days, assign scenes, and optimize run-of-show planning.",
+  },
+  tasks: {
+    title: "Tasks",
+    description:
+      "Create, assign, and track production tickets across cast, crew, and departments.",
   },
   callsheets: {
     title: "Call Sheets",
@@ -149,12 +157,20 @@ const SECTION_META: Record<ProjectSection, { title: string; description: string 
   },
 };
 
-type DataKey = "scenes" | "scripts" | "cast" | "crew" | "locations" | "elements";
+type DataKey =
+  | "scenes"
+  | "scripts"
+  | "cast"
+  | "crew"
+  | "locations"
+  | "elements"
+  | "tasks";
 
 const SECTION_DATA_KEYS: Record<ProjectSection, DataKey[]> = {
   dashboard: ["scenes", "scripts", "cast", "crew"],
   assistant: [],
   script: ["scripts"],
+  tasks: ["tasks"],
   schedule: ["scenes", "locations", "cast"],
   callsheets: ["scenes", "cast", "crew"],
   art: ["scenes", "crew"],
@@ -177,6 +193,7 @@ const DATA_KEY_LABEL: Record<DataKey, string> = {
   crew: "crew",
   locations: "locations",
   elements: "elements",
+  tasks: "tasks",
 };
 
 const SECTION_ORDER: ProjectSection[] = [
@@ -184,6 +201,7 @@ const SECTION_ORDER: ProjectSection[] = [
   "assistant",
   "script",
   "scenes",
+  "tasks",
   "schedule",
   "callsheets",
   "art",
@@ -197,6 +215,20 @@ const SECTION_ORDER: ProjectSection[] = [
   "budget",
   "settings",
 ];
+
+const MOBILE_PRIMARY_SECTIONS: ProjectSection[] = [
+  "dashboard",
+  "assistant",
+  "script",
+  "scenes",
+  "tasks",
+  "schedule",
+  "callsheets",
+];
+
+const MOBILE_ADVANCED_SECTIONS: ProjectSection[] = SECTION_ORDER.filter(
+  (section) => !MOBILE_PRIMARY_SECTIONS.includes(section)
+);
 
 const WORKFLOW_PLAN: { id: string; label: string; section: ProjectSection }[] = [
   { id: "script", label: "Script Ready", section: "script" },
@@ -216,6 +248,14 @@ function normalizeSection(section: string | null): ProjectSection | null {
     return section as ProjectSection;
   }
   return null;
+}
+
+function getSectionLabel(section: ProjectSection): string {
+  if (section === "callsheets") return "Call Sheets";
+  if (section === "assistant") return "Agent";
+  if (section === "ge") return "G&E";
+  if (section === "post") return "Post";
+  return section.charAt(0).toUpperCase() + section.slice(1);
 }
 
 export default function ProjectDetailPage() {
@@ -254,6 +294,7 @@ export default function ProjectDetailPage() {
   const [cast, setCast] = React.useState<CastMemberWithInviteStatus[]>([]);
   const [dbLocations, setDbLocations] = React.useState<DBLocation[]>([]);
   const [dbElements, setDbElements] = React.useState<DBElement[]>([]);
+  const [dbTasks, setDbTasks] = React.useState<DBProjectTask[]>([]);
   const [loadedData, setLoadedData] = React.useState<Record<DataKey, boolean>>({
     scenes: false,
     scripts: false,
@@ -261,6 +302,7 @@ export default function ProjectDetailPage() {
     crew: false,
     locations: false,
     elements: false,
+    tasks: false,
   });
   const [loadErrors, setLoadErrors] = React.useState<Record<DataKey, string | null>>({
     scenes: null,
@@ -269,6 +311,7 @@ export default function ProjectDetailPage() {
     crew: null,
     locations: null,
     elements: null,
+    tasks: null,
   });
   const loadedDataRef = React.useRef<Record<DataKey, boolean>>({
     scenes: false,
@@ -277,6 +320,7 @@ export default function ProjectDetailPage() {
     crew: false,
     locations: false,
     elements: false,
+    tasks: false,
   });
   const inFlightLoadsRef = React.useRef<Partial<Record<DataKey, Promise<void>>>>({});
   const trackedProjectRef = React.useRef<string | null>(null);
@@ -349,6 +393,14 @@ export default function ProjectDetailPage() {
     setDbElements(elementsResult.data || []);
   }, [projectId]);
 
+  const loadTasksData = React.useCallback(async () => {
+    const tasksResult = await getProjectTasks(projectId);
+    if (tasksResult.error) {
+      throw new Error(tasksResult.error);
+    }
+    setDbTasks(tasksResult.data || []);
+  }, [projectId]);
+
   const loadDataKey = React.useCallback(
     async (key: DataKey, force = false) => {
       if (!force && loadedDataRef.current[key]) return;
@@ -382,6 +434,9 @@ export default function ProjectDetailPage() {
             case "elements":
               await loadElementsData();
               break;
+            case "tasks":
+              await loadTasksData();
+              break;
             default:
               break;
           }
@@ -414,6 +469,7 @@ export default function ProjectDetailPage() {
       loadLocationsData,
       loadScenesData,
       loadScriptsData,
+      loadTasksData,
     ]
   );
 
@@ -436,6 +492,7 @@ export default function ProjectDetailPage() {
         crew: false,
         locations: false,
         elements: false,
+        tasks: false,
       };
       setLoadedData({
         scenes: false,
@@ -444,6 +501,7 @@ export default function ProjectDetailPage() {
         crew: false,
         locations: false,
         elements: false,
+        tasks: false,
       });
       setLoadErrors({
         scenes: null,
@@ -452,6 +510,7 @@ export default function ProjectDetailPage() {
         crew: null,
         locations: null,
         elements: null,
+        tasks: null,
       });
       inFlightLoadsRef.current = {};
       trackedProjectRef.current = null;
@@ -461,6 +520,7 @@ export default function ProjectDetailPage() {
       setCrew([]);
       setDbLocations([]);
       setDbElements([]);
+      setDbTasks([]);
       setLoading(true);
 
       try {
@@ -537,6 +597,7 @@ export default function ProjectDetailPage() {
     ? (dbLocations as any[])
     : [];
   const elements = loadedData.elements ? dbElements : [];
+  const tasks = loadedData.tasks ? dbTasks : [];
 
   const monitoredScriptId = React.useMemo(() => {
     if (scripts.length === 0) return undefined;
@@ -699,39 +760,13 @@ export default function ProjectDetailPage() {
   const sidebarLocationsCount = loadedData.locations
     ? dbLocations.length
     : project.locationsCount;
+  const sidebarTasksCount = loadedData.tasks ? dbTasks.length : 0;
   const sidebarShootingDaysCount =
     dbShootingDays.length > 0
       ? dbShootingDays.length
       : project.shootingDaysCount;
   const sidebarElementsCount = loadedData.elements ? elements.length : 0;
   const hasScript = scripts.length > 0;
-  const hasBreakdown = sidebarScenesCount > 0 && sidebarElementsCount > 0;
-  const hasSchedule = sidebarShootingDaysCount > 0;
-  const hasCallSheets = (sidebarShootingDaysCount > 0) && (crew.length > 0 || cast.length > 0);
-  const hasArtPlan = sidebarScenesCount > 0 && sidebarShootingDaysCount > 0;
-  const hasCameraPlan = sidebarScenesCount > 0 && sidebarShootingDaysCount > 0;
-  const hasGePlan = sidebarScenesCount > 0 && sidebarShootingDaysCount > 0;
-  const hasPostReadiness = sidebarScenesCount > 0 && sidebarShootingDaysCount > 0;
-
-  const workflowCompletion = [
-    hasScript,
-    hasBreakdown,
-    hasSchedule,
-    hasCallSheets,
-    hasArtPlan,
-    hasCameraPlan,
-    hasGePlan,
-    hasPostReadiness,
-  ];
-  const firstPendingWorkflowIndex = workflowCompletion.findIndex((isComplete) => !isComplete);
-  const workflowSteps = WORKFLOW_PLAN.map((step, index) => ({
-    ...step,
-    status: workflowCompletion[index]
-      ? ("done" as const)
-      : index === firstPendingWorkflowIndex
-        ? ("current" as const)
-        : ("upcoming" as const),
-  }));
 
   const activeSectionDataKeys = SECTION_DATA_KEYS[activeSection];
   const activeSectionErrorKeys = activeSectionDataKeys.filter(
@@ -788,7 +823,13 @@ export default function ProjectDetailPage() {
           />
         );
       case "assistant":
-        return <AssistantSection projectId={projectId} projectName={project.name} />;
+        return (
+          <AssistantSection
+            projectId={projectId}
+            projectName={project.name}
+            className="h-full"
+          />
+        );
       case "script":
         return (
           <ScriptSection
@@ -817,6 +858,16 @@ export default function ProjectDetailPage() {
             stripeboardScenes={dbScenes}
             stripeboardCast={cast}
             useMockData={false}
+          />
+        );
+      case "tasks":
+        return (
+          <TasksSection
+            projectId={projectId}
+            tasks={tasks}
+            cast={cast}
+            crew={crew}
+            currentUserId={user?.id}
           />
         );
       case "callsheets":
@@ -963,7 +1014,7 @@ export default function ProjectDetailPage() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="hidden w-72 flex-shrink-0 border-r border-border/85 bg-background/65 md:flex md:flex-col">
+        <aside className="hidden w-80 flex-shrink-0 border-r border-border/85 bg-background/65 md:flex md:flex-col">
           {/* Project Mini Header */}
           <div className="border-b border-border/85 p-4">
             <div className="skeuo-panel relative overflow-hidden rounded-xl p-3">
@@ -1002,9 +1053,9 @@ export default function ProjectDetailPage() {
           <ProjectSidebar
             activeSection={activeSection}
             onSectionChange={handleSectionChange}
-            workflow={workflowSteps}
             counts={{
               scenes: sidebarScenesCount,
+              tasks: sidebarTasksCount,
               cast: sidebarCastCount,
               crew: crew.length,
               locations: sidebarLocationsCount,
@@ -1018,42 +1069,53 @@ export default function ProjectDetailPage() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto">
+        <main className="flex min-h-0 flex-1 flex-col overflow-auto">
           {/* Mobile Section Tabs (hidden on desktop) */}
           <div className="border-b border-border px-4 py-2 md:hidden">
             <div className="scrollbar-thin flex gap-2 overflow-x-auto pb-1">
-              {SECTION_ORDER.map(
-                (section) => (
-                  <button
-                    key={section}
-                    onClick={() => handleSectionChange(section)}
-                    className={cn(
-                      "whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm transition-colors",
-                      activeSection === section
-                        ? "border-border bg-foreground text-background"
-                        : "border-border/70 text-muted-foreground hover:bg-muted"
-                    )}
-                  >
-                    {section === "callsheets"
-                      ? "Call Sheets"
-                      : section === "assistant"
-                        ? "Agent"
-                      : section === "art"
-                        ? "Art"
-                      : section === "camera"
-                        ? "Camera"
-                        : section === "ge"
-                          ? "G&E"
-                        : section === "post"
-                          ? "Post"
-                        : section.charAt(0).toUpperCase() + section.slice(1)}
-                  </button>
-                )
-              )}
+              {MOBILE_PRIMARY_SECTIONS.map((section) => (
+                <button
+                  key={section}
+                  onClick={() => handleSectionChange(section)}
+                  className={cn(
+                    "whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm transition-colors",
+                    activeSection === section
+                      ? "border-border bg-foreground text-background"
+                      : "border-border/70 text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  {getSectionLabel(section)}
+                </button>
+              ))}
+              <div className="min-w-[150px] shrink-0">
+                <Select
+                  value={
+                    MOBILE_PRIMARY_SECTIONS.includes(activeSection)
+                      ? ""
+                      : activeSection
+                  }
+                  onChange={(event) => {
+                    if (event.target.value) {
+                      handleSectionChange(event.target.value as ProjectSection);
+                    }
+                  }}
+                  options={MOBILE_ADVANCED_SECTIONS.map((section) => ({
+                    value: section,
+                    label: getSectionLabel(section),
+                  }))}
+                  placeholder="More tools"
+                  className="h-[34px] border-border/70 bg-background text-sm text-muted-foreground"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="mx-auto w-full max-w-[1320px] p-4 md:p-6">
+          <div
+            className={cn(
+              "mx-auto w-full max-w-[1320px] p-4 md:p-6",
+              isAssistantSection && "flex min-h-full flex-1 flex-col",
+            )}
+          >
             <div className="skeuo-panel mb-4 rounded-xl px-4 py-3">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 {sectionMeta.title}
@@ -1066,7 +1128,7 @@ export default function ProjectDetailPage() {
               className={cn(
                 "min-h-[220px]",
                 isAssistantSection
-                  ? "rounded-2xl"
+                  ? "flex min-h-0 flex-1 rounded-2xl"
                   : "skeuo-panel rounded-2xl p-4 md:p-5"
               )}
             >
