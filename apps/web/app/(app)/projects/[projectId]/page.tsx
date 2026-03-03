@@ -198,17 +198,6 @@ const SECTION_ORDER: ProjectSection[] = [
   "settings",
 ];
 
-const WORKFLOW_PLAN: { id: string; label: string; section: ProjectSection }[] = [
-  { id: "script", label: "Script Ready", section: "script" },
-  { id: "breakdown", label: "Scene Breakdowns", section: "scenes" },
-  { id: "schedule", label: "Plan Shoot Days", section: "schedule" },
-  { id: "callsheets", label: "Publish Call Sheets", section: "callsheets" },
-  { id: "art", label: "Art Plan", section: "art" },
-  { id: "camera", label: "Camera Plan", section: "camera" },
-  { id: "ge", label: "G&E Plan", section: "ge" },
-  { id: "post", label: "Post Readiness", section: "post" },
-];
-
 function normalizeSection(section: string | null): ProjectSection | null {
   if (!section) return null;
   if (section === "overview") return "dashboard";
@@ -705,33 +694,6 @@ export default function ProjectDetailPage() {
       : project.shootingDaysCount;
   const sidebarElementsCount = loadedData.elements ? elements.length : 0;
   const hasScript = scripts.length > 0;
-  const hasBreakdown = sidebarScenesCount > 0 && sidebarElementsCount > 0;
-  const hasSchedule = sidebarShootingDaysCount > 0;
-  const hasCallSheets = (sidebarShootingDaysCount > 0) && (crew.length > 0 || cast.length > 0);
-  const hasArtPlan = sidebarScenesCount > 0 && sidebarShootingDaysCount > 0;
-  const hasCameraPlan = sidebarScenesCount > 0 && sidebarShootingDaysCount > 0;
-  const hasGePlan = sidebarScenesCount > 0 && sidebarShootingDaysCount > 0;
-  const hasPostReadiness = sidebarScenesCount > 0 && sidebarShootingDaysCount > 0;
-
-  const workflowCompletion = [
-    hasScript,
-    hasBreakdown,
-    hasSchedule,
-    hasCallSheets,
-    hasArtPlan,
-    hasCameraPlan,
-    hasGePlan,
-    hasPostReadiness,
-  ];
-  const firstPendingWorkflowIndex = workflowCompletion.findIndex((isComplete) => !isComplete);
-  const workflowSteps = WORKFLOW_PLAN.map((step, index) => ({
-    ...step,
-    status: workflowCompletion[index]
-      ? ("done" as const)
-      : index === firstPendingWorkflowIndex
-        ? ("current" as const)
-        : ("upcoming" as const),
-  }));
 
   const activeSectionDataKeys = SECTION_DATA_KEYS[activeSection];
   const activeSectionErrorKeys = activeSectionDataKeys.filter(
@@ -963,7 +925,7 @@ export default function ProjectDetailPage() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="hidden w-72 flex-shrink-0 border-r border-border/85 bg-background/65 md:flex md:flex-col">
+        <aside className="hidden w-80 flex-shrink-0 border-r border-border/85 bg-background/65 md:flex md:flex-col">
           {/* Project Mini Header */}
           <div className="border-b border-border/85 p-4">
             <div className="skeuo-panel relative overflow-hidden rounded-xl p-3">
@@ -1002,7 +964,6 @@ export default function ProjectDetailPage() {
           <ProjectSidebar
             activeSection={activeSection}
             onSectionChange={handleSectionChange}
-            workflow={workflowSteps}
             counts={{
               scenes: sidebarScenesCount,
               cast: sidebarCastCount,
