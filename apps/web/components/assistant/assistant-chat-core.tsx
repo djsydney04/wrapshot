@@ -31,6 +31,11 @@ const QUICK_PROMPTS = [
   "What prep should departments complete before day one?",
 ];
 
+interface ChatAgentPayload {
+  data?: ChatMessage;
+  error?: string;
+}
+
 function formatMessageTime(createdAt: string): string {
   return new Date(createdAt).toLocaleString(undefined, {
     month: "short",
@@ -117,16 +122,15 @@ export function AssistantChatCore({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, message }),
       });
-      const payload = (await response.json()) as {
-        data?: ChatMessage;
-        error?: string;
-        status?: string;
-        confirmationId?: string;
-      };
-      if (!response.ok || !payload.data) {
+      const payload = (await response.json()) as ChatAgentPayload;
+      if (!response.ok) {
         throw new Error(payload.error || "Failed to send message");
       }
-      setMessages((prev) => [...prev, payload.data!]);
+      if (!payload.data) {
+        throw new Error("Failed to send message");
+      }
+      const agentReply = payload.data;
+      setMessages((prev) => [...prev, agentReply]);
     } catch (err) {
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
       setError(err instanceof Error ? err.message : "Failed to send message");
@@ -211,13 +215,16 @@ export function AssistantChatCore({
             </div>
             <div className="space-y-2">
               {QUICK_PROMPTS.map((prompt) => (
-                <button
+                <Button
                   key={prompt}
+                  type="button"
+                  variant="skeuo-outline"
+                  size="sm"
                   onClick={() => void handleSend(prompt)}
-                  className="w-full rounded-lg border border-border/70 bg-background/90 px-3 py-2 text-left text-xs transition-colors hover:bg-muted/60"
+                  className="h-auto w-full justify-start whitespace-normal px-3 py-2 text-left text-xs"
                 >
                   {prompt}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -255,17 +262,19 @@ export function AssistantChatCore({
                     >
                       <span>{formatMessageTime(message.createdAt)}</span>
                       {isAssistant && (
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="icon-sm"
                           onClick={() => void handleCopyMessage(message)}
-                          className="inline-flex items-center gap-1 rounded-sm px-1 py-0.5 hover:bg-background/70"
+                          className="h-5 w-5 rounded-sm"
                         >
                           {copiedMessageId === message.id ? (
                             <Check className="h-3 w-3" />
                           ) : (
                             <Copy className="h-3 w-3" />
                           )}
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>

@@ -15,6 +15,13 @@ out/
 /build
 /dist
 
+# Expo / React Native
+.expo/
+.expo-shared/
+apps/mobile/dist/
+apps/mobile/android/
+apps/mobile/ios/
+
 # Misc
 .DS_Store
 *.pem

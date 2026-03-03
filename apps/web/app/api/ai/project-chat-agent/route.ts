@@ -148,6 +148,48 @@ type LLMMessage = {
   tool_call_id?: string;
 };
 
+interface ApiChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+  metadata?: AgentMessageMetadata | null;
+}
+
+async function persistChatMessage(
+  supabase: any,
+  input: {
+    projectId: string;
+    userId: string;
+    role: "user" | "assistant";
+    content: string;
+    metadata?: AgentMessageMetadata | Record<string, unknown> | null;
+  }
+): Promise<{ data: ApiChatMessage | null; error?: string }> {
+  const createdAt = new Date().toISOString();
+  const { error } = await supabase.from("ProjectAIChatMessage").insert({
+    projectId: input.projectId,
+    userId: input.userId,
+    role: input.role,
+    content: input.content,
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+  });
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+
+  return {
+    data: {
+      id: randomUUID(),
+      role: input.role,
+      content: input.content,
+      createdAt,
+      metadata: (input.metadata as AgentMessageMetadata | null) ?? null,
+    },
+  };
+}
+
 // Helper to safely extract function info from a tool call
 function getToolCallFn(tc: any): { id: string; name: string; arguments: string } {
   return {
@@ -204,12 +246,15 @@ export async function POST(request: Request) {
     }
 
     // Save user message
-    await supabase.from("ProjectAIChatMessage").insert({
+    const { error: userInsertError } = await supabase.from("ProjectAIChatMessage").insert({
       projectId,
       userId: user.id,
       role: "user",
       content: message,
     });
+    if (userInsertError) {
+      return NextResponse.json({ error: userInsertError.message }, { status: 500 });
+    }
 
     // Fetch history + context
     const [{ data: historyRows }, context] = await Promise.all([
@@ -262,16 +307,18 @@ export async function POST(request: Request) {
           assistantMsg.content?.trim() ||
           "I couldn't generate a response. Please try again.";
 
-        const { data: saved } = await supabase
-          .from("ProjectAIChatMessage")
-          .insert({
-            projectId,
-            userId: user.id,
-            role: "assistant",
-            content,
-          })
-          .select("id, role, content, createdAt, metadata")
-          .single();
+        const { data: saved, error: saveError } = await persistChatMessage(supabase, {
+          projectId,
+          userId: user.id,
+          role: "assistant",
+          content,
+        });
+        if (saveError || !saved) {
+          return NextResponse.json(
+            { error: saveError || "Failed to store assistant response" },
+            { status: 500 }
+          );
+        }
 
         await logProcessing(supabase, user.id, projectId, startTime, true);
 
@@ -356,17 +403,19 @@ export async function POST(request: Request) {
         assistantMsg.content ||
         `I'd like to perform ${actions.length} action(s). Please review and approve.`;
 
-      const { data: saved } = await supabase
-        .from("ProjectAIChatMessage")
-        .insert({
-          projectId,
-          userId: user.id,
-          role: "assistant",
-          content: confirmContent,
-          metadata,
-        })
-        .select("id, role, content, createdAt, metadata")
-        .single();
+      const { data: saved, error: saveError } = await persistChatMessage(supabase, {
+        projectId,
+        userId: user.id,
+        role: "assistant",
+        content: confirmContent,
+        metadata,
+      });
+      if (saveError || !saved) {
+        return NextResponse.json(
+          { error: saveError || "Failed to store confirmation request" },
+          { status: 500 }
+        );
+      }
 
       await logProcessing(supabase, user.id, projectId, startTime, true);
 
@@ -379,11 +428,20 @@ export async function POST(request: Request) {
 
     // Max iterations reached
     const fallbackContent = "I ran into the tool call limit. Could you break your request into smaller steps?";
-    const { data: saved } = await supabase
-      .from("ProjectAIChatMessage")
-      .insert({ projectId, userId: user.id, role: "assistant", content: fallbackContent })
-      .select("id, role, content, createdAt, metadata")
-      .single();
+    const { data: saved, error: saveError } = await persistChatMessage(supabase, {
+      projectId,
+      userId: user.id,
+      role: "assistant",
+      content: fallbackContent,
+    });
+    if (saveError || !saved) {
+      return NextResponse.json(
+        { error: saveError || "Failed to store fallback response" },
+        { status: 500 }
+      );
+    }
+
+    await logProcessing(supabase, user.id, projectId, startTime, true);
 
     return NextResponse.json({ data: saved });
   } catch (error) {
@@ -437,17 +495,19 @@ async function handleConfirmation(
   if (approved !== true) {
     // User declined (or approved was not explicitly true)
     const declineContent = "Understood, I won't make those changes. What would you like to do instead?";
-    const { data: saved } = await supabase
-      .from("ProjectAIChatMessage")
-      .insert({
-        projectId,
-        userId: toolCtx.userId,
-        role: "assistant",
-        content: declineContent,
-        metadata: { type: "confirmation_declined", confirmationId },
-      })
-      .select("id, role, content, createdAt, metadata")
-      .single();
+    const { data: saved, error: saveError } = await persistChatMessage(supabase, {
+      projectId: projectId!,
+      userId: toolCtx.userId,
+      role: "assistant",
+      content: declineContent,
+      metadata: { type: "confirmation_declined", confirmationId },
+    });
+    if (saveError || !saved) {
+      return NextResponse.json(
+        { error: saveError || "Failed to store declined confirmation response" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ data: saved });
   }
@@ -501,17 +561,19 @@ async function handleConfirmation(
     results,
   };
 
-  const { data: saved } = await supabase
-    .from("ProjectAIChatMessage")
-    .insert({
-      projectId,
-      userId: toolCtx.userId,
-      role: "assistant",
-      content: summaryResponse,
-      metadata: resultMeta,
-    })
-    .select("id, role, content, createdAt, metadata")
-    .single();
+  const { data: saved, error: saveError } = await persistChatMessage(supabase, {
+    projectId: projectId!,
+    userId: toolCtx.userId,
+    role: "assistant",
+    content: summaryResponse,
+    metadata: resultMeta,
+  });
+  if (saveError || !saved) {
+    return NextResponse.json(
+      { error: saveError || "Failed to store tool execution summary" },
+      { status: 500 }
+    );
+  }
 
   await logProcessing(supabase, toolCtx.userId, projectId, startTime, true);
 
