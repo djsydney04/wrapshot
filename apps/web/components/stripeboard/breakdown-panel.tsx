@@ -127,11 +127,11 @@ export function BreakdownPanel({
     <div className={cn("space-y-4", expanded ? "grid grid-cols-2 gap-6 space-y-0" : "")}>
       {/* Left column (or full width when compact) */}
       <div className="space-y-4">
-        {/* Set Name */}
+        {/* Scene Heading */}
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-1 block">
             <MapPin className="h-3 w-3 inline mr-1" />
-            Set Name
+            Scene Heading
           </label>
           <Input
             value={editedScene.setName || scene.location?.name || ""}

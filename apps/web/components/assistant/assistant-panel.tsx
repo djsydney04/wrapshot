@@ -22,16 +22,19 @@ export function AssistantPanel() {
         open={panelOpen}
         onOpenChange={(open) => !open && closePanel()}
         side="right"
-        className="w-[400px]"
+        className="w-[420px] max-w-[95vw] border-l border-border/80 bg-card/95"
       >
-        <SlidePanelHeader onClose={closePanel}>
-          <SlidePanelTitle>Wrapshot Assistant</SlidePanelTitle>
+        <SlidePanelHeader
+          onClose={closePanel}
+          className="border-border/80 bg-muted/25 px-4 py-3.5"
+        >
+          <SlidePanelTitle>Project Agent</SlidePanelTitle>
           <SlidePanelDescription>
-            Open a project to use the assistant.
+            Open a project to use context-aware actions.
           </SlidePanelDescription>
         </SlidePanelHeader>
         <div className="flex flex-1 items-center justify-center p-6 text-center">
-          <p className="text-sm text-muted-foreground">
+          <p className="max-w-[250px] text-sm text-muted-foreground">
             Navigate to a project to start chatting with the assistant.
           </p>
         </div>
@@ -44,21 +47,21 @@ export function AssistantPanel() {
       open={panelOpen}
       onOpenChange={(open) => !open && closePanel()}
       side="right"
-      className="w-[400px]"
+      className="w-[420px] max-w-[95vw] border-l border-border/80 bg-card/95"
     >
-      <SlidePanelHeader onClose={closePanel}>
+      <SlidePanelHeader
+        onClose={closePanel}
+        className="border-border/80 bg-muted/25 px-4 py-3.5"
+      >
         <div className="flex items-center gap-2">
-          <SlidePanelTitle>Assistant</SlidePanelTitle>
-          <AIIndicator variant="pill" size="sm" label="Agent" />
+          <SlidePanelTitle>Project Agent</SlidePanelTitle>
+          <AIIndicator variant="pill" size="sm" label="Live" />
         </div>
         <SlidePanelDescription>
-          Read, create, and modify project data.
+          Ask, plan, and execute project tasks.
         </SlidePanelDescription>
       </SlidePanelHeader>
-      <AssistantChatCore
-        projectId={activeProjectId}
-        compact
-      />
+      <AssistantChatCore projectId={activeProjectId} compact />
     </SlidePanel>
   );
 }

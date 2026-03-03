@@ -463,11 +463,12 @@ export function BudgetSection({ projectId }: BudgetSectionProps) {
         <div className="grid gap-4 lg:grid-cols-[340px,1fr]">
           <div className="space-y-3">
             {budgets.map((budget) => {
-              const percentSpent =
+              const percentReserved =
                 budget.totalEstimated > 0
-                  ? (budget.totalActual / budget.totalEstimated) * 100
+                  ? ((budget.totalActual + budget.totalCommitted) / budget.totalEstimated) * 100
                   : 0;
-              const remaining = budget.totalEstimated - budget.totalActual;
+              const remaining =
+                budget.totalEstimated - budget.totalActual - budget.totalCommitted;
               const isSelected = budget.id === selectedBudgetId;
 
               return (
@@ -498,15 +499,21 @@ export function BudgetSection({ projectId }: BudgetSectionProps) {
                     </Badge>
                   </div>
 
-                  <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                  <div className="mt-3 grid grid-cols-4 gap-2 text-xs">
                     <div>
                       <p className="text-muted-foreground">Budget</p>
                       <p className="font-medium">{formatCurrency(budget.totalEstimated)}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Spent</p>
-                      <p className={cn("font-medium", getHealthColor(percentSpent))}>
+                      <p className={cn("font-medium", getHealthColor(percentReserved))}>
                         {formatCurrency(budget.totalActual)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Committed</p>
+                      <p className={cn("font-medium", getHealthColor(percentReserved))}>
+                        {formatCurrency(budget.totalCommitted)}
                       </p>
                     </div>
                     <div>

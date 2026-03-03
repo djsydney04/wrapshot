@@ -10,6 +10,7 @@ export interface HeuristicScene {
   characters: string[];
   scriptPageStart: number;
   scriptPageEnd: number;
+  sourceText?: string;
 }
 
 export interface HeuristicSceneOptions {
@@ -39,6 +40,29 @@ const TIME_OF_DAY_ALIASES: Record<string, string> = {
   'MOMENTS LATER': 'CONTINUOUS',
   'SAME TIME': 'CONTINUOUS',
 };
+
+const SCENE_HEADER_NOISE = new Set([
+  'INT',
+  'EXT',
+  'INT/EXT',
+  'EXT/INT',
+  'I/E',
+  'DAY',
+  'NIGHT',
+  'MORNING',
+  'AFTERNOON',
+  'EVENING',
+  'DAWN',
+  'DUSK',
+  'CONTINUOUS',
+  'CUT TO',
+  'FADE IN',
+  'FADE OUT',
+  'ANGLE ON',
+  'CLOSE ON',
+  'WIDE ON',
+  'MONTAGE',
+]);
 
 export function extractHeuristicScenesFromChunkText(
   chunkText: string,
@@ -91,6 +115,7 @@ export function extractHeuristicScenesFromChunkText(
     const header = headers[i];
     const nextOffset = headers[i + 1]?.offset ?? text.length;
     const sceneCharLength = Math.max(1, nextOffset - header.offset);
+    const sceneText = text.slice(header.offset, nextOffset).trim();
 
     const startPageEstimate = chunkStartPage + (header.offset / chunkLength) * chunkPageSpan;
     const durationPages = Math.max(1 / 8, sceneCharLength / HEURISTIC_CHARS_PER_PAGE);
@@ -116,10 +141,11 @@ export function extractHeuristicScenesFromChunkText(
       setName: header.setName,
       timeOfDay: header.timeOfDay,
       pageLengthEighths,
-      synopsis: 'Auto-detected from scene heading.',
-      characters: [],
+      synopsis: '',
+      characters: extractCharacterCuesFromSceneText(sceneText),
       scriptPageStart,
       scriptPageEnd,
+      sourceText: sceneText,
     });
   }
 
@@ -229,4 +255,48 @@ function parseSceneNumber(sceneNumber: string): number {
     return parseInt(match[1], 10);
   }
   return 0;
+}
+
+export function extractCharacterCuesFromSceneText(sceneText: string): string[] {
+  if (!sceneText) {
+    return [];
+  }
+
+  const names = new Set<string>();
+  const lines = sceneText.split('\n');
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (isLikelySceneHeaderLine(trimmed)) continue;
+
+    // Dialogue-style character cues: uppercase short lines like "JANE", "JANE (V.O.)"
+    if (/^[A-Z0-9 .'\-()]{2,50}$/.test(trimmed) && trimmed === trimmed.toUpperCase()) {
+      const normalized = trimmed
+        .replace(/\s*\(.*?\)\s*/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      if (normalized && !SCENE_HEADER_NOISE.has(normalized) && wordCount(normalized) <= 4) {
+        names.add(normalized);
+      }
+      continue;
+    }
+
+    // Action-line mentions in caps ("JOHN grabs the gun")
+    const capPhrases = trimmed.match(/\b[A-Z]{2,}(?:\s+[A-Z]{2,}){0,2}\b/g) || [];
+    for (const phrase of capPhrases) {
+      const candidate = phrase.trim();
+      if (!candidate) continue;
+      if (SCENE_HEADER_NOISE.has(candidate)) continue;
+      if (wordCount(candidate) > 3) continue;
+      names.add(candidate);
+    }
+  }
+
+  return Array.from(names).slice(0, 12);
+}
+
+function wordCount(value: string): number {
+  return value.split(/\s+/).filter(Boolean).length;
 }

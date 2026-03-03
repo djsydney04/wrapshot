@@ -69,12 +69,7 @@ Important:
 - Return ONLY valid JSON, no other text`;
 
 interface ElementExtractionResponse {
-  elements: Array<{
-    category: string;
-    name: string;
-    description?: string;
-    sceneNumbers: string[];
-  }>;
+  elements: unknown[];
 }
 
 // Valid element categories
@@ -150,54 +145,34 @@ export async function executeElementExtractor(
 
       if (!parseResult.success) {
         console.error(`[ElementExtractor] Failed to parse response for batch ${processedBatches}:`, parseResult.error);
+        mergeElements(
+          allElements,
+          extractHeuristicElementsFromBatch(batch)
+        );
         processedBatches++;
         continue;
       }
 
       // Normalize and add elements
-      for (const element of parseResult.data.elements) {
-        // Skip elements with missing required fields
-        if (!element.name || typeof element.name !== 'string') continue;
-        if (!element.category || typeof element.category !== 'string') continue;
+      const normalizedElements = parseResult.data.elements
+        .map((candidate) => normalizeElementCandidate(candidate))
+        .filter((element): element is ExtractedElement => element !== null);
 
-        const normalizedCategory = normalizeCategory(element.category);
-        if (!normalizedCategory) {
-          continue;
-        }
+      mergeElements(allElements, normalizedElements);
 
-        const normalizedElement: ExtractedElement = {
-          category: normalizedCategory,
-          name: element.name.trim(),
-          description: element.description?.trim(),
-          sceneNumbers: Array.isArray(element.sceneNumbers)
-            ? element.sceneNumbers.map(s => String(s).trim()).filter(Boolean)
-            : [],
-        };
-
-        // Check for duplicates
-        const existing = allElements.find(
-          e => e.category === normalizedElement.category &&
-               e.name.toLowerCase() === normalizedElement.name.toLowerCase()
-        );
-
-        if (existing) {
-          // Merge scene numbers
-          const allSceneNumbers = new Set([...existing.sceneNumbers, ...normalizedElement.sceneNumbers]);
-          existing.sceneNumbers = Array.from(allSceneNumbers).sort((a, b) => {
-            const aNum = parseInt(a) || 0;
-            const bNum = parseInt(b) || 0;
-            return aNum - bNum;
-          });
-        } else {
-          allElements.push(normalizedElement);
-        }
+      if (normalizedElements.length === 0) {
+        mergeElements(allElements, extractHeuristicElementsFromBatch(batch));
       }
 
-      console.log(`[ElementExtractor] Extracted ${parseResult.data.elements.length} elements from batch ${processedBatches + 1}`);
+      console.log(`[ElementExtractor] Extracted ${normalizedElements.length} elements from batch ${processedBatches + 1}`);
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[ElementExtractor] Error processing batch ${processedBatches}:`, errorMessage);
+      mergeElements(
+        allElements,
+        extractHeuristicElementsFromBatch(batch)
+      );
       // Continue with other batches
     }
 
@@ -242,7 +217,10 @@ function formatScenesForPrompt(scenes: ExtractedScene[]): string {
     const header = `SCENE ${scene.sceneNumber} - ${scene.intExt}. ${scene.setName} - ${scene.timeOfDay}`;
     const chars = scene.characters.length > 0 ? `Characters: ${scene.characters.join(', ')}` : '';
     const synopsis = scene.synopsis || '';
-    return `${header}\n${chars}\n${synopsis}`;
+    const sourceText = scene.sourceText
+      ? `Scene text:\n${scene.sourceText.slice(0, 1400)}`
+      : '';
+    return `${header}\n${chars}\n${synopsis}\n${sourceText}`.trim();
   }).join('\n\n---\n\n');
 }
 
@@ -288,6 +266,150 @@ function normalizeCategory(category: string): ElementCategory | null {
 
   // Default to OTHER for unrecognized
   return 'OTHER';
+}
+
+function normalizeElementCandidate(candidate: unknown): ExtractedElement | null {
+  if (!candidate || typeof candidate !== 'object') {
+    return null;
+  }
+
+  const record = candidate as Record<string, unknown>;
+  const category = String(record.category || record.type || '').trim();
+  const name = String(record.name || record.element || '').trim();
+  if (!category || !name) {
+    return null;
+  }
+
+  const normalizedCategory = normalizeCategory(category);
+  if (!normalizedCategory) {
+    return null;
+  }
+
+  const sceneNumbersValue = record.sceneNumbers ?? record.scene_numbers ?? record.scenes;
+  const sceneNumbers = Array.isArray(sceneNumbersValue)
+    ? sceneNumbersValue.map((value) => String(value || '').trim()).filter(Boolean)
+    : [];
+
+  return {
+    category: normalizedCategory,
+    name,
+    description: String(record.description || record.notes || '').trim() || undefined,
+    sceneNumbers,
+  };
+}
+
+function mergeElements(target: ExtractedElement[], source: ExtractedElement[]): void {
+  for (const element of source) {
+    const existing = target.find(
+      (entry) =>
+        entry.category === element.category &&
+        entry.name.toLowerCase() === element.name.toLowerCase()
+    );
+
+    if (!existing) {
+      target.push(element);
+      continue;
+    }
+
+    const mergedScenes = new Set([...existing.sceneNumbers, ...element.sceneNumbers]);
+    existing.sceneNumbers = Array.from(mergedScenes).sort((a, b) => {
+      const aNum = parseInt(a, 10) || 0;
+      const bNum = parseInt(b, 10) || 0;
+      return aNum - bNum;
+    });
+
+    if (!existing.description && element.description) {
+      existing.description = element.description;
+    }
+  }
+}
+
+function extractHeuristicElementsFromBatch(batch: ExtractedScene[]): ExtractedElement[] {
+  const extracted: ExtractedElement[] = [];
+
+  for (const scene of batch) {
+    const text = `${scene.synopsis || ''}\n${scene.sourceText || ''}`.toLowerCase();
+    if (!text.trim()) continue;
+
+    addElementIfMatch(extracted, text, {
+      category: 'VEHICLE',
+      name: 'Vehicle',
+      sceneNumber: scene.sceneNumber,
+      patterns: [/\bcar\b/, /\btruck\b/, /\bvan\b/, /\bmotorcycle\b/, /\btaxi\b/],
+    });
+
+    addElementIfMatch(extracted, text, {
+      category: 'ANIMAL',
+      name: 'Animal',
+      sceneNumber: scene.sceneNumber,
+      patterns: [/\bdog\b/, /\bcat\b/, /\bhorse\b/, /\bbird\b/],
+    });
+
+    addElementIfMatch(extracted, text, {
+      category: 'SFX',
+      name: 'Practical effects',
+      sceneNumber: scene.sceneNumber,
+      patterns: [/\bexplosion\b/, /\bfire\b/, /\bsmoke\b/, /\brain\b/, /\bfog\b/],
+    });
+
+    addElementIfMatch(extracted, text, {
+      category: 'STUNT',
+      name: 'Stunt action',
+      sceneNumber: scene.sceneNumber,
+      patterns: [/\bfight\b/, /\bchase\b/, /\bstunt\b/, /\bfall\b/],
+    });
+
+    addElementIfMatch(extracted, text, {
+      category: 'BACKGROUND',
+      name: 'Background performers',
+      sceneNumber: scene.sceneNumber,
+      patterns: [/\bextras?\b/, /\bcrowd\b/, /\bbackground\b/],
+    });
+
+    addElementIfMatch(extracted, text, {
+      category: 'PROP',
+      name: 'Hand props',
+      sceneNumber: scene.sceneNumber,
+      patterns: [/\bgun\b/, /\bphone\b/, /\bletter\b/, /\bglass\b/, /\bkey\b/, /\bbook\b/],
+    });
+  }
+
+  return extracted;
+}
+
+function addElementIfMatch(
+  elements: ExtractedElement[],
+  text: string,
+  config: {
+    category: ElementCategory;
+    name: string;
+    sceneNumber: string;
+    patterns: RegExp[];
+  }
+): void {
+  const hasMatch = config.patterns.some((pattern) => pattern.test(text));
+  if (!hasMatch) {
+    return;
+  }
+
+  const existing = elements.find(
+    (element) =>
+      element.category === config.category &&
+      element.name.toLowerCase() === config.name.toLowerCase()
+  );
+
+  if (!existing) {
+    elements.push({
+      category: config.category,
+      name: config.name,
+      sceneNumbers: [config.sceneNumber],
+    });
+    return;
+  }
+
+  if (!existing.sceneNumbers.includes(config.sceneNumber)) {
+    existing.sceneNumbers.push(config.sceneNumber);
+  }
 }
 
 function categoryCounts(elements: ExtractedElement[]): Record<string, number> {

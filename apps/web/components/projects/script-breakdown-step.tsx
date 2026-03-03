@@ -3,11 +3,9 @@
 import * as React from "react";
 import { Loader2, FileText, Lightbulb, Check, AlertCircle, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BreakdownPreviewModal } from "./breakdown-preview-modal";
 import { AgentProgressCard } from "@/components/agents/agent-progress-card";
 import { useAgentJob, useStartAgentJob } from "@/lib/hooks/use-agent-job";
 import { useAgentProgressToast } from "@/lib/hooks/use-agent-progress-toast";
-import type { ExtractedScene, BreakdownResult } from "@/lib/actions/script-breakdown";
 import type { AgentJobResult } from "@/lib/agents/types";
 
 interface ScriptBreakdownStepProps {
@@ -30,10 +28,7 @@ export function ScriptBreakdownStep({
   onSkip,
 }: ScriptBreakdownStepProps) {
   const [state, setState] = React.useState<BreakdownState>("idle");
-  const [breakdownResult, setBreakdownResult] = React.useState<BreakdownResult | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [scenesToImport, setScenesToImport] = React.useState<ExtractedScene[]>([]);
-  const [useAdvancedAgent, setUseAdvancedAgent] = React.useState(true);
   const [activeJobId, setActiveJobId] = React.useState<string | null>(null);
 
   const { startJob, loading: startingJob } = useStartAgentJob();
@@ -87,78 +82,6 @@ export function ScriptBreakdownStep({
     }
   };
 
-  const handleAnalyzeLegacy = async () => {
-    if (!scriptId || !scriptUrl) {
-      setError("No script available to analyze");
-      return;
-    }
-
-    setState("analyzing");
-    setError(null);
-
-    try {
-      const response = await fetch("/api/scripts/breakdown", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scriptId, fileUrl: scriptUrl, fileName: scriptName }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Breakdown failed");
-      }
-
-      const result = await response.json();
-      setBreakdownResult(result.data);
-      setScenesToImport(result.data.scenes);
-      setState("preview");
-    } catch (err) {
-      console.error("Breakdown error:", err);
-      setError(err instanceof Error ? err.message : "Failed to analyze script");
-      setState("error");
-    }
-  };
-
-  const handleAnalyze = () => {
-    if (useAdvancedAgent) {
-      handleAnalyzeWithAgent();
-    } else {
-      handleAnalyzeLegacy();
-    }
-  };
-
-  const handleImport = async () => {
-    if (!breakdownResult || scenesToImport.length === 0) return;
-
-    setState("importing");
-
-    try {
-      const { importBreakdownScenes } = await import("@/lib/actions/script-breakdown");
-      const result = await importBreakdownScenes(projectId, scriptId!, scenesToImport);
-
-      if (!result.success) {
-        throw new Error(result.error || "Import failed");
-      }
-
-      setState("complete");
-      onComplete(result.scenesCreated ?? 0);
-    } catch (err) {
-      console.error("Import error:", err);
-      setError(err instanceof Error ? err.message : "Failed to import scenes");
-      setState("error");
-    }
-  };
-
-  const handleRemoveScene = (index: number) => {
-    setScenesToImport((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleEditScene = (index: number, updates: Partial<ExtractedScene>) => {
-    setScenesToImport((prev) =>
-      prev.map((scene, i) => (i === index ? { ...scene, ...updates } : scene))
-    );
-  };
-
   const handleRetry = () => {
     setActiveJobId(null);
     setState("idle");
@@ -206,30 +129,19 @@ export function ScriptBreakdownStep({
           </div>
         </div>
 
-        {/* Analysis mode toggle */}
         <div className="mb-4 p-3 rounded-lg bg-muted/50">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={useAdvancedAgent}
-              onChange={(e) => setUseAdvancedAgent(e.target.checked)}
-              className="rounded border-gray-300 text-primary focus:ring-primary"
-            />
-            <div className="flex items-center gap-1.5">
-              <Zap className="h-4 w-4 text-amber-500" />
-              <span className="text-sm font-medium">Use Advanced Agent</span>
-            </div>
-          </label>
-          <p className="text-xs text-muted-foreground ml-6 mt-1">
-            {useAdvancedAgent
-              ? "Extracts scenes, elements, cast, synopses, and time estimates. Handles large scripts better."
-              : "Basic scene extraction only. Faster but less comprehensive."}
+          <div className="flex items-center gap-1.5">
+            <Zap className="h-4 w-4 text-amber-500" />
+            <span className="text-sm font-medium">Advanced Agent Enabled</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Extracts scenes, elements, cast, synopses, and time estimates with guardrails.
           </p>
         </div>
 
         <div className="space-y-2">
           <Button
-            onClick={handleAnalyze}
+            onClick={handleAnalyzeWithAgent}
             className="w-full"
             disabled={startingJob}
           >
@@ -266,57 +178,11 @@ export function ScriptBreakdownStep({
     );
   }
 
-  // Legacy analyzing state
-  if (state === "analyzing") {
-    return (
-      <div className="py-8 text-center">
-        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-          <Loader2 className="h-8 w-8 text-primary animate-spin" />
-        </div>
-        <h2 className="text-xl font-semibold mb-2">Analyzing Script...</h2>
-        <p className="text-muted-foreground max-w-md mx-auto">
-          Wrapshot Intelligence is reading through your script to identify scenes,
-          characters, and production elements. This may take a minute.
-        </p>
-      </div>
-    );
-  }
-
-  // Preview state
-  if (state === "preview" && breakdownResult) {
-    return (
-      <BreakdownPreviewModal
-        result={breakdownResult}
-        scenes={scenesToImport}
-        onRemoveScene={handleRemoveScene}
-        onEditScene={handleEditScene}
-        onImport={handleImport}
-        onCancel={onSkip}
-        isImporting={false}
-      />
-    );
-  }
-
-  // Importing state
-  if (state === "importing") {
-    return (
-      <div className="py-8 text-center">
-        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-          <Loader2 className="h-8 w-8 text-primary animate-spin" />
-        </div>
-        <h2 className="text-xl font-semibold mb-2">Importing Scenes...</h2>
-        <p className="text-muted-foreground max-w-md mx-auto">
-          Creating scenes and linking characters to your project.
-        </p>
-      </div>
-    );
-  }
-
   // Complete state
   if (state === "complete") {
     const scenesCount = job?.result
       ? (job.result as AgentJobResult).scenesCreated
-      : scenesToImport.length;
+      : 0;
 
     return (
       <div className="py-8 text-center">
