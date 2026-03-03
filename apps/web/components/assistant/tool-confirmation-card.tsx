@@ -1,7 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, Check, X, Clapperboard, MapPin, Users, Calendar, Package, UserPlus } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  X,
+  Clapperboard,
+  MapPin,
+  Users,
+  Calendar,
+  Package,
+  UserPlus,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { PlannedAction } from "@/lib/ai/tools/types";
@@ -41,7 +51,7 @@ export function ToolConfirmationCard({
         "rounded-xl border px-3 py-3 text-sm",
         hasDestructive
           ? "border-destructive/30 bg-destructive/5"
-          : "border-amber-500/30 bg-amber-500/5"
+          : "border-amber-500/30 bg-amber-500/5",
       )}
     >
       <div className="flex items-center gap-2 text-xs font-medium">
@@ -50,7 +60,13 @@ export function ToolConfirmationCard({
         ) : (
           <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
         )}
-        <span className={hasDestructive ? "text-destructive" : "text-amber-600 dark:text-amber-400"}>
+        <span
+          className={
+            hasDestructive
+              ? "text-destructive"
+              : "text-amber-600 dark:text-amber-400"
+          }
+        >
           {actions.length} planned action{actions.length !== 1 ? "s" : ""}
         </span>
       </div>
@@ -65,7 +81,7 @@ export function ToolConfirmationCard({
                 "flex items-start gap-2 rounded-lg border px-2.5 py-1.5 text-xs",
                 action.tier === "destructive"
                   ? "border-destructive/20 bg-destructive/5"
-                  : "border-border bg-background/60"
+                  : "border-border bg-background/60",
               )}
             >
               <Icon className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
@@ -93,8 +109,8 @@ export function ToolConfirmationCard({
         <div className="mt-3 flex items-center gap-2">
           <Button
             size="sm"
-            variant={hasDestructive ? "destructive" : "default"}
-            className="h-7 gap-1 text-xs"
+            variant={hasDestructive ? "destructive" : "secondary"}
+            className="h-7 gap-1.5 px-2.5 text-xs shadow-none"
             onClick={() => onApprove(confirmationId)}
             disabled={disabled}
           >
