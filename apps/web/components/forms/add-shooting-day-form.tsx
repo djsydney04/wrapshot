@@ -74,12 +74,17 @@ export function AddShootingDayForm({
   );
 
   // In production mode, use props; in mock mode, use the store
-  const existingDays = useMockData
-    ? getShootingDaysForProject(projectId)
-    : (existingShootingDays || []);
-  const scenes = useMockData
-    ? getScenesForProject(projectId)
-    : (availableScenes || []);
+  const existingDays = React.useMemo(
+    () =>
+      useMockData
+        ? getShootingDaysForProject(projectId)
+        : (existingShootingDays ?? []),
+    [useMockData, getShootingDaysForProject, projectId, existingShootingDays]
+  );
+  const scenes = React.useMemo(
+    () => (useMockData ? getScenesForProject(projectId) : (availableScenes ?? [])),
+    [useMockData, getScenesForProject, projectId, availableScenes]
+  );
 
   const isEditMode = !!editingDay;
 

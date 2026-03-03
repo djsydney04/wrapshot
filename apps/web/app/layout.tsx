@@ -1,27 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { JetBrains_Mono, Manrope, Space_Grotesk } from "next/font/google";
+import type { CSSProperties } from "react";
 import "./globals.css";
 import { CommandPalette } from "@/components/command-palette";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
 import { Toaster } from "sonner";
 
-const manrope = Manrope({
-  subsets: ["latin"],
-  variable: "--font-manrope",
-  display: "swap",
-});
-
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-space-grotesk",
-  display: "swap",
-});
-
-const jetBrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-jetbrains-mono",
-  display: "swap",
-});
+const localFontVariables = {
+  "--font-manrope": "\"Avenir Next\", \"Segoe UI\", system-ui, sans-serif",
+  "--font-space-grotesk": "\"Trebuchet MS\", \"Avenir Next\", \"Segoe UI\", sans-serif",
+  "--font-jetbrains-mono":
+    "\"SFMono-Regular\", Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace",
+} as CSSProperties;
 
 export const metadata: Metadata = {
   title: {
@@ -76,9 +65,7 @@ export default function RootLayout({
 
   return (
     <html lang="en">
-      <body
-        className={`${manrope.variable} ${spaceGrotesk.variable} ${jetBrainsMono.variable} font-sans antialiased`}
-      >
+      <body style={localFontVariables} className="font-sans antialiased">
         <PostHogProvider posthogKey={posthogKey} posthogHost={posthogHost}>
           {children}
           <CommandPalette />
