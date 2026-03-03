@@ -64,6 +64,13 @@ export async function updateSession(request: NextRequest) {
 
   // Pass pathname to layout for route-specific logic
   supabaseResponse.headers.set('x-pathname', request.nextUrl.pathname);
+  supabaseResponse.headers.set('X-Content-Type-Options', 'nosniff');
+  supabaseResponse.headers.set('X-Frame-Options', 'DENY');
+  supabaseResponse.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  supabaseResponse.headers.set(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), interest-cohort=()'
+  );
 
   return supabaseResponse;
 }

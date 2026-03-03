@@ -14,6 +14,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { ScriptAnalysisAgent } from '@/lib/agents/script-analysis';
 import { JobManager } from '@/lib/agents/orchestrator/job-manager';
 import { getScriptAnalysisApiKey } from '@/lib/ai/config';
+import { isTrustedSupabaseStorageUrl } from '@/lib/security/script-url';
 import type { AgentJobType, StartAgentJobRequest, StartAgentJobResponse } from '@/lib/agents/types';
 
 const SCRIPT_SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
@@ -58,6 +59,10 @@ async function probeScriptUrl(url: string): Promise<ScriptUrlProbeResult> {
 }
 
 function extractStorageObjectPath(fileUrl: string): { bucket: string; objectPath: string } | null {
+  if (!isTrustedSupabaseStorageUrl(fileUrl)) {
+    return null;
+  }
+
   try {
     const parsed = new URL(fileUrl);
     const marker = '/storage/v1/object/';
@@ -191,6 +196,13 @@ export async function POST(request: Request) {
     if (!script.fileUrl) {
       return NextResponse.json(
         { error: 'Script file URL is missing' },
+        { status: 400 }
+      );
+    }
+
+    if (!isTrustedSupabaseStorageUrl(script.fileUrl)) {
+      return NextResponse.json(
+        { error: 'Script file URL is not from trusted storage' },
         { status: 400 }
       );
     }

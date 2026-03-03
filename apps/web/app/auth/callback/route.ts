@@ -2,6 +2,56 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+function normalizeRedirectPath(next: string | null): string {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) {
+    return "/";
+  }
+
+  return next;
+}
+
+function getConfiguredAppHost(): string | null {
+  const configuredUrls = [
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.NEXT_PUBLIC_SITE_URL,
+  ];
+
+  for (const candidate of configuredUrls) {
+    if (!candidate) {
+      continue;
+    }
+
+    try {
+      return new URL(candidate).host.toLowerCase();
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
+function getTrustedRedirectOrigin(request: Request, fallbackOrigin: string): string {
+  if (process.env.NODE_ENV === "development") {
+    return fallbackOrigin;
+  }
+
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  if (!forwardedHost) {
+    return fallbackOrigin;
+  }
+
+  const fallbackHost = new URL(fallbackOrigin).host.toLowerCase();
+  const expectedHost = getConfiguredAppHost() || fallbackHost;
+  if (forwardedHost.toLowerCase() !== expectedHost) {
+    console.warn("Ignoring untrusted x-forwarded-host in auth callback redirect");
+    return fallbackOrigin;
+  }
+
+  const forwardedProto = request.headers.get("x-forwarded-proto") || "https";
+  return `${forwardedProto}://${forwardedHost}`;
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
@@ -16,7 +66,8 @@ export async function GET(request: Request) {
         data: { user },
       } = await supabase.auth.getUser();
 
-      let redirectTo = next ?? "/";
+      const requestedRedirect = normalizeRedirectPath(next);
+      let redirectTo = requestedRedirect;
 
       if (user) {
         const normalizedEmail = user.email?.toLowerCase();
@@ -62,7 +113,7 @@ export async function GET(request: Request) {
         // Check if this user came from a project invite (metadata from invite email)
         const inviteToken = user.user_metadata?.invite_token;
 
-        if (redirectTo === (next ?? "/") && inviteToken) {
+        if (redirectTo === requestedRedirect && inviteToken) {
           // Check if there's a valid pending invite for this token
           const { data: invite } = await supabase
             .from("ProjectInvite")
@@ -78,7 +129,7 @@ export async function GET(request: Request) {
         }
 
         // If no invite redirect, check for pending cast/crew invites by email
-        if (redirectTo === (next ?? "/") && user.email) {
+        if (redirectTo === requestedRedirect && user.email) {
           const { data: pendingCastCrewInvite } = await supabase
             .from("CastCrewInvite")
             .select("token")
@@ -95,7 +146,7 @@ export async function GET(request: Request) {
         }
 
         // If no invite redirect, check for pending project invites by email
-        if (redirectTo === (next ?? "/") && user.email) {
+        if (redirectTo === requestedRedirect && user.email) {
           const { data: pendingInvite } = await supabase
             .from("ProjectInvite")
             .select("token")
@@ -125,16 +176,8 @@ export async function GET(request: Request) {
         }
       }
 
-      const forwardedHost = request.headers.get("x-forwarded-host");
-      const isLocalEnv = process.env.NODE_ENV === "development";
-
-      if (isLocalEnv) {
-        return NextResponse.redirect(`${origin}${redirectTo}`);
-      } else if (forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${redirectTo}`);
-      } else {
-        return NextResponse.redirect(`${origin}${redirectTo}`);
-      }
+      const redirectOrigin = getTrustedRedirectOrigin(request, origin);
+      return NextResponse.redirect(`${redirectOrigin}${redirectTo}`);
     }
   }
 
