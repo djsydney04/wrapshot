@@ -123,7 +123,7 @@ export async function inviteCastMember(
   const normalizedEmail = castMember.email.trim().toLowerCase();
 
   // Check if user already exists on the platform
-  const userCheck = await checkUserExistsByEmail(normalizedEmail);
+  const userCheck = await checkUserExistsByEmail(normalizedEmail, projectId);
 
   if (userCheck.exists && userCheck.userId) {
     // User exists - link them immediately
@@ -281,7 +281,7 @@ export async function inviteCrewMember(
   const normalizedEmail = crewMember.email.trim().toLowerCase();
 
   // Check if user already exists on the platform
-  const userCheck = await checkUserExistsByEmail(normalizedEmail);
+  const userCheck = await checkUserExistsByEmail(normalizedEmail, projectId);
 
   if (userCheck.exists && userCheck.userId) {
     // User exists - link them immediately

@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCurrentUserId } from "@/lib/permissions/server";
+import { getCurrentUserId, requireProjectPermission } from "@/lib/permissions/server";
 
 export interface UserSearchResult {
   id: string;
@@ -130,12 +130,9 @@ export async function searchUsersForInvite(
   query: string,
   projectId: string
 ): Promise<UserSearchResult[]> {
-  const supabase = await createClient();
-  const currentUserId = await getCurrentUserId();
+  await requireProjectPermission(projectId, "project:manage-team");
 
-  if (!currentUserId) {
-    throw new Error("Not authenticated");
-  }
+  const supabase = await createClient();
 
   if (!query || query.trim().length < 2) {
     return [];
@@ -268,7 +265,7 @@ export async function searchUsersAndCheckEmail(
   }
 
   // Email wasn't in search results, check if user exists but is already a member
-  const userCheck = await checkUserExistsByEmail(normalizedEmail);
+  const userCheck = await checkUserExistsByEmail(normalizedEmail, projectId);
 
   if (userCheck.exists && userCheck.profile) {
     return {
@@ -283,13 +280,10 @@ export async function searchUsersAndCheckEmail(
 
 // Check if a user exists by email in the auth system
 export async function checkUserExistsByEmail(
-  email: string
+  email: string,
+  projectId: string
 ): Promise<{ exists: boolean; userId?: string; profile?: UserSearchResult }> {
-  const currentUserId = await getCurrentUserId();
-
-  if (!currentUserId) {
-    throw new Error("Not authenticated");
-  }
+  await requireProjectPermission(projectId, "project:manage-team");
 
   const normalizedEmail = email.trim().toLowerCase();
 
