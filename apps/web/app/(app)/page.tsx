@@ -32,7 +32,6 @@ import { useAuth } from "@/components/providers/auth-provider";
 export default function ProjectsDashboard() {
   const router = useRouter();
   const { user } = useAuth();
-  const isMountedRef = React.useRef(true);
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [pendingProjectInvites, setPendingProjectInvites] = React.useState<
     Awaited<ReturnType<typeof getMyPendingProjectInvites>>
@@ -41,53 +40,44 @@ export default function ProjectsDashboard() {
     Awaited<ReturnType<typeof getMyPendingCastCrewInvites>>
   >([]);
   const [loading, setLoading] = React.useState(true);
-  const [isReloading, setIsReloading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  const loadProjectsData = React.useCallback(async (mode: "initial" | "reload") => {
-    if (mode === "initial") {
-      setLoading(true);
-    } else {
-      setIsReloading(true);
+  React.useEffect(() => {
+    async function loadProjects() {
+      try {
+        const [projectData, projectInviteData, castCrewInviteData] = await Promise.all([
+          getProjects(),
+          getMyPendingProjectInvites(),
+          getMyPendingCastCrewInvites(),
+        ]);
+        setProjects(projectData);
+        setPendingProjectInvites(projectInviteData);
+        setPendingCastCrewInvites(castCrewInviteData);
+      } catch (err) {
+        console.error("Error loading projects:", err);
+        setError("Failed to load projects");
+      } finally {
+        setLoading(false);
+      }
     }
-    setError(null);
 
+    loadProjects();
+  }, []);
+
+  const reloadProjects = async () => {
     try {
       const [projectData, projectInviteData, castCrewInviteData] = await Promise.all([
         getProjects(),
         getMyPendingProjectInvites(),
         getMyPendingCastCrewInvites(),
       ]);
-
-      if (!isMountedRef.current) return;
       setProjects(projectData);
       setPendingProjectInvites(projectInviteData);
       setPendingCastCrewInvites(castCrewInviteData);
     } catch (err) {
-      console.error(`Error ${mode === "initial" ? "loading" : "reloading"} projects:`, err);
-      if (!isMountedRef.current) return;
-      setError("Failed to load projects. Please try again.");
-    } finally {
-      if (!isMountedRef.current) return;
-      if (mode === "initial") {
-        setLoading(false);
-      } else {
-        setIsReloading(false);
-      }
+      console.error("Error reloading projects:", err);
     }
-  }, []);
-
-  React.useEffect(() => {
-    isMountedRef.current = true;
-    void loadProjectsData("initial");
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, [loadProjectsData]);
-
-  const reloadProjects = React.useCallback(async () => {
-    await loadProjectsData("reload");
-  }, [loadProjectsData]);
+  };
 
   const hasProjects = projects.length > 0;
   const ownedProjects = React.useMemo(
@@ -132,9 +122,7 @@ export default function ProjectsDashboard() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <div className="px-2 py-1.5">
-                <p className="max-w-[12rem] truncate text-sm font-medium">
-                  {user?.email?.split("@")[0] || "User"}
-                </p>
+                <p className="text-sm font-medium">{user?.email?.split("@")[0] || "User"}</p>
                 <p className="text-xs text-muted-foreground">{user?.email}</p>
               </div>
               <DropdownMenuSeparator />
@@ -188,28 +176,12 @@ export default function ProjectsDashboard() {
           {error && (
             <div className="rounded-lg border border-[hsl(var(--feedback-error-border))] bg-[hsl(var(--feedback-error-bg))] p-4">
               <p className="text-sm text-[hsl(var(--feedback-error-fg))]">{error}</p>
-              <Button
-                className="mt-3"
-                size="sm"
-                variant="outline"
-                onClick={() => void reloadProjects()}
-                disabled={loading || isReloading}
-              >
-                {isReloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Retry
-              </Button>
             </div>
           )}
 
           {/* Projects Grid */}
           {!loading && !error && (
             <div className="space-y-6">
-              {isReloading && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Refreshing projects...
-                </div>
-              )}
               {pendingAccessCount > 0 && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-4">
                   <div className="mb-3 flex items-center justify-between gap-2">
