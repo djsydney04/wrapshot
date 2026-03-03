@@ -262,7 +262,7 @@ export async function createProjectInvite(
   const supabase = await createClient();
   const normalizedEmail = email.trim().toLowerCase();
   void department;
-  const existingUserCheck = await checkUserExistsByEmail(normalizedEmail);
+  const existingUserCheck = await checkUserExistsByEmail(normalizedEmail, projectId);
 
   // Check if user is already a member
   if (existingUserCheck.exists && existingUserCheck.userId) {
@@ -665,7 +665,7 @@ export async function inviteUserToProject(
 
   // Check if user is already a member by email
   // First, check if there's a user with this email
-  const userCheck = await checkUserExistsByEmail(normalizedEmail);
+  const userCheck = await checkUserExistsByEmail(normalizedEmail, projectId);
 
   if (userCheck.exists && userCheck.userId) {
     // Check if already a member

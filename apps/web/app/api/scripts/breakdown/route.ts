@@ -11,6 +11,7 @@ import {
 } from "@/lib/scripts/scene-order";
 import { extractHeuristicScenesFromChunkText } from "@/lib/scripts/scene-heuristics";
 import { getScriptAnalysisApiKey } from "@/lib/ai/config";
+import { isTrustedSupabaseStorageUrl } from "@/lib/security/script-url";
 
 export interface ExtractedScene {
   scene_number: string;
@@ -292,11 +293,41 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { scriptId, fileUrl, fileName } = body;
+    const { scriptId, fileName } = body as {
+      scriptId?: string;
+      fileName?: string;
+    };
 
-    if (!scriptId || !fileUrl) {
+    if (!scriptId) {
       return NextResponse.json(
-        { error: "scriptId and fileUrl are required" },
+        { error: "scriptId is required" },
+        { status: 400 }
+      );
+    }
+
+    const { data: script, error: scriptError } = await supabase
+      .from("Script")
+      .select("id, fileUrl, fileName")
+      .eq("id", scriptId)
+      .single();
+
+    if (scriptError || !script) {
+      return NextResponse.json(
+        { error: "Script not found" },
+        { status: 404 }
+      );
+    }
+
+    if (!script.fileUrl) {
+      return NextResponse.json(
+        { error: "Script file URL is missing" },
+        { status: 400 }
+      );
+    }
+
+    if (!isTrustedSupabaseStorageUrl(script.fileUrl)) {
+      return NextResponse.json(
+        { error: "Script file URL is not from trusted storage" },
         { status: 400 }
       );
     }
@@ -317,12 +348,12 @@ export async function POST(request: Request) {
         breakdownStatus: "IN_PROGRESS",
         breakdownStartedAt: new Date().toISOString(),
       })
-      .eq("id", scriptId);
+      .eq("id", script.id);
 
     // Fetch the script file
     let scriptBuffer: Buffer;
     try {
-      const scriptResponse = await fetch(fileUrl);
+      const scriptResponse = await fetch(script.fileUrl);
       if (!scriptResponse.ok) {
         throw new Error(`Failed to fetch script file: ${scriptResponse.status}`);
       }
@@ -344,7 +375,10 @@ export async function POST(request: Request) {
     let scriptText: string;
     let pageCount: number;
     try {
-      const parsed = await parseScript(scriptBuffer, fileName || fileUrl);
+      const parsed = await parseScript(
+        scriptBuffer,
+        fileName || script.fileName || script.fileUrl
+      );
       scriptText = normalizeScriptText(parsed.text);
       pageCount = parsed.pageCount;
     } catch (parseError) {

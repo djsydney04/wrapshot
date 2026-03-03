@@ -5,11 +5,33 @@ import React from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getFullCallSheetDataForProject } from "@/lib/data/call-sheets";
 import { CallSheetPdf } from "@/lib/pdf/call-sheet-pdf";
+import { z } from "zod";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 let resend: Resend | null = null;
+
+const distributePayloadSchema = z.object({
+  recipients: z.array(
+    z.object({
+      name: z.string().trim().max(120).optional(),
+      email: z.string().trim().email().max(320),
+    }),
+  )
+    .min(1)
+    .max(50),
+});
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function getResend(): Resend {
   if (!resend) {
     if (!process.env.RESEND_API_KEY) {
@@ -37,28 +59,18 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { recipients } = body;
-
-    if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+    const parsedBody = distributePayloadSchema.safeParse(await request.json());
+    if (!parsedBody.success) {
       return NextResponse.json(
-        { error: "Recipients are required" },
+        { error: "Provide 1-50 valid recipient email addresses." },
         { status: 400 },
       );
     }
 
-    // Validate emails
-    const validRecipients = recipients.filter(
-      (r: { name: string; email: string }) =>
-        r.email && typeof r.email === "string",
-    );
-
-    if (validRecipients.length === 0) {
-      return NextResponse.json(
-        { error: "No valid email addresses" },
-        { status: 400 },
-      );
-    }
+    const validRecipients = parsedBody.data.recipients.map((recipient) => ({
+      name: recipient.name?.trim() || "there",
+      email: recipient.email.toLowerCase(),
+    }));
 
     // Get shooting day to find projectId
     const { data: shootingDay, error: sdError } = await supabase
@@ -95,6 +107,7 @@ export async function POST(
     const projectName = data.project?.name || "Production";
     const dayNum = data.shootingDay.dayNumber;
     const filename = `${projectName.replace(/[^a-zA-Z0-9]/g, "_")}_Day${dayNum}_CallSheet.pdf`;
+    const safeProjectName = escapeHtml(projectName);
 
     // Get sender's name
     const { data: profile } = await supabase
@@ -111,6 +124,7 @@ export async function POST(
       profile?.firstName ||
       user.email?.split("@")[0] ||
       "Production";
+    const safeSenderName = escapeHtml(senderName);
 
     // Format date for email subject
     let dateStr = "";
@@ -124,6 +138,13 @@ export async function POST(
     } catch {
       dateStr = data.shootingDay.date;
     }
+    const safeDateStr = escapeHtml(dateStr);
+    const safeGeneralCall = data.shootingDay.generalCall
+      ? escapeHtml(data.shootingDay.generalCall)
+      : null;
+    const safeEstimatedWrap = data.shootingDay.estimatedWrap
+      ? escapeHtml(data.shootingDay.estimatedWrap)
+      : null;
 
     // Send emails
     const emailPromises = validRecipients.map(
@@ -134,13 +155,13 @@ export async function POST(
           subject: `Call Sheet — ${projectName} Day ${dayNum} (${dateStr})`,
           html: `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <h2 style="margin: 0 0 8px 0;">${projectName}</h2>
-              <p style="margin: 0 0 16px 0; color: #666;">Call Sheet — Day ${dayNum} (${dateStr})</p>
-              <p style="margin: 0 0 16px 0;">Hi ${recipient.name},</p>
+              <h2 style="margin: 0 0 8px 0;">${safeProjectName}</h2>
+              <p style="margin: 0 0 16px 0; color: #666;">Call Sheet — Day ${dayNum} (${safeDateStr})</p>
+              <p style="margin: 0 0 16px 0;">Hi ${escapeHtml(recipient.name)},</p>
               <p style="margin: 0 0 16px 0;">Please find the call sheet for Day ${dayNum} attached.</p>
-              ${data.shootingDay.generalCall ? `<p style="margin: 0 0 4px 0;"><strong>General Call:</strong> ${data.shootingDay.generalCall}</p>` : ""}
-              ${data.shootingDay.estimatedWrap ? `<p style="margin: 0 0 16px 0;"><strong>Estimated Wrap:</strong> ${data.shootingDay.estimatedWrap}</p>` : ""}
-              <p style="margin: 16px 0 0 0; color: #999; font-size: 12px;">Sent by ${senderName} via wrapshoot</p>
+              ${safeGeneralCall ? `<p style="margin: 0 0 4px 0;"><strong>General Call:</strong> ${safeGeneralCall}</p>` : ""}
+              ${safeEstimatedWrap ? `<p style="margin: 0 0 16px 0;"><strong>Estimated Wrap:</strong> ${safeEstimatedWrap}</p>` : ""}
+              <p style="margin: 16px 0 0 0; color: #999; font-size: 12px;">Sent by ${safeSenderName} via wrapshoot</p>
             </div>
           `,
           attachments: [
