@@ -16,28 +16,12 @@ function getClampedProgress(progressPercent: number): number {
   return Math.max(0, Math.min(100, progressPercent));
 }
 
-function getRunningToastContent(job: AgentJob): React.ReactNode {
+function getRunningToastContent(job: AgentJob): string {
   const progress = getClampedProgress(job.progressPercent);
   const stepText =
     job.stepDescription || STEP_DEFINITIONS[job.status]?.description || "Processing";
 
-  return (
-    <div className="w-full min-w-0 space-y-2 pt-0.5">
-      <p className="text-xs leading-snug text-muted-foreground">{stepText}</p>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-        <div
-          className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground tabular-nums">
-        <span>
-          Step {Math.max(job.currentStep, 1)} of {Math.max(job.totalSteps, 1)}
-        </span>
-        <span>{progress}%</span>
-      </div>
-    </div>
-  );
+  return `${stepText} • Step ${Math.max(job.currentStep, 1)} of ${Math.max(job.totalSteps, 1)} (${progress}%)`;
 }
 
 function getCompletionDescription(job: AgentJob): string {
