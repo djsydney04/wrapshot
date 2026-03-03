@@ -454,7 +454,7 @@ function BasicInfoFields({ formData, setFormData, locations, error }: BasicInfoF
 
       <div>
         <label className="block text-sm font-medium mb-1.5">
-          Set / Location Name
+          Scene Heading
         </label>
         <Input
           value={formData.setName}
@@ -464,7 +464,7 @@ function BasicInfoFields({ formData, setFormData, locations, error }: BasicInfoF
           placeholder="e.g., JOHN'S APARTMENT - LIVING ROOM"
         />
         <p className="mt-1 text-xs text-muted-foreground">
-          If no location is selected, we&apos;ll auto-create one from this name.
+          If no location is selected, we&apos;ll auto-create one from this heading.
         </p>
       </div>
 
