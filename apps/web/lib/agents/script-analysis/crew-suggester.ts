@@ -151,6 +151,8 @@ const STUNT_AND_SAFETY_ADDITIONS: CrewMapping[] = [
   { role: 'Security Coordinator', department: 'PRODUCTION', priority: 'high' },
 ];
 
+const CREW_AUTO_CREATE_CONFIDENCE_THRESHOLD = 0.85;
+
 export async function executeCrewSuggester(
   context: AgentContext,
   tracker: ProgressTracker
@@ -170,7 +172,7 @@ export async function executeCrewSuggester(
 
     await tracker.updateProgress(0, suggestions.length, `Creating ${suggestions.length} crew suggestions...`);
 
-    // Save to database + auto-create crew members so suggestions are immediately actionable.
+    // Save to database + auto-create only high-confidence crew placeholders.
     const supabase = createAdminClient();
     const { data: existingCrew } = await supabase
       .from('CrewMember')
@@ -186,9 +188,10 @@ export async function executeCrewSuggester(
     const records = [];
     for (const suggestion of suggestions) {
       const roleKey = `${suggestion.department}::${suggestion.role.toLowerCase().trim()}`;
-      let crewMemberId = crewByRoleDepartment.get(roleKey) || null;
+      const shouldAutoCreate = suggestion.confidence >= CREW_AUTO_CREATE_CONFIDENCE_THRESHOLD;
+      let crewMemberId = shouldAutoCreate ? (crewByRoleDepartment.get(roleKey) || null) : null;
 
-      if (!crewMemberId) {
+      if (shouldAutoCreate && !crewMemberId) {
         const { data: newCrewMember, error: crewError } = await supabase
           .from('CrewMember')
           .insert({
@@ -212,14 +215,20 @@ export async function executeCrewSuggester(
         jobId: context.jobId,
         role: suggestion.role,
         department: suggestion.department,
-        reason: suggestion.reason,
+        reason: `${suggestion.reason} (confidence ${suggestion.confidence.toFixed(2)})`,
         priority: suggestion.priority,
+        confidence: suggestion.confidence,
         accepted: crewMemberId ? true : null,
         crewMemberId,
       });
     }
 
-    const { error } = await supabase.from('CrewSuggestion').insert(records);
+    let { error } = await supabase.from('CrewSuggestion').insert(records);
+    if (error && /confidence/i.test(error.message || '')) {
+      const fallbackRecords = records.map(({ confidence, ...record }) => record);
+      const fallbackResult = await supabase.from('CrewSuggestion').insert(fallbackRecords);
+      error = fallbackResult.error;
+    }
 
     if (error) {
       console.error('[CrewSuggester] Failed to save suggestions:', error);
@@ -281,6 +290,7 @@ function generateCrewSuggestions(context: AgentContext): SuggestedCrewRole[] {
           department: mapping.department,
           reason,
           priority,
+          confidence: calculateSuggestionConfidence(priority, count, category),
         },
         true
       );
@@ -299,6 +309,7 @@ function generateCrewSuggestions(context: AgentContext): SuggestedCrewRole[] {
         department: 'LOCATIONS',
         reason: `Script has ${exteriorScenes.length} exterior scenes requiring location management`,
         priority: 'high',
+        confidence: clamp(0.82 + Math.min(0.12, exteriorScenes.length * 0.01), 0.1, 0.98),
       },
       true
     );
@@ -340,6 +351,7 @@ function upsertSuggestion(
     suggestions.set(key, {
       ...suggestion,
       priority: existing.priority,
+      confidence: Math.max(existing.confidence, suggestion.confidence),
     });
   }
 }
@@ -383,6 +395,7 @@ function addBaselineCrewSuggestions(
       department: template.department,
       priority: template.priority,
       reason: baselineReason,
+      confidence: calculateSuggestionConfidence(template.priority, 1, 'BASELINE'),
     });
   }
 
@@ -393,6 +406,7 @@ function addBaselineCrewSuggestions(
         department: template.department,
         priority: template.priority,
         reason: 'Script complexity indicates a larger-unit production team',
+        confidence: calculateSuggestionConfidence(template.priority, 2, 'LARGE_SCOPE'),
       });
     }
   }
@@ -409,7 +423,42 @@ function addBaselineCrewSuggestions(
         department: template.department,
         priority: template.priority,
         reason: 'Stunt/safety indicators in script require dedicated safety and security coverage',
+        confidence: calculateSuggestionConfidence(template.priority, 3, 'SAFETY'),
       });
     }
   }
+}
+
+function calculateSuggestionConfidence(
+  priority: CrewPriority,
+  evidenceCount: number,
+  category: string
+): number {
+  const baseByPriority: Record<CrewPriority, number> = {
+    high: 0.79,
+    medium: 0.7,
+    low: 0.62,
+  };
+
+  const highSignalCategories = new Set([
+    'STUNT',
+    'VFX',
+    'SFX',
+    'ANIMAL',
+    'ANIMAL_WRANGLER',
+    'MECHANICAL_EFFECTS',
+    'SAFETY',
+  ]);
+
+  let confidence = baseByPriority[priority];
+  confidence += Math.min(0.14, Math.max(0, evidenceCount - 1) * 0.02);
+  if (highSignalCategories.has(category)) {
+    confidence += 0.05;
+  }
+
+  return clamp(confidence, 0.1, 0.98);
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }

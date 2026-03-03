@@ -20,6 +20,7 @@ interface SceneRecord {
   locationId: string | null;
   setName: string;
   synopsis: string | null;
+  notes: string | null;
   scriptPageStart: number | null;
   scriptPageEnd: number | null;
   pageEighths: number | null;
@@ -97,6 +98,30 @@ function buildElementKey(category: string, name: string): string {
   return `${normalizeElementCategoryForStorage(category)}-${normalizeElementNameKey(name)}`;
 }
 
+function determineBreakdownStatus(scene: ExtractedScene): 'COMPLETED' | 'NEEDS_REVIEW' {
+  const confidence = typeof scene.confidence === 'number' ? scene.confidence : 0.5;
+  const hasWarnings = (scene.warnings?.length || 0) > 0;
+  const missingSynopsis = !scene.synopsis || scene.synopsis.trim().length < 12;
+  return confidence < 0.6 || hasWarnings || missingSynopsis ? 'NEEDS_REVIEW' : 'COMPLETED';
+}
+
+function buildSceneWarningNotes(scene: ExtractedScene): string | null {
+  const warnings = scene.warnings || [];
+  const evidence = (scene.analysisEvidence || []).slice(0, 2);
+  if (warnings.length === 0 && evidence.length === 0) {
+    return null;
+  }
+
+  const notes: string[] = [];
+  if (warnings.length > 0) {
+    notes.push(`AI warnings: ${warnings.join(', ')}`);
+  }
+  if (evidence.length > 0) {
+    notes.push(`AI evidence: ${evidence.join(' | ')}`);
+  }
+  return notes.join('\n');
+}
+
 export async function executeSceneCreator(
   context: AgentContext,
   tracker: ProgressTracker
@@ -121,7 +146,7 @@ export async function executeSceneCreator(
   // Get existing scenes to avoid duplicates
   const { data: existingScenes } = await supabase
     .from('Scene')
-    .select('id, sceneNumber, sortOrder')
+    .select('id, sceneNumber, sortOrder, synopsis, notes, breakdownStatus')
     .eq('projectId', context.projectId);
 
   const existingSceneNumbers = new Set(
@@ -147,8 +172,19 @@ export async function executeSceneCreator(
   );
 
   const sceneIdMap = new Map<string, string>(); // normalized sceneNumber -> sceneId
+  const existingSceneByKey = new Map<
+    string,
+    { id: string; synopsis: string | null; notes: string | null; breakdownStatus: string | null }
+  >();
   for (const existingScene of existingScenes || []) {
-    sceneIdMap.set(normalizeSceneNumberKey(existingScene.sceneNumber), existingScene.id);
+    const key = normalizeSceneNumberKey(existingScene.sceneNumber);
+    sceneIdMap.set(key, existingScene.id);
+    existingSceneByKey.set(key, {
+      id: existingScene.id,
+      synopsis: existingScene.synopsis ?? null,
+      notes: existingScene.notes ?? null,
+      breakdownStatus: existingScene.breakdownStatus ?? null,
+    });
   }
 
   // Build or create locations from scene set names so location tracking stays in sync.
@@ -216,13 +252,14 @@ export async function executeSceneCreator(
       locationId: sceneLocationByNumber.get(scene.sceneNumber) || null,
       setName: scene.setName,
       synopsis: scene.synopsis || null,
+      notes: buildSceneWarningNotes(scene),
       scriptPageStart: scene.scriptPageStart || null,
       scriptPageEnd: scene.scriptPageEnd || null,
       pageEighths: scene.pageLengthEighths || null,
       estimatedHours: scene.estimatedHours || null,
       sortOrder: maxSortOrder + i + 1,
       status: 'NOT_SCHEDULED',
-      breakdownStatus: 'COMPLETED',
+      breakdownStatus: determineBreakdownStatus(scene),
       createdAt: new Date().toISOString(),
     });
   }
@@ -244,6 +281,49 @@ export async function executeSceneCreator(
     console.log(`[SceneCreator] Created ${sceneRecords.length} scenes`);
   } else {
     console.log('[SceneCreator] All scenes already exist; skipping scene creation');
+  }
+
+  // Backfill existing scenes with improved synopsis/review warnings when available.
+  const existingSceneUpdates = context.extractedScenes
+    .flatMap((scene) => {
+      const key = normalizeSceneNumberKey(scene.sceneNumber);
+      const existing = existingSceneByKey.get(key);
+      if (!existing) return [];
+
+      const synopsis = scene.synopsis?.trim() || null;
+      const notes = buildSceneWarningNotes(scene);
+      const breakdownStatus = determineBreakdownStatus(scene);
+      const shouldUpdateSynopsis = synopsis && !existing.synopsis;
+      const shouldUpdateNotes = notes !== (existing.notes || null);
+      const shouldUpdateStatus = breakdownStatus !== (existing.breakdownStatus || null);
+
+      if (!shouldUpdateSynopsis && !shouldUpdateNotes && !shouldUpdateStatus) {
+        return [];
+      }
+
+      return [{
+        id: existing.id,
+        synopsis: shouldUpdateSynopsis ? synopsis : existing.synopsis,
+        notes,
+        breakdownStatus,
+        updatedAt: new Date().toISOString(),
+      }];
+    });
+
+  for (const update of existingSceneUpdates) {
+    const { error: updateError } = await supabase
+      .from('Scene')
+      .update({
+        synopsis: update.synopsis,
+        notes: update.notes,
+        breakdownStatus: update.breakdownStatus,
+        updatedAt: update.updatedAt,
+      })
+      .eq('id', update.id);
+
+    if (updateError) {
+      console.warn('[SceneCreator] Failed to update existing scene metadata:', updateError.message);
+    }
   }
 
   context.createdSceneIds = sceneRecords.map(s => s.id);
@@ -339,7 +419,7 @@ export async function executeSceneCreator(
   // Create scene-cast links
   const sceneCastRecords: SceneCastMemberRecord[] = [];
 
-  for (const scene of newScenes) {
+  for (const scene of context.extractedScenes) {
     const sceneId = sceneIdMap.get(normalizeSceneNumberKey(scene.sceneNumber));
     if (!sceneId) continue;
 
