@@ -44,6 +44,9 @@ const SCRIPT_ANALYSIS_STEPS: Array<{
 ];
 
 export class ScriptAnalysisAgent {
+  private static readonly MAX_AUTO_RESUME_ATTEMPTS = 2;
+  private static readonly RETRY_BASE_DELAY_MS = 1500;
+
   private jobId: string;
   private projectId: string;
   private scriptId: string;
@@ -60,23 +63,89 @@ export class ScriptAnalysisAgent {
    * Run the full script analysis pipeline
    */
   async run(): Promise<AgentJobResult> {
-    // Initialize context
-    const context = AgentOrchestrator.initContext(
+    const initialContext = AgentOrchestrator.initContext(
       this.jobId,
       this.projectId,
       this.scriptId,
       this.userId
     );
 
-    // Create and run orchestrator with all steps including database creation
-    const orchestrator = AgentOrchestrator.create(
-      this.jobId,
-      context,
-      SCRIPT_ANALYSIS_STEPS
+    let context = initialContext;
+    let resumeStep = 0;
+    let attempt = 0;
+    let lastError: unknown;
+
+    while (attempt <= ScriptAnalysisAgent.MAX_AUTO_RESUME_ATTEMPTS) {
+      try {
+        const orchestrator = AgentOrchestrator.create(
+          this.jobId,
+          context,
+          SCRIPT_ANALYSIS_STEPS
+        );
+
+        if (attempt === 0 || resumeStep <= 0) {
+          return await orchestrator.run();
+        }
+
+        return await orchestrator.resumeFrom(resumeStep);
+      } catch (error) {
+        lastError = error;
+
+        if (attempt >= ScriptAnalysisAgent.MAX_AUTO_RESUME_ATTEMPTS) {
+          break;
+        }
+
+        const recoveryState = await this.getRecoveryState();
+        if (!recoveryState) {
+          break;
+        }
+
+        attempt += 1;
+        context = recoveryState.context;
+        resumeStep = recoveryState.nextStep;
+
+        const backoffMs = ScriptAnalysisAgent.RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        console.warn(
+          `[ScriptAnalysisAgent] Job ${this.jobId} failed, auto-resuming from step ${resumeStep + 1} (attempt ${attempt}/${ScriptAnalysisAgent.MAX_AUTO_RESUME_ATTEMPTS})`
+        );
+        await this.wait(backoffMs);
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
+
+  private async getRecoveryState(): Promise<{
+    context: AgentContext;
+    nextStep: number;
+  } | null> {
+    const job = await JobManager.getJob(this.jobId);
+    if (!job || job.status === 'cancelled' || !job.context) {
+      return null;
+    }
+
+    const details = job.errorDetails as { lastSuccessfulStep?: unknown } | null;
+    const fromErrorDetails =
+      details && typeof details.lastSuccessfulStep === 'number'
+        ? details.lastSuccessfulStep + 1
+        : null;
+    const fromCurrentStep = typeof job.currentStep === 'number' && job.currentStep > 0
+      ? job.currentStep - 1
+      : 0;
+
+    const nextStep = Math.min(
+      Math.max(fromErrorDetails ?? fromCurrentStep, 0),
+      SCRIPT_ANALYSIS_STEPS.length - 1
     );
 
-    // Run all steps including final database record creation
-    return await orchestrator.run();
+    return {
+      context: job.context,
+      nextStep,
+    };
+  }
+
+  private async wait(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
