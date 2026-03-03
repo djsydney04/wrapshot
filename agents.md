@@ -24,6 +24,10 @@ This document defines the software engineering best practices that all AI coding
 
 ## Code Quality & Standards
 
+##IMPORTANT##
+
+Please push all pull requests to the Staging branch and run all of the tests and checks in the .github/workflows/mobile-ci.yml for mobile updates and .github/workflows/web-ci.yml for web updates
+
 ### General Principles
 
 - **DRY (Don't Repeat Yourself)**: Extract repeated logic into reusable functions, hooks, or components

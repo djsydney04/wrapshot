@@ -39,6 +39,7 @@ Smart film production scheduling and management platform designed to help modern
 
 ### Build Tools
 - **Monorepo**: Turbo 2.8 + npm workspaces
+- **Mobile**: Expo + React Native
 - **Node**: 18+ required
 
 ---
@@ -194,6 +195,10 @@ Open [http://localhost:3000](http://localhost:3000) and sign up for an account.
 ```
 ProdAI/
 ├── apps/
+│   ├── mobile/                       # Expo React Native app
+│   │   ├── App.tsx                   # Mobile shell and first screen
+│   │   ├── app.json                  # Expo app config
+│   │   └── package.json              # Mobile workspace scripts/deps
 │   └── web/                          # Next.js 16 application
 │       ├── app/
 │       │   ├── (app)/                # Protected routes (require auth)
@@ -395,10 +400,18 @@ FIREWORKS_API_KEY=fw_...
 
 ```bash
 # Development
-npm run dev              # Start dev server (port 3000)
+npm run dev              # Start default app (web)
+npm run dev:web          # Start web dev server (port 3000)
+npm run dev:mobile       # Start Expo dev server
 npm run build            # Build for production
+npm run build:web        # Build web only
+npm run build:mobile     # Build mobile export only
 npm run lint             # Run ESLint
+npm run lint:web         # Lint web only
+npm run lint:mobile      # Lint mobile only
 npm run typecheck        # TypeScript checking
+npm run typecheck:web    # Typecheck web only
+npm run typecheck:mobile # Typecheck mobile only
 
 # Database
 npm run db:generate      # Generate Prisma client
@@ -419,6 +432,7 @@ npm run test:e2e         # Run end-to-end tests
 ## Documentation
 
 - [docs/README.md](./docs/README.md) - Documentation overview
+- [docs/monorepo.md](./docs/monorepo.md) - Workspace structure and CI boundaries
 - [docs/codebase.md](./docs/codebase.md) - Codebase guide
 - [docs/architecture.md](./docs/architecture.md) - Architecture details
 - [docs/setup.md](./docs/setup.md) - Setup instructions

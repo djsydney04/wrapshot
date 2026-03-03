@@ -214,7 +214,7 @@ export function ProjectAssistantChat({
   return (
     <div
       className={cn(
-        "flex h-full min-h-[420px] flex-col rounded-2xl border border-border bg-card/95",
+        "flex h-[78dvh] min-h-[520px] w-full flex-col overflow-hidden rounded-2xl border border-border bg-card/95",
         className,
       )}
     >
@@ -312,10 +312,12 @@ export function ProjectAssistantChat({
                         >
                           <span>{formatMessageTime(message.createdAt)}</span>
                           {isAssistant && (
-                            <button
+                            <Button
                               type="button"
+                              variant="ghost"
+                              size="sm"
                               onClick={() => void handleCopyMessage(message)}
-                              className="inline-flex items-center gap-1 rounded-sm px-1 py-0.5 hover:bg-background/70"
+                              className="h-6 gap-1 rounded-sm px-1.5 text-[11px]"
                             >
                               {copiedMessageId === message.id ? (
                                 <>
@@ -328,7 +330,7 @@ export function ProjectAssistantChat({
                                   Copy
                                 </>
                               )}
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </div>
@@ -352,7 +354,7 @@ export function ProjectAssistantChat({
             </div>
           </div>
 
-          <div className="border-t border-border px-5 py-3 sm:px-6 sm:py-4">
+          <div className="shrink-0 border-t border-border px-5 py-3 sm:px-6 sm:py-4">
             <div className="relative">
               <Textarea
                 ref={composerRef}
@@ -397,13 +399,16 @@ export function ProjectAssistantChat({
           </p>
           <div className="mt-3 space-y-2">
             {QUICK_PROMPTS.map((prompt) => (
-              <button
+              <Button
                 key={prompt}
+                type="button"
+                variant="skeuo-outline"
+                size="sm"
                 onClick={() => setQuery(prompt)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-left text-xs transition-colors hover:bg-muted/50"
+                className="h-auto w-full justify-start whitespace-normal px-3 py-2 text-left text-xs"
               >
                 {prompt}
-              </button>
+              </Button>
             ))}
           </div>
           <div className="mt-6 rounded-lg border border-border bg-muted/30 px-3 py-3">
