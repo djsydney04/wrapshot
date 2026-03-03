@@ -19,10 +19,8 @@ import {
   DollarSign,
   Settings,
   ClipboardList,
-  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 
 export type ProjectSection =
   | "dashboard"
@@ -62,12 +60,6 @@ interface SidebarGroup {
 interface ProjectSidebarProps {
   activeSection: ProjectSection;
   onSectionChange: (section: ProjectSection) => void;
-  workflow?: {
-    id: string;
-    label: string;
-    section: ProjectSection;
-    status: "done" | "current" | "upcoming";
-  }[];
   counts: {
     scenes: number;
     tasks?: number;
@@ -93,7 +85,6 @@ const CORE_WORKFLOW_SECTIONS: ProjectSection[] = [
 export function ProjectSidebar({
   activeSection,
   onSectionChange,
-  workflow,
   counts,
   className,
 }: ProjectSidebarProps) {
@@ -344,32 +335,49 @@ export function ProjectSidebar({
                     )}
                     <button
                       type="button"
-                      onClick={() => onSectionChange(step.section)}
+                      disabled={item.disabled || !item.id}
+                      onClick={() => item.id && onSectionChange(item.id)}
                       className={cn(
-                        "flex w-full items-center gap-2 rounded-md border border-transparent px-1.5 py-1 text-left text-xs transition-colors",
+                        "group w-full rounded-md border border-transparent px-2 py-1.5 text-sm transition-all",
                         isActive
-                          ? "skeuo-pressed"
-                          : "text-muted-foreground hover:border-border/70 hover:bg-muted/40 hover:text-foreground"
+                          ? "skeuo-pressed text-foreground"
+                          : "text-muted-foreground hover:border-border/60 hover:bg-muted/50 hover:text-foreground",
+                        (item.disabled || !item.id) &&
+                          "cursor-not-allowed opacity-65 hover:border-transparent hover:bg-transparent hover:text-muted-foreground"
                       )}
                     >
-                      <span
-                        className={cn(
-                          "inline-flex h-5 w-5 items-center justify-center rounded-[6px] text-[10px] font-semibold tabular-nums",
-                          statusClass
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "flex h-6 w-6 items-center justify-center rounded-md",
+                            isActive
+                              ? "skeuo-chip border-border/90 bg-card text-foreground"
+                              : "bg-muted/80 text-muted-foreground group-hover:text-foreground",
+                            (item.disabled || !item.id) &&
+                              "bg-muted/55 text-muted-foreground"
+                          )}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="flex-1 text-left">{item.label}</span>
+                        {item.count !== undefined && item.count > 0 && (
+                          <span
+                            className={cn(
+                              "rounded-sm px-1.5 py-0.5 text-[11px] leading-none tabular-nums",
+                              isActive
+                                ? "bg-foreground/10 text-foreground"
+                                : "bg-muted text-muted-foreground"
+                            )}
+                          >
+                            {item.count}
+                          </span>
                         )}
-                      >
-                        {index + 1}
+                        {item.badge && (
+                          <span className="rounded-sm border border-border/70 bg-card/70 px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground">
+                            {item.badge}
+                          </span>
+                        )}
                       </span>
-                      <span className="flex-1 truncate font-medium">{step.label}</span>
-                      {step.status === "done" ? (
-                        <span className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-                          Done
-                        </span>
-                      ) : step.status === "current" ? (
-                        <span className="text-[10px] uppercase tracking-[0.08em] text-foreground">
-                          Next
-                        </span>
-                      ) : null}
                     </button>
                   </li>
                 );
