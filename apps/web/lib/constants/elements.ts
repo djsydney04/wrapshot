@@ -52,7 +52,7 @@ export const DB_COMPATIBLE_ELEMENT_CATEGORIES = [
 
 export type DbElementCategory = (typeof DB_COMPATIBLE_ELEMENT_CATEGORIES)[number];
 
-const EXTENDED_TO_DB_CATEGORY_MAP: Partial<Record<ElementCategory, DbElementCategory>> = {
+const EXTENDED_TO_DB_CATEGORY_MAP: Record<string, DbElementCategory> = {
   NAME: "OTHER",
   CAMERA: "SPECIAL_EQUIPMENT",
   GRIP: "SPECIAL_EQUIPMENT",
@@ -68,6 +68,9 @@ const EXTENDED_TO_DB_CATEGORY_MAP: Partial<Record<ElementCategory, DbElementCate
   QUESTIONS: "OTHER",
   COMMENTS: "OTHER",
   MISCELLANEOUS: "OTHER",
+  PROPS: "PROP",
+  COSTUME: "WARDROBE",
+  COSTUMES: "WARDROBE",
 };
 
 /**
@@ -77,7 +80,7 @@ const EXTENDED_TO_DB_CATEGORY_MAP: Partial<Record<ElementCategory, DbElementCate
 export function normalizeElementCategoryForStorage(
   category: ElementCategory | string
 ): DbElementCategory {
-  const upper = String(category || "").toUpperCase().trim() as ElementCategory;
+  const upper = String(category || "").toUpperCase().trim() as ElementCategory | keyof typeof EXTENDED_TO_DB_CATEGORY_MAP;
 
   if (
     (DB_COMPATIBLE_ELEMENT_CATEGORIES as readonly string[]).includes(upper)

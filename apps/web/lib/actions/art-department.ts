@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserId } from "@/lib/permissions/server";
 import { createBudgetLineItem } from "@/lib/actions/budget-line-items";
+import { normalizeElementCategoryForStorage } from "@/lib/constants/elements";
 import { syncDayDependenciesToCallSheet } from "@/lib/actions/departments-readiness";
 import type { DepartmentDayDependency } from "@/lib/actions/departments-readiness";
 import {
@@ -45,6 +46,11 @@ const ART_SCENE_ELEMENT_CATEGORIES = new Set([
   "WARDROBE",
   "GREENERY",
 ]);
+
+function isArtSceneElementCategory(category: string | null | undefined): boolean {
+  const normalized = normalizeElementCategoryForStorage(String(category || ""));
+  return ART_SCENE_ELEMENT_CATEGORIES.has(normalized);
+}
 
 export type ArtPullListStatus = "DRAFT" | "ACTIVE" | "WRAPPED";
 export type ArtPullSource = "STOCK" | "RENTAL" | "PURCHASE" | "BORROW" | "BUILD";
@@ -1462,7 +1468,7 @@ export async function createArtPullListFromScene(input: {
     const element = row.element as { name: string; category: string } | { name: string; category: string }[] | null;
     const normalized = Array.isArray(element) ? element[0] : element;
     if (!normalized) return false;
-    return ART_SCENE_ELEMENT_CATEGORIES.has(normalized.category);
+    return isArtSceneElementCategory(normalized.category);
   });
 
   if (artRows.length === 0) {
