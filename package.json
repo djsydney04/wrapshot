@@ -38,7 +38,7 @@
     "@testing-library/user-event": "^14.5.2",
     "jsdom": "^25.0.1",
     "prettier": "^3.2.5",
-    "supabase": "^2.76.15",
+    "supabase": "^2.76.17",
     "turbo": "^2.7.4",
     "typescript": "^5.7.2",
     "vitest": "^4.0.18"
